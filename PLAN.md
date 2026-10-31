@@ -42,7 +42,7 @@ License: GPL-3.0-only (`LICENSE`).
 | 3.3 V → 5 V outputs | 74AHCT125, VCC = target VDD | BKPT/DSCLK, DSI; series 47–100 Ω; OE tristates |
 | AHCT125 OE pull-up | 10 kΩ to target VDD | Outputs tristated while the pod is unpowered or booting |
 | 3.3 V → 5 V outputs, spare | 74AHCT125, 2 channels | Unused; inputs tied to GND |
-| 5 V → 3.3 V inputs | 74LVC125, VCC = 3.3 V | IPIPE/DSO, FREEZE, RESET sense, DS; 5 V tolerant inputs, Ioff. IPIPE is pin 10 outside BDM, so its channel reads both |
+| 5 V → 3.3 V inputs | 74LVC125, VCC = 3.3 V | IPIPE/DSO, FREEZE, RESET sense, DS; inputs to 5.5 V at any VCC. IPIPE is pin 10 outside BDM, so its channel reads both |
 | RESET drive | 2N7002, open-drain | Target also drives RESET; sense separately |
 | BERR drive | 2N7002, open-drain | Abort hung bus cycles |
 | 2N7002 gate pull-downs | 100 kΩ to GND | RESET and BERR not asserted while the pod is unpowered or booting |
@@ -53,12 +53,18 @@ Board: a 2-layer carrier with the translators and the BDM header; the
 Pico plugs in. A custom RP2040 PCB only if the carrier proves too
 bulky.
 
-Translators stay on either Pico: the RP2350's 5 V tolerance
-holds only while IOVDD is powered, and the pod must sit harmlessly on
-a running target while unpowered.
+Translators stay on either Pico: the RP2350's GPIOs are "5 V-tolerant
+(powered) and 3.3 V-failsafe (unpowered)" (RP2350 datasheet, chapter 1
+features), and the pod must sit harmlessly on a running target while
+unpowered.
 
-Check in the 74AHCT125 datasheet: inputs driven to 3.3 V with VCC = 0
-(target off, pod on) are within ratings (no input clamp to VCC).
+Unpowered sides (TI datasheets in `third_party/ti/`):
+- Target off, pod on: 74AHCT125 inputs at 3.3 V with VCC = 0 are within
+  ratings: VI to 7 V at any VCC, clamp only below 0 V (SCLS264R, 5.1).
+- Pod off, target on: 74LVC125A inputs at 5 V with VCC = 0 are within
+  ratings: VI to 6.5 V, 5.5 V recommended, at any VCC (SCAS290T, 5.1,
+  5.3).  Its outputs face the unpowered Pico; no Ioff is specified,
+  and none is needed with both sides off.
 
 **Gotcha:** pin 8 is IFETCH (an output) when the CPU is not in BDM. Keep the DSI driver tristated until FREEZE is asserted.
 
@@ -67,26 +73,35 @@ Check in the 74AHCT125 datasheet: inputs driven to 3.3 V with VCC = 0
 ## Protocol summary
 
 - BKPT/DSCLK idles **high**. Low while running requests a halt.
-- **Enter BDM from reset:** BKPT low → pulse RESET → release RESET → wait for FREEZE → release BKPT.
-- **Halt:** BKPT low → wait for FREEZE → release BKPT.
-- **Transfer:** 17 bits, MSB first, full duplex. The target latches DSI on the DSCLK rising edge and updates DSO after it. The host samples DSO while DSCLK is low. Edge timing: verify against CPU32RM.
-- CPU32 synchronizes DSCLK to its system clock, so each phase must last several CLKOUT periods. Start at 500 kHz–1 MHz.
+- **Enable BDM:** BKPT low at the rising edge of RESET; BDM stays enabled until the next reset. BKPT low at least 2 clocks before RESET negates (MC68331UM 5.10.2.1).
+- **Enter BDM from reset:** BKPT low → pulse RESET → release RESET → wait for FREEZE.
+- **Halt:** BKPT low → wait for FREEZE.
+- **BKPT stays low after FREEZE.** The CPU takes each DSCLK rising edge as a bit, so a separate release would be a spurious clock. The first transfer's first rising edge releases it, as CPU32RM's sample circuit does (7.2.7.2, Figures 7-8, 7-9). DSCLK is left high after the last bit of each transfer, so the prefetch at the end of a session is not tagged.
+- **First command after entry:** RSREG ATEMP, which holds the entry source and which later commands overwrite (MC68331UM 5.10.2.3, Table 5-4).
+- **Transfer:** 17 bits, MSB first, full duplex. The CPU acts only on DSCLK rising edges, synchronized to CLKOUT: it takes DSI, then half a CLKOUT later puts the next bit on DSO, which need not stay stable until the falling edge (CPU32RM 7.2.7.1). The host changes DSI after the falling edge and samples DSO at the end of the low phase, just before the next rise. MC68331UM 5.10.2.7's "transitions on the falling edge" is the host's side; CPU32RM governs.
+- **DSI hold:** without a clock shared with the target, at least one CLKOUT period after the DSCLK rise (CPU32RM 7.2.7.1). DSI changes only at the next fall, a whole high phase later.
+- **Timing** (MC68331UM Table A-7): DSCLK from DC to half the system clock; cycle ≥ 2 tcyc, low ≥ 1 tcyc; DSI setup 15 ns, hold 10 ns; DSO delay ≤ 25 ns. At 16.78 MHz that is ≤ 8.39 MHz; start at 1 MHz and raise it (Bring-up checklist).
+- **Blocks:** DUMP follows a READ, which sets the address; FILL follows a WRITE (MC68331UM Table 5-5).
 
-Response bit 16:
+Response bit 16 (MC68331UM Table 5-6):
 
 | Bit 16 | Data   | Meaning |
 |--------|--------|---------|
 | 0      | xxxx   | Valid data |
+| 0      | FFFF   | Command complete; status OK |
 | 1      | 0000   | Not ready; clock NOP and retry |
 | 1      | 0001   | BERR-terminated bus cycle |
 | 1      | FFFF   | Illegal command |
 
-Core opcodes (b/w/l; **verify against CPU32RM**):
+Opcodes (b/w/l), CPU32RM 7.2.8.4–7.2.8.15.  RSREG's figure there
+(7.2.8.6) prints `0x2480`, the same as WSREG's: a misprint.  `0x2580`
+is from Pisa's driver documentation (References) and is checked on
+silicon at bring-up (RSREG ATEMP after entry).
 
 | Command | Opcode |
 |---|---|
-| RREG (D0–D7 = 0–7, A0–A7 = 8–F) | `0x2180 \| r` |
-| WREG | `0x2080 \| r` |
+| RDREG/RAREG (D0–D7 = 0–7, A0–A7 = 8–F) | `0x2180 \| r` |
+| WDREG/WAREG | `0x2080 \| r` |
 | RSREG | `0x2580 \| s` |
 | WSREG | `0x2480 \| s` |
 | READ | `0x1900` / `0x1940` / `0x1980` |
@@ -97,6 +112,12 @@ Core opcodes (b/w/l; **verify against CPU32RM**):
 | CALL | `0x0800` |
 | RST | `0x0400` |
 | NOP | `0x0000` |
+
+System register select codes `s` (CPU32RM 7.2.8.6): RPC 0, PCC 1,
+ATEMP 8, FAR 9, VBR A, SR B, USP C, SSP D, SFC E, DFC F.
+
+DUMP and FILL are valid only after a READ/DUMP or WRITE/FILL; NOP pads
+between them without losing the address (CPU32RM 7.2.8.10, 7.2.8.11).
 
 ---
 
@@ -109,9 +130,9 @@ Core opcodes (b/w/l; **verify against CPU32RM**):
     pull block               ; word << 15 (left-justified)
     set x, 16
 bit:
-    out pins, 1     side 0 [3]   ; DSCLK low, drive DSI
-    in  pins, 1            [3]   ; sample DSO mid-low
-    jmp x-- bit     side 1 [7]   ; DSCLK high: target latches DSI, shifts DSO
+    out pins, 1     side 0 [6]   ; DSCLK low: drive DSI
+    in  pins, 1                  ; sample DSO at the end of the low phase
+    jmp x-- bit     side 1 [7]   ; DSCLK rises: target takes DSI, then shifts DSO
     push block               ; 17 bits, right-justified
 .wrap
 ```
@@ -121,6 +142,12 @@ Config: out and in shift left, no autopull/autopush. `out` base = DSI,
 
 - Each phase is 8 PIO cycles, so DSCLK = PIO clock / 16; set it with
   clkdiv.  `[7]` is the most delay `.side_set 1 opt` leaves (3 bits).
+- DSO is sampled one PIO cycle before DSCLK rises, 15 after the
+  previous rise: the target's synchronizer (about 1.5 CLKOUT), its DSO
+  delay and both translators' delays must fit in those 15.  At 1 MHz
+  DSCLK that is 937 ns.
+- After a halt DSCLK is already low, so the first `out ... side 0`
+  keeps it low and the first rise is the release (Protocol summary).
 - Between words DSCLK stays high (last side-set) for the `push`,
   `pull` and `set` cycles plus any FIFO wait; the high phase only
   grows, which CPU32 allows.
@@ -158,8 +185,8 @@ m683xx-pod/
 ## Firmware (Pico / Pico 2)
 
 Embassy (`embassy-rp`, `embassy-usb`, PIO through `embassy_rp::pio`).
-A Cargo feature picks the chip: `rp2040` (thumbv6m-none-eabi) or
-`rp235xa` (thumbv8m.main-none-eabihf).
+A Cargo feature picks the chip: `rp2040` (thumbv6m-none-eabi, the
+default) or `rp235xa` (thumbv8m.main-none-eabihf).
 Reasons: async USB and PIO FIFO waits without a hand-written state
 machine; `embassy-usb` vendor class; matches the async rules in
 `AGENTS.md`.
@@ -168,8 +195,8 @@ USB vendor class, bulk endpoints. Commands:
 
 - `xfer(words[]) -> words[]`: raw 17-bit transfers, for bring-up.
 - `reset_bdm`, `halt`, `go`, `pins` (FREEZE, RESET, DS, IPIPE, VDD).
-- `read_mem(addr, len, size)` / `write_mem(addr, data, size)`: loop
-  DUMP/FILL on-chip.
+- `read_mem(addr, len, size)` / `write_mem(addr, data, size)`: READ
+  then DUMP, WRITE then FILL, on-chip.
 - `set_clock(hz)`.
 
 Handle not-ready retries in firmware; report BERR and illegal-command
@@ -200,8 +227,9 @@ USB command reports the high-water mark.
 - [ ] PIO loopback: scope DSCLK/DSI, verify 17-bit framing and
       idle-high
 - [ ] Reset into BDM; confirm FREEZE asserts
+- [ ] RSREG ATEMP first (`0x2588`): confirms RSREG's `0x2580`
 - [ ] NOP / not-ready handling
-- [ ] RREG D0; RSREG PC
+- [ ] RDREG D0; RSREG RPC
 - [ ] Read SIMCR (0xFFFA00) and other SIM regs; compare to reset
       values
 - [ ] Write chip-select init; read/write external RAM
@@ -214,13 +242,19 @@ USB command reports the high-water mark.
 
 ## Open questions
 
-- Exact DSCLK max vs. CLKOUT, and DSI setup/hold / DSO update edge:
-  confirm in CPU32RM.
+- RSREG `0x2580` on silicon (Protocol summary).
 
 ## References
 
-- Motorola CPU32 Reference Manual (CPU32RM/AD), BDM section
-- MC68331 User's Manual (SIM, reset configuration)
+- `third_party/motorola/CPU32RM.pdf`: BDM (7.2), serial interface
+  (7.2.7), command set (7.2.8)
+- `third_party/motorola/MC68331UM.pdf`: BDM (5.10.2), timing (Table
+  A-7), connector (Figure 5-11), SIM, reset configuration
+- `third_party/motorola/SIMRM.pdf`: SIM reference, BKPT timing at reset
+- `third_party/ti/`, `third_party/diodes/`: translator and MOSFET data
+  sheets
+- `third_party/raspberrypi/`: RP2040, RP2350, Pico and Pico 2 data
+  sheets (PIO, GPIO ratings)
 - Pavel Pisa, "BDM Interface for Motorola 683xx MCU":
   https://cmp.felk.cvut.cz/~pisa/m683xx/bdm_driver.html
 - m68k-bdm (Linux driver, bdm-load):

@@ -1,15 +1,5 @@
 # To do
 
-## Sources
-
-- CPU32RM/AD and the MC68331 User's Manual into `third_party/`, with
-  `third_party/NOTICE` (provenance, SHA-256).
-- From CPU32RM: DSCLK maximum against CLKOUT, DSI setup/hold, the
-  DSCLK edge on which DSO changes, and the opcode table (PLAN.md,
-  Protocol summary).
-- 74AHCT125 datasheet: inputs at 3.3 V with VCC = 0 (PLAN.md,
-  Hardware).
-
 ## Hardware
 
 - Schematic: carrier for the Pico / Pico 2 footprint (PLAN.md,
@@ -25,8 +15,9 @@
 - Bring-up, in order (PLAN.md, Bring-up checklist):
   - PIO loopback: scope DSCLK/DSI, 17-bit framing, idle high.
   - Reset into BDM; FREEZE asserts.
+  - RSREG ATEMP first (`0x2588`): confirms RSREG's `0x2580` (PLAN.md).
   - NOP / not-ready handling.
-  - RREG D0; RSREG PC.
+  - RDREG D0; RSREG RPC.
   - SIMCR (0xFFFA00) and other SIM registers against reset values.
   - Chip-select init; external RAM read/write.
   - DUMP/FILL throughput; raise DSCLK until it fails, back off.

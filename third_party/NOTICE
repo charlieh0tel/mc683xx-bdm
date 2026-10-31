@@ -1,0 +1,108 @@
+Third-party material
+====================
+
+The manuals and datasheets in this directory are not part of this
+project, and the project's license does not apply to them.  Each is
+the property of its copyright holder.  They are included for reference
+because they are the specification this project is written against:
+`PLAN.md` and the code cite them by document and section.
+
+No license to any of this material is granted or implied by its
+presence here.
+
+Motorola
+--------
+
+In `motorola/`.  Motorola's semiconductor manuals, later published by
+Freescale and then NXP.  NXP no longer serves them at the addresses
+below.  Copied from the m683xx-emu project's `third_party/`, whose
+NOTICE gives their provenance: the reference manuals are NXP's own
+files as archived by the Internet Archive (web.archive.org) on
+2019-08-21; the user's manual came from the smartclock project's
+`third_party/` (github.com/charlieh0tel/smartclock).
+
+  CPU32RM.pdf      "CPU32 Central Processor Unit Reference Manual",
+                   (c) Motorola 1990, 1996.  nxp.com/docs/en/
+                   reference-manual/CPU32RM.pdf.  Authoritative for
+                   background debug mode (7.2): its serial interface
+                   and timing (7.2.7) and command set and encodings
+                   (7.2.8).  Its RSREG format figure (7.2.8.6) is a
+                   misprint (PLAN.md, Protocol summary).
+                   SHA-256 4a096e7edfbc01086dff56ca76677e8c
+                           c4281ec53d7e86bfc2a3c98df9505916
+  MC68331UM.pdf    "MC68331 User's Manual", (c) Motorola 1996;
+                   (c) Freescale Semiconductor, Inc., 2004.
+                   nxp.com/docs/en/data-sheet/MC68331UM.pdf.  The
+                   target: BDM summary (5.10.2), the BDM connector
+                   (Figure 5-11), BDM timing (Table A-7), the SIM and
+                   reset configuration.
+                   SHA-256 d5d71f87309b4d8d5a5af76b9bff79ed
+                           82b3a58dd697f513ebeedca9f1ec17eb
+  SIMRM.pdf        "System Integration Module Reference Manual",
+                   Motorola.  The file prints no copyright notice or
+                   year; its PDF metadata gives it to Freescale
+                   Semiconductor, Inc., made 1997-08-14 and last
+                   changed 2004-05-04.
+                   nxp.com/docs/en/reference-manual/SIMRM.pdf.  Reset
+                   timing, chip selects and the rest of the SIM, for
+                   the target init script.
+                   SHA-256 bf8ed68d5e07e8e4f0972d1c3e175fdf
+                           43e837f99264bf4e524616c3edb0ef70
+
+Datasheets
+----------
+
+Makers' datasheets for the pod's parts, each its maker's file as
+served on 2026-10-31.
+
+In `ti/`, (c) Texas Instruments Incorporated:
+
+  SN74AHCT125.pdf  "SNx4AHCT125 Quadruple Bus Buffer Gates With
+                   3-State Outputs", SCLS264R, revised February 2024.
+                   ti.com/lit/ds/symlink/sn74ahct125.pdf.  The
+                   3.3 V to 5 V outputs: input ratings with the supply
+                   off (5.1).
+                   SHA-256 66da72e586dbca7a1548164adf28e238
+                           484c5c1ad250fcb28ec972e4732c6fc2
+  SN74LVC125A.pdf  "SN74LVC125A Quadruple Bus Buffer Gate With 3-State
+                   Outputs", SCAS290T, revised September 2024.
+                   ti.com/lit/ds/symlink/sn74lvc125a.pdf.  The 5 V to
+                   3.3 V inputs: 5.5 V inputs (5.1, 5.3).
+                   SHA-256 06ff124c6c762b7c8e0e6f2df79edd1d
+                           acb1368a40039542da0b5cedb7c54b28
+
+In `diodes/`, (c) Diodes Incorporated:
+
+  2N7002.pdf       "2N7002 N-Channel Enhancement Mode MOSFET",
+                   DS11303 Rev. 33-2.  diodes.com/assets/Datasheets/
+                   ds11303.pdf.  The RESET and BERR drivers.
+                   SHA-256 3984debf5b29376201b1042ba3d174c3
+                           8f6dc6023ffec218d2f95ea843dc4d20
+
+In `raspberrypi/`, (c) Raspberry Pi Ltd:
+
+  rp2040-datasheet.pdf
+                   "RP2040 Datasheet", built 2025-02-20.
+                   datasheets.raspberrypi.com/rp2040/
+                   rp2040-datasheet.pdf.  PIO, GPIO and ADC.
+                   SHA-256 be56fbb75ba0ae9e26558a73c93ac3e7
+                           5c2ad4e6878d3b6703de2a76d886ea8c
+  rp2350-datasheet.pdf
+                   "RP2350 Datasheet", built 2026-10-01.
+                   datasheets.raspberrypi.com/rp2350/
+                   rp2350-datasheet.pdf.  PIO, GPIO (5 V tolerance
+                   and its IOVDD condition) and ADC.
+                   SHA-256 a638d6780da919162660691bfa02c6dc
+                           f7c2a0b6e9f18e2d7519c80b664a2e39
+  pico-datasheet.pdf
+                   "Raspberry Pi Pico Datasheet", built 2026-07-03.
+                   datasheets.raspberrypi.com/pico/pico-datasheet.pdf.
+                   The carrier's footprint and pinout.
+                   SHA-256 757ff485227493b9fcc0c2c96c4dea9d
+                           e020e1d8b2b11e2aa4f9ee8b25aa89eb
+  pico-2-datasheet.pdf
+                   "Raspberry Pi Pico 2 Datasheet", built 2026-07-03.
+                   datasheets.raspberrypi.com/pico/
+                   pico-2-datasheet.pdf.  The same footprint, RP2350.
+                   SHA-256 cbcfaf881018c686495a2e53c7bd281e
+                           7e0a8217d79447d73eda7c8f74b7f675
