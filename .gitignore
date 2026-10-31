@@ -1,0 +1,22 @@
+# Editor backups
+*~
+*.swp
+
+# Rust
+target/
+
+# Python
+.venv/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+
+# KiCad
+*-backups/
+_autosave-*
+*.lck
+fp-info-cache
+*.kicad_prl
+
+# Local tool settings
+.claude/settings.local.json

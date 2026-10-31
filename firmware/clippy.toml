@@ -1,0 +1,4 @@
+# The firmware's stack (AGENTS.md, Stack and RAM): no large array goes
+# on the stack.  Bytes.  clippy's large_stack_frames estimates frames
+# before optimization, several times too large, so it is off.
+array-size-threshold = 512

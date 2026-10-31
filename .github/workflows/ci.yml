@@ -1,0 +1,38 @@
+# The commit-message check, the Rust tests and `make lint`, as AGENTS.md
+# has them run before each commit.  The toolchain and its targets come
+# from firmware/rust-toolchain.toml.  The Rust steps are skipped until
+# firmware/ has a workspace.
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  commit-messages:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: No AI attribution
+        run: |
+          for c in $(git rev-list HEAD); do
+            git log -1 --format=%B "$c" | .githooks/commit-msg /dev/stdin || exit 1
+          done
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - name: Toolchain
+        if: hashFiles('firmware/Cargo.toml') != ''
+        working-directory: firmware
+        run: rustup toolchain install
+      - name: Tests
+        if: hashFiles('firmware/Cargo.toml') != ''
+        working-directory: firmware
+        run: cargo test
+      - name: Lint
+        run: make lint
