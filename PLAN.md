@@ -112,7 +112,9 @@ Unpowered sides (TI datasheets in `third_party/ti/`):
 - BKPT/DSCLK idles **high**. Low while running requests a halt.
 - **Enable BDM:** BKPT low at the rising edge of RESET; BDM stays enabled until the next reset. BKPT low at least 2 clocks before RESET negates (MC68331UM 5.10.2.1).
 - **Enter BDM from reset:** BKPT low → pulse RESET → release RESET → wait for FREEZE.
-- **Halt:** BKPT low → wait for FREEZE.
+- **Halt:** BKPT low → wait for FREEZE.  Only with BDM enabled at the
+  last reset; otherwise BKPT is a breakpoint exception, vector $0C, in
+  the running program (MC68331UM 5.10.2.2.1, Table 5-3).
 - **BKPT stays low after FREEZE.** The CPU takes each DSCLK rising edge as a bit, so a separate release would be a spurious clock. The first transfer's first rising edge releases it, as CPU32RM's sample circuit does (7.2.7.2, Figures 7-8, 7-9). DSCLK is left high after the last bit of each transfer, so the prefetch at the end of a session is not tagged.
 - **First command after entry:** RSREG ATEMP, which holds the entry source and which later commands overwrite (MC68331UM 5.10.2.3, Table 5-4).
 - **Transfer:** 17 bits, MSB first, full duplex. The CPU acts only on DSCLK rising edges, synchronized to CLKOUT: it takes DSI, then half a CLKOUT later puts the next bit on DSO, which need not stay stable until the falling edge (CPU32RM 7.2.7.1). The host changes DSI after the falling edge and samples DSO at the end of the low phase, just before the next rise. MC68331UM 5.10.2.7's "transitions on the falling edge" is the host's side; CPU32RM governs.

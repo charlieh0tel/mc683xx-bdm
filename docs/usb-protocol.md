@@ -78,6 +78,10 @@ Semantics:
   0xFFFF in the low for a double bus fault (CPU32RM Table 7-2).  Both
   are refused with NoTarget below 4.5 V VDD, and NoFreeze if FREEZE
   does not assert within 100 ms.
+- Halt works only if BDM was enabled at the target's last reset (BKPT
+  low as RESET rises, MC68331UM 5.10.2.1), as ResetHalt does.  Without
+  it BKPT is a breakpoint exception, vector $0C (MC68331UM 5.10.2.2.1,
+  Table 5-3): the program takes it, and Halt answers NoFreeze.
 - Go and Call release DSI after their last word (PLAN.md, PIO
   program); nothing is clocked after them.
 - SetClock never sets a rate faster than asked, nor above 4 MHz.
