@@ -369,6 +369,13 @@ USB command reports the high-water mark.  Not written yet.
 - [ ] RSREG ATEMP first (`0x2588`): confirms RSREG's `0x2580`
 - [ ] BGND and a breakpoint after GO: `bdm pins` reports a fresh ATEMP
       of 1 and 0; DSI driven again
+- [ ] Silicon questions the manuals leave open (from m683xx-emu's
+      model, which takes one answer for each):
+  - PCC after a double bus fault out of reset: $00000001 (CPU32RM
+    7.2.5.3) or $FFFFFFFF (7.2.3)
+  - BKPT on a CPU in STOP or LPSTOP: enters background mode or not
+  - A double bus fault with BDM enabled: whether the SIM halt monitor
+    still resets
 - [ ] NOP / not-ready handling
 - [ ] RDREG D0; RSREG RPC
 - [ ] Read SIMCR (0xFFFA00) and other SIM regs; compare to reset

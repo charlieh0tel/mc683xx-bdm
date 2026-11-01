@@ -35,6 +35,9 @@
   - RSREG ATEMP first (`0x2588`): confirms RSREG's `0x2580` (PLAN.md).
   - BGND and a breakpoint after GO: `bdm pins` gives a fresh ATEMP of 1
     and 0, and commands work (DSI driven again).
+  - Silicon questions for m683xx-emu (PLAN.md, Bring-up checklist): PCC
+    after a reset double bus fault, BKPT out of LPSTOP, the halt
+    monitor on a double fault in BDM.
   - NOP / not-ready handling.
   - RDREG D0; RSREG RPC.
   - SIMCR (0xFFFA00) and other SIM registers against reset values.
