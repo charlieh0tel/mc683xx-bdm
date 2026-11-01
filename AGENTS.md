@@ -72,7 +72,8 @@
   to `rep` or `repeat` but not to `rpt`.  Domain acronyms / wire-
   protocol terms are fine -- `bdm`, `cpu32`, `dsclk`, `dsi`, `dso`,
   `bkpt`, `berr`, `ipipe`, `ifetch`, `ds`, `vdd`, `clkout`, `sim`,
-  `qsm`, `simcr`, `pc`, `sr`, `pio`, `sm`, `fifo`, `osr`, `isr`, `adc`,
+  `qsm`, `simcr`, `pc`, `sr`, `rpc`, `pcc`, `atemp`, `far`, `vbr`,
+  `usp`, `ssp`, `sfc`, `dfc`, `pio`, `sm`, `fifo`, `osr`, `isr`, `adc`,
   `gpio`, `usb`, `led`, `rx`, `tx`, `srec`, `elf`.
 - CPU32RM mnemonics keep their documented spelling in opcode constants
   (`RSREG`, `DUMP`).  Rust functions use the long form:

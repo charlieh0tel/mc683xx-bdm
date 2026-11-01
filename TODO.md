@@ -9,9 +9,11 @@
 
 ## Firmware
 
-- Workspace in `firmware/`: `cpu32-target`, `pod-proto`, `pod-fw`
-  (features `rp2040`, `rp235xa`), `pod-host` (PLAN.md, Repo layout).
-- `make lint` and CI then run clippy on them.
+- `pod-fw` (features `rp2040`, the default, and `rp235xa`): PIO
+  `Link`, USB vendor class.
+- `pod-proto`: USB commands between host and pod.
+- `pod-host`: `bdm` CLI over nusb; `Cpu32Target` over it.
+- m683xx-emu: depend on `cpu32-target` by git and implement it.
 - Bring-up, in order (PLAN.md, Bring-up checklist):
   - PIO loopback: scope DSCLK/DSI, 17-bit framing, idle high.
   - Reset into BDM; FREEZE asserts.

@@ -171,7 +171,7 @@ m683xx-pod/
 ├── production/          # each release as ordered
 ├── firmware/
 │   ├── cpu32-target/    # Cpu32Target trait, no_std; shared with the emulator
-│   ├── pod-proto/       # USB command definitions, no_std
+│   ├── pod-proto/       # BDM words and command sequences; USB commands; no_std
 │   ├── pod-fw/          # Pico / Pico 2 firmware, embassy-rp, PIO
 │   └── pod-host/        # Rust library + `bdm` CLI (nusb); Cpu32Target impl
 ├── third_party/         # vendor manuals + NOTICE
@@ -200,7 +200,13 @@ USB vendor class, bulk endpoints. Commands:
 - `set_clock(hz)`.
 
 Handle not-ready retries in firmware; report BERR and illegal-command
-errors to the host.
+errors to the host.  `pod-proto`'s `session` does both, over a `Link`
+trait that the PIO state machine implements; tests run it against
+scripted CPU32RM command sequences.
+
+Each result is collected with NOPs, so a DUMP or FILL block costs about
+two transfers per access.  Sending the next DUMP in place of the NOP
+would nearly halve that; done if the throughput test asks for it.
 
 Flash and debug: `probe-rs` over SWD (a Raspberry Pi Debug Probe),
 which supports RP2040 and RP235x; UF2 over BOOTSEL as a fallback.

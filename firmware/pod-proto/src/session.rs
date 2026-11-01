@@ -1,0 +1,405 @@
+//! BDM commands carried out over a serial link: each command's words
+//! out, then NOPs until its result or "command complete" comes back
+//! (CPU32RM 7.2.8.2).
+//!
+//! Every word in returns the CPU's answer to the word before, so a
+//! command's own answer comes back while the next word goes out.  The
+//! session collects it with NOPs, which do nothing; a NOP's own
+//! "command complete" comes back with the next command's opcode, and is
+//! ignored there.
+
+use cpu32_target::Address;
+use cpu32_target::Register;
+use cpu32_target::Size;
+use cpu32_target::SystemRegister;
+
+use crate::bdm::COMPLETE;
+use crate::bdm::Command;
+use crate::bdm::NOP;
+use crate::bdm::Reply;
+use crate::bdm::Response;
+
+/// The serial link to the CPU: DSCLK, DSI and DSO, in the firmware the
+/// PIO state machine (PLAN.md, PIO program).
+#[expect(async_fn_in_trait, reason = "the pod runs one single-threaded executor; no Send bound is wanted")]
+pub trait Link {
+    /// The link's own failure.
+    type Error;
+
+    /// Shifts `word` out on DSI with bit 16 clear, and returns the 17
+    /// bits shifted in from DSO at the same time.
+    async fn transfer(&mut self, word: u16) -> Result<u32, Self::Error>;
+}
+
+/// Why a command did not complete.
+#[derive(Debug, PartialEq, Eq, thiserror::Error)]
+pub enum Error<L> {
+    /// The link failed.
+    #[error("serial link failed")]
+    Link(L),
+    /// The access ended in a bus or address error.
+    #[error("bus error")]
+    BusError,
+    /// The CPU did not take the command.
+    #[error("illegal command")]
+    Illegal,
+    /// Still not ready after the session's retries.
+    #[error("not ready after {0} retries")]
+    NotReady(u32),
+    /// A response the command's sequence does not allow.
+    #[error("unexpected response {0:?}")]
+    Unexpected(Response),
+    /// A block's length is not a whole number of accesses.
+    #[error("length {length} is not a multiple of {size:?}")]
+    Length {
+        /// The block's length in bytes.
+        length: usize,
+        /// The access size.
+        size: Size,
+    },
+}
+
+/// Commands over a link to a CPU in background mode.
+#[derive(Debug)]
+pub struct Session<L> {
+    link: L,
+    /// NOPs clocked while the CPU answers "not ready" before giving up.
+    retries: u32,
+}
+
+impl<L: Link> Session<L> {
+    /// A session over `link`, waiting up to `retries` NOPs for each
+    /// result.
+    pub const fn new(link: L, retries: u32) -> Self {
+        Self { link, retries }
+    }
+
+    /// The link, to give it back.
+    pub fn into_link(self) -> L {
+        self.link
+    }
+
+    /// Carries out `command`, returning its result: the value for a
+    /// read, 0 for anything else.  After GO or CALL nothing more is
+    /// clocked: DSCLK is BKPT again once the CPU leaves background
+    /// mode.
+    ///
+    /// # Errors
+    /// The link failed, or the CPU answered with an error.
+    pub async fn execute(&mut self, command: &Command) -> Result<u32, Error<L::Error>> {
+        self.send(command).await?;
+        match command.reply() {
+            Reply::Data { words: 1 } => Ok(u32::from(self.first_word().await?)),
+            Reply::Data { .. } => {
+                let high = self.first_word().await?;
+                let low = self.next_word().await?;
+                Ok(u32::from(high) << 16 | u32::from(low))
+            }
+            Reply::Complete => match self.first_word().await? {
+                COMPLETE => Ok(0),
+                other => Err(Error::Unexpected(Response::Data(other))),
+            },
+            Reply::Exit => Ok(0),
+        }
+    }
+
+    /// Reads a data or address register.
+    ///
+    /// # Errors
+    /// As [`Session::execute`].
+    pub async fn read_register(&mut self, register: Register) -> Result<u32, Error<L::Error>> {
+        self.execute(&Command::ReadRegister(register)).await
+    }
+
+    /// Reads a system register.
+    ///
+    /// # Errors
+    /// As [`Session::execute`].
+    pub async fn read_system_register(&mut self, register: SystemRegister) -> Result<u32, Error<L::Error>> {
+        self.execute(&Command::ReadSystemRegister(register)).await
+    }
+
+    /// Reads `data.len()` bytes from `address`, a READ then DUMPs,
+    /// big-endian.
+    ///
+    /// # Errors
+    /// As [`Session::execute`], or a length that is not a multiple of
+    /// `size`.
+    pub async fn read_block(
+        &mut self,
+        address: Address,
+        size: Size,
+        data: &mut [u8],
+    ) -> Result<(), Error<L::Error>> {
+        check_length(size, data.len())?;
+        for (n, chunk) in data.chunks_exact_mut(size.bytes()).enumerate() {
+            let command = if n == 0 { Command::Read(size, address) } else { Command::Dump(size) };
+            let value = self.execute(&command).await?;
+            chunk.copy_from_slice(&value.to_be_bytes()[4 - size.bytes()..]);
+        }
+        Ok(())
+    }
+
+    /// Writes `data` to `address`, a WRITE then FILLs, big-endian.
+    ///
+    /// # Errors
+    /// As [`Session::execute`], or a length that is not a multiple of
+    /// `size`.
+    pub async fn write_block(
+        &mut self,
+        address: Address,
+        size: Size,
+        data: &[u8],
+    ) -> Result<(), Error<L::Error>> {
+        check_length(size, data.len())?;
+        for (n, chunk) in data.chunks_exact(size.bytes()).enumerate() {
+            let mut bytes = [0; 4];
+            bytes[4 - size.bytes()..].copy_from_slice(chunk);
+            let value = u32::from_be_bytes(bytes);
+            let command =
+                if n == 0 { Command::Write(size, address, value) } else { Command::Fill(size, value) };
+            self.execute(&command).await?;
+        }
+        Ok(())
+    }
+
+    /// Sends a command's words.  The answer to the opcode belongs to the
+    /// word before and is ignored; each operand's should be "not ready".
+    /// "Illegal" there means the opcode was refused, and the CPU now
+    /// takes the next word as a command, so the rest are not sent.
+    async fn send(&mut self, command: &Command) -> Result<(), Error<L::Error>> {
+        let words = command.encode();
+        let (opcode, operands) = words.as_slice().split_first().expect("every command has an opcode");
+        self.transfer(*opcode).await?;
+        for operand in operands {
+            match self.transfer(*operand).await? {
+                Response::NotReady => {}
+                Response::Illegal => return Err(Error::Illegal),
+                other => return Err(Error::Unexpected(other)),
+            }
+        }
+        Ok(())
+    }
+
+    /// The first word of an answer: NOPs until the CPU is ready.
+    async fn first_word(&mut self) -> Result<u16, Error<L::Error>> {
+        for _ in 0..=self.retries {
+            match self.transfer(NOP).await? {
+                Response::NotReady => {}
+                Response::Data(data) => return Ok(data),
+                Response::BusError => return Err(Error::BusError),
+                Response::Illegal => return Err(Error::Illegal),
+                other @ Response::Unknown(_) => return Err(Error::Unexpected(other)),
+            }
+        }
+        Err(Error::NotReady(self.retries))
+    }
+
+    /// The second word of a long result, which follows the first at once.
+    async fn next_word(&mut self) -> Result<u16, Error<L::Error>> {
+        match self.transfer(NOP).await? {
+            Response::Data(data) => Ok(data),
+            other => Err(Error::Unexpected(other)),
+        }
+    }
+
+    async fn transfer(&mut self, word: u16) -> Result<Response, Error<L::Error>> {
+        let bits = self.link.transfer(word).await.map_err(Error::Link)?;
+        Ok(Response::decode(bits))
+    }
+}
+
+fn check_length<L>(size: Size, length: usize) -> Result<(), Error<L>> {
+    if length.is_multiple_of(size.bytes()) { Ok(()) } else { Err(Error::Length { length, size }) }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::VecDeque;
+
+    use embassy_futures::block_on;
+
+    use super::Address;
+    use super::Command;
+    use super::Error;
+    use super::Link;
+    use super::Register;
+    use super::Response;
+    use super::Session;
+    use super::Size;
+    use super::SystemRegister;
+
+    /// Responses as the CPU sends them (CPU32RM Table 7-3).
+    const NOT_READY: u32 = 0x1_0000;
+    const BUS_ERROR: u32 = 0x1_0001;
+    const ILLEGAL: u32 = 0x1_FFFF;
+    const COMPLETE: u32 = 0x0_FFFF;
+    /// Whatever the CPU answers to an opcode: the previous command's.
+    const STALE: u32 = COMPLETE;
+    const RETRIES: u32 = 3;
+
+    /// A link that checks each word sent against a script and answers
+    /// from it.
+    #[derive(Debug)]
+    struct Script(VecDeque<(u16, u32)>);
+
+    impl Link for Script {
+        type Error = ();
+
+        async fn transfer(&mut self, word: u16) -> Result<u32, ()> {
+            let (expected, response) = self.0.pop_front().expect("script ended early");
+            assert_eq!(word, expected, "word sent");
+            Ok(response)
+        }
+    }
+
+    /// Runs `body` on a session over `script` and checks the script was
+    /// used up.
+    fn run<T>(script: &[(u16, u32)], body: impl AsyncFnOnce(&mut Session<Script>) -> T) -> T {
+        let mut session = Session::new(Script(script.iter().copied().collect()), RETRIES);
+        let result = block_on(body(&mut session));
+        assert!(session.into_link().0.is_empty(), "script not used up");
+        result
+    }
+
+    #[test]
+    fn read_register_waits_out_not_ready() {
+        let result =
+            run(&[(0x2180, STALE), (0x0000, NOT_READY), (0x0000, 0x1234), (0x0000, 0x5678)], async |s| {
+                s.read_register(Register::D0).await
+            });
+        assert_eq!(result, Ok(0x1234_5678));
+    }
+
+    #[test]
+    fn read_atemp_after_entry() {
+        let result = run(&[(0x2588, NOT_READY), (0x0000, 0x0000), (0x0000, 0x0001)], async |s| {
+            s.read_system_register(SystemRegister::Atemp).await
+        });
+        assert_eq!(result, Ok(1));
+    }
+
+    #[test]
+    fn write_register_until_complete() {
+        let result = run(
+            &[(0x2081, STALE), (0xDEAD, NOT_READY), (0xBEEF, NOT_READY), (0x0000, COMPLETE)],
+            async |s| s.execute(&Command::WriteRegister(Register::D1, 0xDEAD_BEEF)).await,
+        );
+        assert_eq!(result, Ok(0));
+    }
+
+    #[test]
+    fn read_byte_is_in_the_low_byte() {
+        let result = run(
+            &[
+                (0x1900, STALE),
+                (0x00FF, NOT_READY),
+                (0xFA00, NOT_READY),
+                (0x0000, NOT_READY),
+                (0x0000, 0x00CF),
+            ],
+            async |s| s.execute(&Command::Read(Size::Byte, Address(0x00FF_FA00))).await,
+        );
+        assert_eq!(result, Ok(0xCF));
+    }
+
+    #[test]
+    fn bus_error_on_read() {
+        let result = run(
+            &[(0x1940, STALE), (0x0010, NOT_READY), (0x0000, NOT_READY), (0x0000, BUS_ERROR)],
+            async |s| s.execute(&Command::Read(Size::Word, Address(0x0010_0000))).await,
+        );
+        assert_eq!(result, Err(Error::BusError));
+    }
+
+    #[test]
+    fn illegal_opcode_stops_the_operands() {
+        // The CPU takes the word after an illegal opcode as a command, so
+        // the second address word is never sent.
+        let result = run(&[(0x1980, STALE), (0x0000, ILLEGAL)], async |s| {
+            s.execute(&Command::Read(Size::Long, Address(0))).await
+        });
+        assert_eq!(result, Err(Error::Illegal));
+    }
+
+    #[test]
+    fn not_ready_gives_up_after_the_retries() {
+        let result = run(
+            &[
+                (0x0400, STALE),
+                (0x0000, NOT_READY),
+                (0x0000, NOT_READY),
+                (0x0000, NOT_READY),
+                (0x0000, NOT_READY),
+            ],
+            async |s| s.execute(&Command::ResetPeripherals).await,
+        );
+        assert_eq!(result, Err(Error::NotReady(RETRIES)));
+    }
+
+    #[test]
+    fn write_expects_command_complete() {
+        let result = run(&[(0x0000, STALE), (0x0000, 0x1234)], async |s| s.execute(&Command::Nop).await);
+        assert_eq!(result, Err(Error::Unexpected(Response::Data(0x1234))));
+    }
+
+    #[test]
+    fn go_clocks_nothing_after() {
+        let result = run(&[(0x0C00, STALE)], async |s| s.execute(&Command::Go).await);
+        assert_eq!(result, Ok(0));
+    }
+
+    #[test]
+    fn read_block_is_read_then_dump() {
+        let mut data = [0; 6];
+        let result = run(
+            &[
+                (0x1940, STALE),
+                (0x0000, NOT_READY),
+                (0x1000, NOT_READY),
+                (0x0000, 0x0102),
+                (0x1D40, COMPLETE),
+                (0x0000, 0x0304),
+                (0x1D40, COMPLETE),
+                (0x0000, NOT_READY),
+                (0x0000, 0x0506),
+            ],
+            async |s| s.read_block(Address(0x1000), Size::Word, &mut data).await,
+        );
+        assert_eq!(result, Ok(()));
+        assert_eq!(data, [1, 2, 3, 4, 5, 6]);
+    }
+
+    #[test]
+    fn write_block_is_write_then_fill() {
+        let result = run(
+            &[
+                (0x1880, STALE),
+                (0x0000, NOT_READY),
+                (0x2000, NOT_READY),
+                (0x0102, NOT_READY),
+                (0x0304, NOT_READY),
+                (0x0000, COMPLETE),
+                (0x1C80, COMPLETE),
+                (0x0506, NOT_READY),
+                (0x0708, NOT_READY),
+                (0x0000, COMPLETE),
+            ],
+            async |s| s.write_block(Address(0x2000), Size::Long, &[1, 2, 3, 4, 5, 6, 7, 8]).await,
+        );
+        assert_eq!(result, Ok(()));
+    }
+
+    #[test]
+    fn block_length_must_be_whole_accesses() {
+        let mut data = [0; 3];
+        let result = run(&[], async |s| s.read_block(Address(0), Size::Word, &mut data).await);
+        assert_eq!(result, Err(Error::Length { length: 3, size: Size::Word }));
+    }
+
+    #[test]
+    fn empty_block_sends_nothing() {
+        let result = run(&[], async |s| s.write_block(Address(0), Size::Byte, &[]).await);
+        assert_eq!(result, Ok(()));
+    }
+}
