@@ -18,6 +18,10 @@
 - A `Link` adapter onto m683xx-emu's BDM serial exchange once it
   lands; then delete `bdm-model`.
 - `bdm load <srec/elf>`; a target init script run after each reset.
+  It sets SIMCR FRZSW or disables the watchdog: with FRZSW 0, the
+  68331's reset value, the watchdog runs while the CPU is halted.
+- `pod-host` integration test against `mc683xx-run --bdm` and its
+  example image, once m683xx-emu's virtual cable lands.
 - A second Pico as a stand-in CPU32: a target-side PIO program around
   `bdm-model`, driving FREEZE and watching BKPT and RESET.
 - `mc683xx-target` from crates.io once 0.3.0 is published, in place of

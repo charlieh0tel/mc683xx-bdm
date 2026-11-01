@@ -153,22 +153,46 @@ impl<S> StreamTransport<S> {
 
 impl<S: Read + Write> Transport for StreamTransport<S> {
     fn exchange(&mut self, request: &[u8], reply: &mut [u8; PACKET]) -> Result<usize, TransportError> {
-        let length = u8::try_from(request.len())
-            .ok()
-            .filter(|n| (1..=PACKET).contains(&usize::from(*n)))
-            .ok_or(TransportError::MessageLength(request.len()))?;
-        self.stream.write_all(&[length])?;
-        self.stream.write_all(request)?;
-        self.stream.flush()?;
-        let mut length = [0];
-        self.stream.read_exact(&mut length)?;
-        let length = usize::from(length[0]);
-        if !(1..=PACKET).contains(&length) {
-            return Err(TransportError::MessageLength(length));
-        }
-        self.stream.read_exact(&mut reply[..length])?;
-        Ok(length)
+        write_message(&mut self.stream, request)?;
+        read_message(&mut self.stream, reply)?
+            .ok_or_else(|| std::io::Error::from(std::io::ErrorKind::UnexpectedEof).into())
     }
+}
+
+/// Writes one stream message: its length byte, then `packet`.
+///
+/// # Errors
+/// A packet of 0 or more than [`PACKET`] bytes, or the stream failed.
+pub fn write_message(stream: &mut impl Write, packet: &[u8]) -> Result<(), TransportError> {
+    let length = u8::try_from(packet.len())
+        .ok()
+        .filter(|n| (1..=PACKET).contains(&usize::from(*n)))
+        .ok_or(TransportError::MessageLength(packet.len()))?;
+    stream.write_all(&[length])?;
+    stream.write_all(packet)?;
+    stream.flush()?;
+    Ok(())
+}
+
+/// Reads one stream message into `packet`, returning its length, or
+/// `None` if the stream ended before a message began.
+///
+/// # Errors
+/// A length byte of 0 or more than [`PACKET`], or the stream failed.
+pub fn read_message(
+    stream: &mut impl Read,
+    packet: &mut [u8; PACKET],
+) -> Result<Option<usize>, TransportError> {
+    let mut length = [0];
+    if stream.read(&mut length)? == 0 {
+        return Ok(None);
+    }
+    let length = usize::from(length[0]);
+    if !(1..=PACKET).contains(&length) {
+        return Err(TransportError::MessageLength(length));
+    }
+    stream.read_exact(&mut packet[..length])?;
+    Ok(Some(length))
 }
 
 #[cfg(test)]

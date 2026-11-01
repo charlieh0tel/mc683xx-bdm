@@ -15,6 +15,8 @@
 
 #![no_std]
 
+pub mod board;
+
 use core::convert::Infallible;
 use core::ops::Range;
 

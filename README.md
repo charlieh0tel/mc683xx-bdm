@@ -43,6 +43,9 @@ make lint                      # clippy on every build, before each commit
 cd firmware
 cargo run -p pod-host --bin bdm -- pins     # or halt, regs, dump 0xfffa00 64, ...
 cargo run -p pod-host --bin bdm -- --pod unix:/path/to/socket regs   # a stand-in pod
+
+cargo run -p pod-host --bin bdm-stand-in -- unix:/tmp/pod.sock &      # a pod on a model CPU32
+cargo run -p pod-host --bin bdm -- --pod unix:/tmp/pod.sock reset
 ```
 
 Without root on Linux, the pod needs a udev rule, e.g.

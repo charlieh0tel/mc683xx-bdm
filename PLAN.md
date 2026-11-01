@@ -230,7 +230,7 @@ m683xx-pod/
 │   └── release.py       # JLCPCB release package (uv)
 ├── production/          # each release as ordered
 ├── firmware/
-│   ├── bdm-model/       # a CPU32 in background mode at the serial word, no_std; test target
+│   ├── bdm-model/       # a CPU32 in background mode at the serial word, and a board around it; no_std; test target
 │   ├── pod-proto/       # BDM words and command sequences; USB commands; no_std
 │   ├── pod-fw/          # Pico / Pico 2 firmware, embassy-rp, PIO
 │   └── pod-host/        # Rust library + `bdm` CLI (nusb)
@@ -335,6 +335,13 @@ USB command reports the high-water mark.  Not written yet.
   code, reading the program's value first; SFC/DFC reads and writes
   reach the program's value; go, call and `restore_function_codes` put
   it back.
+- `pod-host`'s `stand_in` and `bdm-stand-in`: `pod-proto`'s `pod` over
+  `bdm-model`'s `ModelBoard` on a stream socket, one client at a time.
+  `bdm` and `PodTarget` run end to end against it with no hardware
+  (`pod-host/tests/stand_in.rs`).  The model's FREEZE is its state, VDD
+  5 V; a halt or reset enters with a breakpoint, and a reset keeps
+  registers and memory.  Not the emulator: no instructions run, so a
+  test enters background mode itself.
 - `bdm`: pins, halt, reset, go, call, clock, regs, get, set, dump,
   write, xfer, through `PodTarget`.  Halt and reset print the entry
   source.  Dump and write take `--fc`, default 5 (supervisor data).
