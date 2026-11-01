@@ -51,9 +51,11 @@ License: GPL-3.0-only (`LICENSE`).
 
 Two output enables: BKPT must be driven to request a halt while DSI
 stays tristated, because pin 8 is IFETCH, a CPU output, until FREEZE
-(gotcha below).  After GO the firmware turns DSI off as soon as the
-transfer ends, a few microseconds; the CPU may drive IFETCH before then,
-and the series resistor limits that overlap's current.
+(gotcha below).  DSI's enable is a PIO pin: the program turns DSI off
+itself 3 PIO cycles after the last rising edge of GO's opcode or CALL's
+last word, about 190 ns at 1 MHz DSCLK (PIO program).  How soon the CPU
+drives IFETCH after that edge is not in the manuals: check on the scope
+at bring-up.  The series resistor limits any overlap's current.
 
 Pico pins (GPn):
 
@@ -68,7 +70,7 @@ Pico pins (GPn):
 | 8 | RESET drive (2N7002 gate) | out, high asserts RESET |
 | 9 | BERR drive (2N7002 gate) | out, high asserts BERR |
 | 10 | 74AHCT125 OE, BKPT/DSCLK | out, low enables |
-| 11 | 74AHCT125 OE, DSI | out, low enables |
+| 11 | 74AHCT125 OE, DSI | PIO set, low enables |
 | 25 | LED (on the Pico) | out |
 | 26 | VDD sense (ADC0) | analog |
 
@@ -155,28 +157,44 @@ between them without losing the address (CPU32RM 7.2.8.10, 7.2.8.11).
 bit:
     out pins, 1     side 0 [6]   ; DSCLK low: drive DSI
     in  pins, 1                  ; sample DSO at the end of the low phase
-    jmp x-- bit     side 1 [7]   ; DSCLK rises: target takes DSI, then shifts DSO
+    jmp !x last     side 1       ; DSCLK rises: target takes DSI, then shifts DSO
+    jmp x-- bit            [6]   ; rest of the high phase, if a bit follows
+last:
+    out y, 1                 ; release flag: the OSR bit after the word
+    jmp !y keep
+    set pins, 1              ; DSI's output enable high: DSI off
+keep:
     push block               ; 17 bits, right-justified
 .wrap
 ```
 
 Config: out and in shift left, no autopull/autopush. `out` base = DSI,
-`in` base = DSO, side-set base = DSCLK, `set` base = DSCLK (count 1).
+`in` base = DSO, side-set base = DSCLK, `set` base = DSI's output
+enable (GP11, count 1).
+
+- The firmware pushes `word << 15`, with bit 14 set for the last word
+  before the CPU leaves background mode (`Link::transfer_exit`): DSI
+  goes off 3 PIO cycles after that word's last rising edge, before the
+  `push`.  The firmware turns DSI on again when FREEZE next asserts.
 
 - Each phase is 8 PIO cycles, so DSCLK = PIO clock / 16; set it with
-  clkdiv.  `[7]` is the most delay `.side_set 1 opt` leaves (3 bits).
+  clkdiv.  `.side_set 1 opt` leaves 3 delay bits, `[7]` at most.
+- The high phase's delay is on the loop's back edge, so after the 17th
+  rise the release check runs at once: `set pins` is the 3rd cycle
+  after the rise.
 - DSO is sampled one PIO cycle before DSCLK rises, 15 after the
   previous rise: the target's synchronizer (about 1.5 CLKOUT), its DSO
   delay and both translators' delays must fit in those 15.  At 1 MHz
   DSCLK that is 937 ns.
 - After a halt DSCLK is already low, so the first `out ... side 0`
   keeps it low and the first rise is the release (Protocol summary).
-- Between words DSCLK stays high (last side-set) for the `push`,
-  `pull` and `set` cycles plus any FIFO wait; the high phase only
-  grows, which CPU32 allows.
-- Reset entry and halt: `exec` a forced `set pins` while the SM is
-  stalled on `pull`, so PIO keeps the pin.  This needs the `set` base
-  above.
+- Between words DSCLK stays high (last side-set) for the release
+  check, `push`, `pull` and `set` cycles plus any FIFO wait; the high
+  phase only grows, which CPU32 allows.
+- Reset entry and halt drive DSCLK low, and the firmware drives DSI's
+  enable, with embassy-rp's `StateMachine::set_pins`: it pauses the SM
+  (stalled on `pull`), points the `set` base at the pin, runs a `set
+  pins` and restores the config, so PIO keeps both pins.
 
 ---
 

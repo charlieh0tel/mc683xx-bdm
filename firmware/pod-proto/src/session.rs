@@ -29,6 +29,12 @@ pub trait Link {
     /// Shifts `word` out on DSI with bit 16 clear, and returns the 17
     /// bits shifted in from DSO at the same time.
     async fn transfer(&mut self, word: u16) -> Result<u32, Self::Error>;
+
+    /// As [`Link::transfer`], for the last word before the CPU leaves
+    /// background mode (GO's opcode, CALL's last address word): the link
+    /// stops driving DSI as soon as the word is out, since pin 8 is
+    /// IFETCH, a CPU output, once FREEZE negates (PLAN.md, Hardware).
+    async fn transfer_exit(&mut self, word: u16) -> Result<u32, Self::Error>;
 }
 
 /// Why a command did not complete.
@@ -169,16 +175,25 @@ impl<L: Link> Session<L> {
         Ok(())
     }
 
-    /// Sends a command's words.  The answer to the opcode belongs to the
-    /// word before and is ignored; each operand's should be "not ready".
-    /// "Illegal" there means the opcode was refused, and the CPU now
-    /// takes the next word as a command, so the rest are not sent.
+    /// Sends a command's words, the last through
+    /// [`Link::transfer_exit`] if the command leaves background mode.
+    /// The answer to the opcode belongs to the word before and is
+    /// ignored; each operand's should be "not ready".  "Illegal" there
+    /// means the opcode was refused, and the CPU now takes the next word
+    /// as a command, so the rest are not sent.
     async fn send(&mut self, command: &Command) -> Result<(), Error<L::Error>> {
         let words = command.encode();
-        let (opcode, operands) = words.as_slice().split_first().expect("every command has an opcode");
-        self.transfer(*opcode).await?;
-        for operand in operands {
-            match self.transfer(*operand).await? {
+        let words = words.as_slice();
+        let exits = command.reply() == Reply::Exit;
+        for (n, word) in words.iter().enumerate() {
+            let response = if exits && n + 1 == words.len() {
+                let bits = self.link.transfer_exit(*word).await.map_err(Error::Link)?;
+                Response::decode(bits)
+            } else {
+                self.transfer(*word).await?
+            };
+            match response {
+                _ if n == 0 => {}
                 Response::NotReady => {}
                 Response::Illegal => return Err(Error::Illegal),
                 other => return Err(Error::Unexpected(other)),
@@ -246,25 +261,47 @@ mod tests {
 
     /// A link that checks each word sent against a script and answers
     /// from it.
-    #[derive(Debug)]
-    struct Script(VecDeque<(u16, u32)>);
+    #[derive(Debug, Default)]
+    struct Script {
+        /// Each word expected, and the answer to it.
+        steps: VecDeque<(u16, u32)>,
+        /// The words sent with `transfer_exit`.
+        exits: Vec<u16>,
+    }
 
     impl Link for Script {
         type Error = ();
 
         async fn transfer(&mut self, word: u16) -> Result<u32, ()> {
-            let (expected, response) = self.0.pop_front().expect("script ended early");
+            let (expected, response) = self.steps.pop_front().expect("script ended early");
             assert_eq!(word, expected, "word sent");
             Ok(response)
+        }
+
+        async fn transfer_exit(&mut self, word: u16) -> Result<u32, ()> {
+            self.exits.push(word);
+            self.transfer(word).await
         }
     }
 
     /// Runs `body` on a session over `script` and checks the script was
     /// used up.
     fn run<T>(script: &[(u16, u32)], body: impl AsyncFnOnce(&mut Session<Script>) -> T) -> T {
-        let mut session = Session::new(Script(script.iter().copied().collect()), RETRIES);
+        run_exiting(script, &[], body)
+    }
+
+    /// As `run`, checking which words went through `transfer_exit`.
+    fn run_exiting<T>(
+        script: &[(u16, u32)],
+        exits: &[u16],
+        body: impl AsyncFnOnce(&mut Session<Script>) -> T,
+    ) -> T {
+        let link = Script { steps: script.iter().copied().collect(), exits: Vec::new() };
+        let mut session = Session::new(link, RETRIES);
         let result = block_on(body(&mut session));
-        assert!(session.into_link().0.is_empty(), "script not used up");
+        let link = session.into_link();
+        assert!(link.steps.is_empty(), "script not used up");
+        assert_eq!(link.exits, exits, "words sent as the last before leaving background mode");
         result
     }
 
@@ -351,7 +388,16 @@ mod tests {
 
     #[test]
     fn go_clocks_nothing_after() {
-        let result = run(&[(0x0C00, STALE)], async |s| s.execute(&Command::Go).await);
+        let result = run_exiting(&[(0x0C00, STALE)], &[0x0C00], async |s| s.execute(&Command::Go).await);
+        assert_eq!(result, Ok(0));
+    }
+
+    #[test]
+    fn call_releases_dsi_on_its_last_word() {
+        let result =
+            run_exiting(&[(0x0800, STALE), (0x0004, NOT_READY), (0x1000, NOT_READY)], &[0x1000], async |s| {
+                s.execute(&Command::Call(Address(0x0004_1000))).await
+            });
         assert_eq!(result, Ok(0));
     }
 

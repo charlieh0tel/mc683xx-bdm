@@ -1,5 +1,7 @@
 //! The BDM serial link on PIO0's state machine 0 (PLAN.md, PIO
-//! program): 17-bit full-duplex words, DSCLK idling high.
+//! program): 17-bit full-duplex words, DSCLK idling high, and DSI's
+//! output enable, which the program turns off itself after the last
+//! word before the CPU leaves background mode.
 
 use core::convert::Infallible;
 
@@ -8,6 +10,7 @@ use embassy_rp::gpio::Level;
 use embassy_rp::peripherals::PIN_2;
 use embassy_rp::peripherals::PIN_3;
 use embassy_rp::peripherals::PIN_4;
+use embassy_rp::peripherals::PIN_11;
 use embassy_rp::peripherals::PIO0;
 use embassy_rp::pio::Common;
 use embassy_rp::pio::Config;
@@ -24,29 +27,49 @@ use pod_proto::session::Link;
 const WORD_BITS: u32 = 17;
 /// The OSR shifts left, so a word goes in left-justified.
 const LEFT_JUSTIFY: u32 = u32::BITS - WORD_BITS;
+/// The bit after a word in the OSR: set to turn DSI off once the word is
+/// out.
+const RELEASE_DSI: u32 = 1 << (LEFT_JUSTIFY - 1);
 /// The 17 bits shifted in.
 const WORD_MASK: u32 = (1 << WORD_BITS) - 1;
 /// The OSR and ISR are 32 bits; the program pulls and pushes itself.
 const SHIFT_THRESHOLD: u8 = 32;
 
-/// DSCLK (BKPT) on GP2, DSI on GP3, DSO on GP4 (PLAN.md, Pins).
+/// The PIO's pins (PLAN.md, Hardware): DSCLK (BKPT) on GP2, DSI on GP3,
+/// DSO on GP4, and DSI's 74AHCT125 output enable on GP11, active low.
 pub(crate) struct PioLink<'d> {
     sm: StateMachine<'d, PIO0, 0>,
     dsclk: Pin<'d, PIO0>,
+    dsi_enable: Pin<'d, PIO0>,
+}
+
+/// The pins [`PioLink::new`] takes over.
+pub(crate) struct LinkPins<'d> {
+    /// BKPT/DSCLK.
+    pub(crate) dsclk: Peri<'d, PIN_2>,
+    /// IFETCH/DSI.
+    pub(crate) dsi: Peri<'d, PIN_3>,
+    /// IPIPE/DSO.
+    pub(crate) dso: Peri<'d, PIN_4>,
+    /// DSI's output enable.
+    pub(crate) dsi_enable: Peri<'d, PIN_11>,
 }
 
 impl<'d> PioLink<'d> {
-    /// Loads the program and starts the state machine with DSCLK high.
+    /// Loads the program and starts the state machine with DSCLK high
+    /// and DSI off.
     pub(crate) fn new(
         common: &mut Common<'d, PIO0>,
         mut sm: StateMachine<'d, PIO0, 0>,
-        dsclk: Peri<'d, PIN_2>,
-        dsi: Peri<'d, PIN_3>,
-        dso: Peri<'d, PIN_4>,
+        pins: LinkPins<'d>,
         divider: Divider,
     ) -> Self {
         // Each phase is 8 cycles; DSO is sampled on the low phase's last
-        // cycle, just before DSCLK rises (PLAN.md, PIO program).
+        // cycle, just before DSCLK rises.  The high phase's delay is on
+        // the loop's back edge only, so after the 17th rise the OSR's
+        // next bit, RELEASE_DSI, is checked at once: if set, `set pins, 1`
+        // drives DSI's output enable high 3 cycles after the rise
+        // (PLAN.md, PIO program).
         let program = pio::pio_asm!(
             ".side_set 1 opt",
             ".wrap_target",
@@ -55,29 +78,36 @@ impl<'d> PioLink<'d> {
             "bit:",
             "    out pins, 1     side 0 [6]",
             "    in  pins, 1",
-            "    jmp x-- bit     side 1 [7]",
+            "    jmp !x last     side 1",
+            "    jmp x-- bit            [6]",
+            "last:",
+            "    out y, 1",
+            "    jmp !y keep",
+            "    set pins, 1",
+            "keep:",
             "    push block",
             ".wrap",
         );
-        let dsclk = common.make_pio_pin(dsclk);
-        let dsi = common.make_pio_pin(dsi);
-        let dso = common.make_pio_pin(dso);
+        let dsclk = common.make_pio_pin(pins.dsclk);
+        let dsi = common.make_pio_pin(pins.dsi);
+        let dso = common.make_pio_pin(pins.dso);
+        let dsi_enable = common.make_pio_pin(pins.dsi_enable);
         let shift =
             ShiftConfig { threshold: SHIFT_THRESHOLD, direction: ShiftDirection::Left, auto_fill: false };
         let mut config = Config::default();
         config.use_program(&common.load_program(&program.program), &[&dsclk]);
         config.set_out_pins(&[&dsi]);
         config.set_in_pins(&[&dso]);
-        config.set_set_pins(&[&dsclk]);
+        config.set_set_pins(&[&dsi_enable]);
         config.shift_out = shift;
         config.shift_in = shift;
         config.clock_divider = FixedU32::from_bits(divider.bits);
         sm.set_config(&config);
-        sm.set_pins(Level::High, &[&dsclk]);
-        sm.set_pin_dirs(Direction::Out, &[&dsclk, &dsi]);
+        sm.set_pins(Level::High, &[&dsclk, &dsi_enable]);
+        sm.set_pin_dirs(Direction::Out, &[&dsclk, &dsi, &dsi_enable]);
         sm.set_pin_dirs(Direction::In, &[&dso]);
         sm.set_enable(true);
-        Self { sm, dsclk }
+        Self { sm, dsclk, dsi_enable }
     }
 
     /// Drives DSCLK (BKPT) between words: low to request a halt.
@@ -85,9 +115,20 @@ impl<'d> PioLink<'d> {
         self.sm.set_pins(level, &[&self.dsclk]);
     }
 
+    /// Turns the DSI driver on (FREEZE asserted) or off.
+    pub(crate) fn set_dsi_enabled(&mut self, enabled: bool) {
+        let level = if enabled { Level::Low } else { Level::High };
+        self.sm.set_pins(level, &[&self.dsi_enable]);
+    }
+
     /// Changes DSCLK's rate.
     pub(crate) fn set_divider(&mut self, divider: Divider) {
         self.sm.set_clock_divider(FixedU32::from_bits(divider.bits));
+    }
+
+    async fn shift(&mut self, osr: u32) -> u32 {
+        self.sm.tx().wait_push(osr).await;
+        self.sm.rx().wait_pull().await & WORD_MASK
     }
 }
 
@@ -95,7 +136,10 @@ impl Link for PioLink<'_> {
     type Error = Infallible;
 
     async fn transfer(&mut self, word: u16) -> Result<u32, Infallible> {
-        self.sm.tx().wait_push(u32::from(word) << LEFT_JUSTIFY).await;
-        Ok(self.sm.rx().wait_pull().await & WORD_MASK)
+        Ok(self.shift(u32::from(word) << LEFT_JUSTIFY).await)
+    }
+
+    async fn transfer_exit(&mut self, word: u16) -> Result<u32, Infallible> {
+        Ok(self.shift(u32::from(word) << LEFT_JUSTIFY | RELEASE_DSI).await)
     }
 }

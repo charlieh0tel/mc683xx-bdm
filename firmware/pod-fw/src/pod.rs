@@ -50,9 +50,6 @@ pub(crate) struct Pod<'d> {
     session: Session<PioLink<'d>>,
     /// 74AHCT125 output enable for BKPT/DSCLK, active low.
     dsclk_enable: Output<'d>,
-    /// 74AHCT125 output enable for DSI, active low: off whenever pin 8 is
-    /// IFETCH, a CPU output, which is whenever FREEZE is negated.
-    dsi_enable: Output<'d>,
     /// 2N7002 gate: high pulls RESET low.
     reset_drive: Output<'d>,
     freeze: Input<'d>,
@@ -66,8 +63,6 @@ pub(crate) struct Pod<'d> {
 pub(crate) struct Lines<'d> {
     /// See [`Pod`].
     pub(crate) dsclk_enable: Output<'d>,
-    /// See [`Pod`].
-    pub(crate) dsi_enable: Output<'d>,
     /// See [`Pod`].
     pub(crate) reset_drive: Output<'d>,
     /// FREEZE, high in background mode.
@@ -83,7 +78,6 @@ impl<'d> Pod<'d> {
         Self {
             session: Session::new(link, NOT_READY_RETRIES),
             dsclk_enable: lines.dsclk_enable,
-            dsi_enable: lines.dsi_enable,
             reset_drive: lines.reset_drive,
             freeze: lines.freeze,
             reset: lines.reset,
@@ -159,7 +153,7 @@ impl<'d> Pod<'d> {
     /// background mode (MC68331UM 5.10.2.1).
     async fn reset_halt(&mut self) -> Result<(), Status> {
         self.require_target().await?;
-        self.dsi_enable.set_high();
+        self.session.link_mut().set_dsi_enabled(false);
         self.bkpt_low();
         self.reset_drive.set_high();
         Timer::after(RESET_PULSE).await;
@@ -167,15 +161,14 @@ impl<'d> Pod<'d> {
         self.wait_freeze(async |pod| pod.reset.wait_for_high().await).await
     }
 
-    /// GO, then DSI off: pin 8 is IFETCH again.  Only in background mode:
-    /// otherwise its clocks would be BKPT pulses.
+    /// GO.  The PIO turns DSI off as the word ends (`Link::transfer_exit`):
+    /// pin 8 is IFETCH again.  Only in background mode: otherwise its
+    /// clocks would be BKPT pulses.
     async fn go(&mut self) -> Result<(), Status> {
         if self.freeze.is_low() {
             return Err(Status::NoFreeze);
         }
-        let done = self.session.execute(&Command::Go).await;
-        self.dsi_enable.set_high();
-        done.map(|_| ()).map_err(Status::from)
+        self.session.execute(&Command::Go).await.map(|_| ()).map_err(Status::from)
     }
 
     fn set_clock(&mut self, dsclk_hz: u32) -> u32 {
@@ -199,7 +192,7 @@ impl<'d> Pod<'d> {
         })
         .await;
         if frozen.is_ok() {
-            self.dsi_enable.set_low();
+            self.session.link_mut().set_dsi_enabled(true);
             Ok(())
         } else {
             self.session.link_mut().set_dsclk(Level::High);

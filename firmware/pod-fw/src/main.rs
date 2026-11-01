@@ -41,6 +41,7 @@ use pod_proto::usb::Status;
 use pod_proto::usb::encode_status;
 use static_cell::ConstStaticCell;
 
+use crate::link::LinkPins;
 use crate::link::PioLink;
 use crate::pod::Lines;
 use crate::pod::Pod;
@@ -86,7 +87,6 @@ async fn main(_spawner: Spawner) {
     // and RESET and BERR stay released.
     let lines = Lines {
         dsclk_enable: Output::new(p.PIN_10, Level::High),
-        dsi_enable: Output::new(p.PIN_11, Level::High),
         reset_drive: Output::new(p.PIN_8, Level::Low),
         freeze: Input::new(p.PIN_5, Pull::Down),
         reset: Input::new(p.PIN_6, Pull::None),
@@ -96,7 +96,8 @@ async fn main(_spawner: Spawner) {
     let _led = Output::new(p.PIN_25, Level::High);
 
     let Pio { mut common, sm0, .. } = Pio::new(p.PIO0, Irqs);
-    let link = PioLink::new(&mut common, sm0, p.PIN_2, p.PIN_3, p.PIN_4, divider(clk_sys_freq(), DEFAULT_HZ));
+    let pins = LinkPins { dsclk: p.PIN_2, dsi: p.PIN_3, dso: p.PIN_4, dsi_enable: p.PIN_11 };
+    let link = PioLink::new(&mut common, sm0, pins, divider(clk_sys_freq(), DEFAULT_HZ));
     let adc = Adc::new(p.ADC, Irqs, adc::Config::default());
     let vdd = adc::Channel::new_pin(p.PIN_26, Pull::None);
     let mut pod = Pod::new(link, lines, adc, vdd);
