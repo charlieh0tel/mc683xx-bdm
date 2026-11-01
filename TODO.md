@@ -14,6 +14,8 @@
   Firmware).
 - DSCLK above 4 MHz, once the throughput test measures the margin.
 - `pod-host`: `bdm` CLI over nusb; `Cpu32Target` over it.
+- A second Pico as a stand-in CPU32: a target-side PIO program around
+  `bdm-model`, driving FREEZE and watching BKPT and RESET.
 - m683xx-emu: depend on `cpu32-target` by git and implement it.
 - Bring-up, in order (PLAN.md, Bring-up checklist):
   - PIO loopback: scope DSCLK/DSI, 17-bit framing, idle high.

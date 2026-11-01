@@ -24,7 +24,7 @@ CLI yet.
 
 ```
 cd firmware
-cargo test                     # cpu32-target and pod-proto, on the host
+cargo test                     # cpu32-target, pod-proto and bdm-model, on the host
 
 cd pod-fw
 cargo run --release            # Pico, defmt over RTT, through an SWD probe

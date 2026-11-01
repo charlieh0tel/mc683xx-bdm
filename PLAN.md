@@ -223,6 +223,7 @@ m683xx-pod/
 │   └── release.py       # JLCPCB release package (uv)
 ├── production/          # each release as ordered
 ├── firmware/
+│   ├── bdm-model/       # a CPU32 in background mode at the serial word, no_std; test target
 │   ├── cpu32-target/    # Cpu32Target trait, no_std; shared with the emulator
 │   ├── pod-proto/       # BDM words and command sequences; USB commands; no_std
 │   ├── pod-fw/          # Pico / Pico 2 firmware, embassy-rp, PIO
@@ -275,8 +276,14 @@ The firmware's own sizes, release builds: about 24 KB of flash and
 
 Handle not-ready retries in firmware; report BERR and illegal-command
 errors to the host.  `pod-proto`'s `session` does both, over a `Link`
-trait that the PIO state machine implements; tests run it against
-scripted CPU32RM command sequences.
+trait that the PIO state machine implements.  Two sets of host tests
+run it: scripted word sequences from CPU32RM's figures (`pod-proto`),
+and `bdm-model`, a CPU32 in background mode that answers each word as
+CPU32RM 7.2.8 says, decodes opcodes independently of `pod-proto`, and
+records what a real CPU would not take: clocks while running, words
+lost while busy, DUMP or FILL without READ or WRITE, GO or CALL
+without the DSI release.  It is `no_std` so a second Pico can run it
+as a stand-in target later.
 
 Each result is collected with NOPs, so a DUMP or FILL block costs about
 two transfers per access.  Sending the next DUMP in place of the NOP
