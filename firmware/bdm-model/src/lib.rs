@@ -18,10 +18,12 @@
 use core::convert::Infallible;
 use core::ops::Range;
 
-use cpu32_target::Address;
-use cpu32_target::Register;
-use cpu32_target::Size;
-use cpu32_target::SystemRegister;
+use mc683xx_target::address::Address;
+use mc683xx_target::entry::Entry;
+use mc683xx_target::register::Register;
+use mc683xx_target::register::SystemRegister;
+use mc683xx_target::size::Size;
+use pod_proto::bdm::byte_count;
 use pod_proto::session::Link;
 
 /// Words the CPU shifts out (CPU32RM Table 7-3).
@@ -38,7 +40,6 @@ const NOP: u16 = 0x0000;
 const REGISTER_MASK: u16 = 0xFFF0;
 const SIZED_MASK: u16 = 0xFF3F;
 const SIZE_SHIFT: u16 = 6;
-const SIZE_FIELD: u16 = 0b11;
 const LOW_NIBBLE: u16 = 0x000F;
 
 /// Bytes in a long, the stack step for CALL's return address.
@@ -49,28 +50,6 @@ const LOW_WORD: u32 = 0xFFFF;
 /// The ATEMP a command leaves behind once it has used it for scratch
 /// (CPU32RM 7.2.3: most commands do).
 const ATEMP_SCRATCH: u32 = 0xA7E3_A7E3;
-
-/// How the CPU came to background mode, and so what ATEMP holds
-/// (CPU32RM Table 7-2).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Entry {
-    /// BKPT, from the pod or a peripheral.
-    Breakpoint,
-    /// The BGND instruction.
-    Bgnd,
-    /// A double bus fault, with its special status word.
-    DoubleBusFault(u16),
-}
-
-impl Entry {
-    const fn atemp(self) -> u32 {
-        match self {
-            Self::Breakpoint => 0x0000_0000,
-            Self::Bgnd => 0x0000_0001,
-            Self::DoubleBusFault(ssw) => (ssw as u32) << 16 | 0xFFFF,
-        }
-    }
-}
 
 /// Something a real CPU32 would not have taken.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -112,7 +91,7 @@ enum Op {
 impl Op {
     fn decode(word: u16) -> Option<Self> {
         let low = word & LOW_NIBBLE;
-        let size = Size::from_code((word >> SIZE_SHIFT) & SIZE_FIELD);
+        let size = Size::from_field(word >> SIZE_SHIFT);
         match (word & REGISTER_MASK, word & SIZED_MASK) {
             (0x2180, _) => Register::from_code(low).map(Self::ReadRegister),
             (0x2080, _) => Register::from_code(low).map(Self::WriteRegister),
@@ -456,7 +435,7 @@ impl<const RAM: usize> Target<RAM> {
         self.busy = self.memory_busy;
         match self.load(size, address) {
             Ok(value) => {
-                self.block_address = address.wrapping_add(width(size));
+                self.block_address = address.wrapping_add(size.bytes());
                 match size {
                     Size::Long => self.reply_long(value),
                     Size::Byte | Size::Word => self.reply(&[(value, Input::Command)]),
@@ -470,7 +449,7 @@ impl<const RAM: usize> Target<RAM> {
         self.busy = self.memory_busy;
         match self.store(size, address, value) {
             Ok(()) => {
-                self.block_address = address.wrapping_add(width(size));
+                self.block_address = address.wrapping_add(size.bytes());
                 self.reply(&[(COMPLETE, Input::Command)]);
             }
             Err(()) => self.reply(&[(BUS_ERROR, Input::Discard)]),
@@ -485,7 +464,7 @@ impl<const RAM: usize> Target<RAM> {
         }
         let offset = address.checked_sub(self.ram_base).ok_or(())?;
         let start = usize::try_from(offset).map_err(|_| ())?;
-        let end = start.checked_add(size.bytes()).ok_or(())?;
+        let end = start.checked_add(byte_count(size)).ok_or(())?;
         if end > RAM {
             return Err(());
         }
@@ -520,11 +499,6 @@ impl<const RAM: usize> Target<RAM> {
         self.first_violation.get_or_insert(violation);
         self.violations += 1;
     }
-}
-
-/// An access's width as an address step.
-fn width(size: Size) -> u32 {
-    u32::try_from(size.bytes()).expect("1, 2 or 4 bytes")
 }
 
 impl<const RAM: usize> Link for Target<RAM> {

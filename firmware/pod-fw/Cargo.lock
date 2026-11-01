@@ -215,10 +215,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "cpu32-target"
-version = "0.1.0"
-
-[[package]]
 name = "cpufeatures"
 version = "0.2.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -915,6 +911,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "mc683xx-target"
+version = "0.2.0"
+source = "git+https://github.com/charlieh0tel/mc683xx?rev=5dec517bdfc4456228fa2681fc1d1229172a1aae#5dec517bdfc4456228fa2681fc1d1229172a1aae"
+dependencies = [
+ "thiserror",
+]
+
+[[package]]
 name = "memchr"
 version = "2.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1116,7 +1120,6 @@ version = "0.1.0"
 dependencies = [
  "cortex-m",
  "cortex-m-rt",
- "cpu32-target",
  "defmt",
  "defmt-rtt",
  "embassy-executor",
@@ -1125,6 +1128,7 @@ dependencies = [
  "embassy-time",
  "embassy-usb",
  "fixed",
+ "mc683xx-target",
  "panic-halt",
  "panic-probe",
  "pio",
@@ -1137,7 +1141,7 @@ dependencies = [
 name = "pod-proto"
 version = "0.1.0"
 dependencies = [
- "cpu32-target",
+ "mc683xx-target",
  "thiserror",
 ]
 

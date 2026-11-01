@@ -2,10 +2,10 @@
 //! 7.2.8).  A word is 17 bits: bit 16 is status (from the CPU) or
 //! control (from the host, always clear), bits 15-0 data.
 
-use cpu32_target::Address;
-use cpu32_target::Register;
-use cpu32_target::Size;
-use cpu32_target::SystemRegister;
+use mc683xx_target::address::Address;
+use mc683xx_target::register::Register;
+use mc683xx_target::register::SystemRegister;
+use mc683xx_target::size::Size;
 
 /// Opcodes, CPU32RM 7.2.8.4-7.2.8.15.  RSREG's figure there prints
 /// 0x2480, the same as WSREG's: a misprint (PLAN.md, Protocol summary).
@@ -136,7 +136,14 @@ const fn split(value: u32) -> [u16; 2] {
 
 /// An opcode with its size field.
 const fn sized(opcode: u16, size: Size) -> u16 {
-    opcode | (size.code() << SIZE_SHIFT)
+    opcode | (size.field() << SIZE_SHIFT)
+}
+
+/// Bytes in an access of `size`, as a length.
+#[must_use]
+pub const fn byte_count(size: Size) -> usize {
+    // 1, 2 or 4: no target's usize loses it.
+    size.bytes() as usize
 }
 
 impl Command {

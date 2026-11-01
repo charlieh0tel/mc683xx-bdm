@@ -2,11 +2,12 @@
 //! bulk IN packet, little-endian.  A request starts with its code, a
 //! reply with its status; what follows depends on the request.
 
-use cpu32_target::Address;
-use cpu32_target::Register;
-use cpu32_target::Size;
-use cpu32_target::SystemRegister;
+use mc683xx_target::address::Address;
+use mc683xx_target::register::Register;
+use mc683xx_target::register::SystemRegister;
+use mc683xx_target::size::Size;
 
+use crate::bdm::byte_count;
 use crate::session;
 
 /// pid.codes' VID, with its test PID below, for private use until the
@@ -259,13 +260,16 @@ impl<'a> Request<'a> {
             Self::ReadMemory { address: Address(address), size, length } => {
                 let bytes = u8::try_from(length).ok().filter(|_| memory_length_ok(size, length));
                 let bytes = bytes.ok_or(ParseError::Field(READ_MEMORY))?;
-                out.put(&[READ_MEMORY]).put(&address.to_le_bytes()).put(&[code_byte(size.code()), bytes]);
+                out.put(&[READ_MEMORY]).put(&address.to_le_bytes()).put(&[code_byte(size.field()), bytes]);
             }
             Self::WriteMemory { address: Address(address), size, data } => {
                 if !memory_length_ok(size, data.len()) {
                     return Err(ParseError::Field(WRITE_MEMORY));
                 }
-                out.put(&[WRITE_MEMORY]).put(&address.to_le_bytes()).put(&[code_byte(size.code())]).put(data);
+                out.put(&[WRITE_MEMORY])
+                    .put(&address.to_le_bytes())
+                    .put(&[code_byte(size.field())])
+                    .put(data);
             }
             Self::Call(Address(address)) => {
                 out.put(&[CALL]).put(&address.to_le_bytes());
@@ -301,7 +305,8 @@ const fn long(bytes: [u8; LONG]) -> u32 {
     u32::from_le_bytes(bytes)
 }
 
-/// A register, select or size code as its one byte: all are under 16.
+/// A register or select code, or a size field, as its one byte: all are
+/// under 16.
 fn code_byte(code: u16) -> u8 {
     u8::try_from(code).expect("register and size codes fit a byte")
 }
@@ -314,14 +319,15 @@ fn system_register_from(byte: u8) -> Option<SystemRegister> {
     SystemRegister::from_code(u16::from(byte))
 }
 
+/// The size a byte names; `from_field` alone would read 4 as a byte.
 fn size_from(byte: u8) -> Option<Size> {
-    Size::from_code(u16::from(byte))
+    Size::from_field(u16::from(byte)).filter(|size| size.field() == u16::from(byte))
 }
 
 /// A memory request's length: whole accesses, at least one, at most
 /// [`MAX_MEMORY_BYTES`].
 fn memory_length_ok(size: Size, length: usize) -> bool {
-    length > 0 && length <= MAX_MEMORY_BYTES && length.is_multiple_of(size.bytes())
+    length > 0 && length <= MAX_MEMORY_BYTES && length.is_multiple_of(byte_count(size))
 }
 
 /// Writes a Transfer request for `words` into `packet`, returning its
@@ -529,6 +535,7 @@ mod tests {
     use super::Size;
     use super::Status;
     use super::SystemRegister;
+    use super::byte_count;
     use super::encode_data;
     use super::encode_pins;
     use super::encode_status;
@@ -572,7 +579,7 @@ mod tests {
         let data = [0xA5; MAX_MEMORY_BYTES];
         round_trip(Request::WriteMemory { address: Address(u32::MAX), size: Size::Long, data: &data });
         round_trip(Request::ReadMemory { address: Address(0), size: Size::Byte, length: MAX_MEMORY_BYTES });
-        assert!(MAX_MEMORY_BYTES.is_multiple_of(Size::Long.bytes()));
+        assert!(MAX_MEMORY_BYTES.is_multiple_of(byte_count(Size::Long)));
         const { assert!(1 + 4 + 1 + MAX_MEMORY_BYTES <= PACKET) };
     }
 
@@ -587,9 +594,16 @@ mod tests {
         }
         let request = Request::WriteMemory { address: Address(0), size: Size::Word, data: &[1, 2, 3] };
         assert_eq!(request.encode(&mut packet), Err(ParseError::Field(0x0C)));
-        // Parsed: odd word length, and the reserved size.
+        // Parsed: odd word length, the reserved size, and sizes past the
+        // field's two bits.
         assert_eq!(Request::parse(&[0x0B, 0, 0, 0, 0, 1, 3]), Err(ParseError::Field(0x0B)));
-        assert_eq!(Request::parse(&[0x0B, 0, 0, 0, 0, 3, 4]), Err(ParseError::Field(0x0B)));
+        for size in [3, 4, 6, 0xFF] {
+            assert_eq!(
+                Request::parse(&[0x0B, 0, 0, 0, 0, size, 4]),
+                Err(ParseError::Field(0x0B)),
+                "size {size}"
+            );
+        }
     }
 
     #[test]

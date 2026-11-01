@@ -8,16 +8,17 @@
 //! "command complete" comes back with the next command's opcode, and is
 //! ignored there.
 
-use cpu32_target::Address;
-use cpu32_target::Register;
-use cpu32_target::Size;
-use cpu32_target::SystemRegister;
+use mc683xx_target::address::Address;
+use mc683xx_target::register::Register;
+use mc683xx_target::register::SystemRegister;
+use mc683xx_target::size::Size;
 
 use crate::bdm::COMPLETE;
 use crate::bdm::Command;
 use crate::bdm::NOP;
 use crate::bdm::Reply;
 use crate::bdm::Response;
+use crate::bdm::byte_count;
 
 /// The serial link to the CPU: DSCLK, DSI and DSO, in the firmware the
 /// PIO state machine (PLAN.md, PIO program).
@@ -144,10 +145,10 @@ impl<L: Link> Session<L> {
         data: &mut [u8],
     ) -> Result<(), Error<L::Error>> {
         check_length(size, data.len())?;
-        for (n, chunk) in data.chunks_exact_mut(size.bytes()).enumerate() {
+        for (n, chunk) in data.chunks_exact_mut(byte_count(size)).enumerate() {
             let command = if n == 0 { Command::Read(size, address) } else { Command::Dump(size) };
             let value = self.execute(&command).await?;
-            chunk.copy_from_slice(&value.to_be_bytes()[4 - size.bytes()..]);
+            chunk.copy_from_slice(&value.to_be_bytes()[4 - byte_count(size)..]);
         }
         Ok(())
     }
@@ -164,9 +165,9 @@ impl<L: Link> Session<L> {
         data: &[u8],
     ) -> Result<(), Error<L::Error>> {
         check_length(size, data.len())?;
-        for (n, chunk) in data.chunks_exact(size.bytes()).enumerate() {
+        for (n, chunk) in data.chunks_exact(byte_count(size)).enumerate() {
             let mut bytes = [0; 4];
-            bytes[4 - size.bytes()..].copy_from_slice(chunk);
+            bytes[4 - byte_count(size)..].copy_from_slice(chunk);
             let value = u32::from_be_bytes(bytes);
             let command =
                 if n == 0 { Command::Write(size, address, value) } else { Command::Fill(size, value) };
@@ -231,7 +232,7 @@ impl<L: Link> Session<L> {
 }
 
 fn check_length<L>(size: Size, length: usize) -> Result<(), Error<L>> {
-    if length.is_multiple_of(size.bytes()) { Ok(()) } else { Err(Error::Length { length, size }) }
+    if length.is_multiple_of(byte_count(size)) { Ok(()) } else { Err(Error::Length { length, size }) }
 }
 
 #[cfg(test)]

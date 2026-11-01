@@ -2,7 +2,6 @@
 //! around the serial link (PLAN.md, Protocol summary) and the USB
 //! requests that call them (`pod_proto::usb`).
 
-use cpu32_target::SystemRegister;
 use embassy_rp::adc::Adc;
 use embassy_rp::adc::Async;
 use embassy_rp::adc::Channel;
@@ -13,6 +12,7 @@ use embassy_rp::gpio::Output;
 use embassy_time::Duration;
 use embassy_time::Timer;
 use embassy_time::with_timeout;
+use mc683xx_target::register::SystemRegister;
 use pod_proto::bdm::Command;
 use pod_proto::dsclk::divider;
 use pod_proto::session::Link;

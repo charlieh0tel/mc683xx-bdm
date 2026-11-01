@@ -25,7 +25,7 @@ schematic drafted (`hardware/m683xx-pod/`), no board layout yet.
 
 ```
 cd firmware
-cargo test                     # cpu32-target, pod-proto and bdm-model, on the host
+cargo test                     # pod-proto, bdm-model and pod-host, on the host
 
 cd pod-fw
 cargo run --release            # Pico, defmt over RTT, through an SWD probe

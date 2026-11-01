@@ -2,10 +2,11 @@
 //! over the transport, and decodes the reply.  Memory and raw transfers
 //! longer than a packet go as several requests.
 
-use cpu32_target::Address;
-use cpu32_target::Register;
-use cpu32_target::Size;
-use cpu32_target::SystemRegister;
+use mc683xx_target::address::Address;
+use mc683xx_target::register::Register;
+use mc683xx_target::register::SystemRegister;
+use mc683xx_target::size::Size;
+use pod_proto::bdm::byte_count;
 use pod_proto::usb::MAX_MEMORY_BYTES;
 use pod_proto::usb::MAX_TRANSFER_WORDS;
 use pod_proto::usb::PACKET;
@@ -242,7 +243,7 @@ fn at(Address(base): Address, offset: usize) -> Address {
 }
 
 fn check_length(size: Size, length: usize) -> Result<(), Error> {
-    if length.is_multiple_of(size.bytes()) { Ok(()) } else { Err(Error::Length { length, size }) }
+    if length.is_multiple_of(byte_count(size)) { Ok(()) } else { Err(Error::Length { length, size }) }
 }
 
 #[cfg(test)]

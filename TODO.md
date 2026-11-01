@@ -15,13 +15,13 @@
 - BERR sense, if a fifth input buffer is worth a part (PLAN.md,
   Firmware).
 - DSCLK above 4 MHz, once the throughput test measures the margin.
-- `pod-host`: `Cpu32Target` over USB once m683xx-emu's `mc683xx-target`
-  lands; then delete `cpu32-target`.  A `Link` adapter onto m683xx-emu's
+- `pod-host`: `Cpu32Target` (`mc683xx-target`) over USB.  A `Link` adapter onto m683xx-emu's
   BDM serial exchange once it lands; then delete `bdm-model`.
 - `bdm load <srec/elf>`; a target init script run after each reset.
 - A second Pico as a stand-in CPU32: a target-side PIO program around
   `bdm-model`, driving FREEZE and watching BKPT and RESET.
-- m683xx-emu: depend on `cpu32-target` by git and implement it.
+- `mc683xx-target` from crates.io once 0.3.0 is published, in place of
+  the pinned git rev.
 - Bring-up, in order (PLAN.md, Bring-up checklist):
   - PIO loopback: scope DSCLK/DSI, 17-bit framing, idle high.
   - Reset into BDM; FREEZE asserts.
@@ -36,4 +36,4 @@
   - DUMP/FILL throughput; raise DSCLK until it fails, back off.
   - Load and run a test program from RAM.
   - Flash programming (target-resident algorithm).
-  - Emulator on `cpu32-target`; smartclock harness on silicon.
+  - Emulator on `mc683xx-target`; smartclock harness on silicon.

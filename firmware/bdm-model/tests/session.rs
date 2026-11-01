@@ -2,14 +2,14 @@
 //! pod uses, run against a CPU32 that answers as CPU32RM 7.2.8 says and
 //! records what a real one would not take.
 
-use bdm_model::Entry;
 use bdm_model::Target;
 use bdm_model::Violation;
-use cpu32_target::Address;
-use cpu32_target::Register;
-use cpu32_target::Size;
-use cpu32_target::SystemRegister;
 use embassy_futures::block_on;
+use mc683xx_target::address::Address;
+use mc683xx_target::entry::Entry;
+use mc683xx_target::register::Register;
+use mc683xx_target::register::SystemRegister;
+use mc683xx_target::size::Size;
 use pod_proto::bdm::Command;
 use pod_proto::session::Error;
 use pod_proto::session::Link;
@@ -38,8 +38,8 @@ fn clean(session: &mut Session<Model>) {
 fn atemp_read_first_gives_the_entry_source() {
     for (entry, atemp) in [
         (Entry::Breakpoint, 0x0000_0000),
-        (Entry::Bgnd, 0x0000_0001),
-        (Entry::DoubleBusFault(0x1234), 0x1234_FFFF),
+        (Entry::Background, 0x0000_0001),
+        (Entry::DoubleBusFault { ssw: 0x1234 }, 0x1234_FFFF),
     ] {
         let mut target = Model::new(Address(RAM_BASE));
         target.enter_background(entry);
@@ -83,7 +83,7 @@ fn system_registers_round_trip() {
 #[test]
 fn memory_round_trips_in_every_size() {
     for busy in [0, 3] {
-        for size in Size::ALL {
+        for size in [Size::Byte, Size::Word, Size::Long] {
             let mut session = halted();
             session.link_mut().memory_busy = busy;
             let data: [u8; 16] =

@@ -10,8 +10,9 @@ Goals:
 - Load and run code in RAM; program external flash.
 - Share a `Cpu32Target` trait with the `cpu32`/`mc68331` emulator
   crates so the smartclock harness can run against silicon or the
-  emulator.  The trait is this repo's `cpu32-target` crate; the
-  emulator depends on it by git.
+  emulator.  The trait is m683xx-emu's `mc683xx-target` crate
+  (github.com/charlieh0tel/mc683xx, crates/target); the pod depends on
+  it by git, pinned to a rev.
 
 Non-goals (for now): other BDM families (ColdFire, HCS08), GDB stub,
 real-time trace.
@@ -230,7 +231,6 @@ m683xx-pod/
 ├── production/          # each release as ordered
 ├── firmware/
 │   ├── bdm-model/       # a CPU32 in background mode at the serial word, no_std; test target
-│   ├── cpu32-target/    # Cpu32Target trait, no_std; shared with the emulator
 │   ├── pod-proto/       # BDM words and command sequences; USB commands; no_std
 │   ├── pod-fw/          # Pico / Pico 2 firmware, embassy-rp, PIO
 │   └── pod-host/        # Rust library + `bdm` CLI (nusb)
@@ -318,11 +318,12 @@ USB command reports the high-water mark.  Not written yet.
 - `bdm`: pins, halt, reset, go, call, clock, regs, get, set, dump,
   write, xfer.  Halt and reset print the entry source from ATEMP.
 - Linux needs a udev rule for access without root (README.md).
-- `Cpu32Target`: moves to m683xx-emu as `mc683xx-target` (no_std,
-  MIT OR Apache-2.0), with explicit function codes on memory calls and
-  a way to wait for a halt; the CPU32's BDM goes there too (agreed with
-  m683xx-emu, 2026-10-31).  `pod-host` implements it over USB once it
-  lands, and `cpu32-target` here goes.
+- `mc683xx-target` (m683xx-emu, no_std, MIT OR Apache-2.0) holds
+  `Cpu32Target` and the types every crate here uses: Address, Size,
+  Register, SystemRegister, FunctionCode, Entry.  Memory calls name
+  their function code; halting returns the entry source decoded from
+  ATEMP.  Taken by git at a pinned rev until its crates.io release
+  (0.3.0).  `pod-host` implements `Cpu32Target` over USB: to come.
 - To come: `bdm load <srec/elf>`, and a target init script (chip
   selects, SIM setup) run after each reset.
 
