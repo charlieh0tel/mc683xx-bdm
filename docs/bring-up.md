@@ -222,7 +222,14 @@ whose model takes one answer for each.
 
 ## 14. Stack peak
 
-With the `rtt` build, the firmware logs its stack's high-water mark
-(PLAN.md, Firmware).  After steps 5, 8, 9 and 12 (a reset into BDM, a
-register dump, a block DUMP), record the peak against the chip's SRAM
-in PLAN.md, as AGENTS.md asks.
+After steps 5, 8, 9 and 12 (a reset into BDM, a register dump, a block
+DUMP), with the Debug Probe attached and no other probe-rs session:
+
+```
+cd firmware/pod-fw
+./stack-peak                                     # RP2040 release build
+./stack-peak target/thumbv8m.main-none-eabihf/release/pod-fw RP235x
+```
+
+It prints the peak against the stack's size.  Record it in PLAN.md
+with the chip's SRAM, as AGENTS.md asks.

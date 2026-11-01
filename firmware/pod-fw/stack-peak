@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+# The firmware's stack high-water mark, read over SWD from a running
+# pod: cortex-m-rt paints the stack (_stack_end up to _stack_start) with
+# 0xCCCCCCCC at reset, and the lowest word changed since is the deepest
+# the stack has been.  No firmware support beyond the paint.
+#
+# Usage: stack-peak [ELF] [CHIP]
+#   ELF   the running build (default: the RP2040 release build)
+#   CHIP  probe-rs's chip name: RP2040 (default) or RP235x
+# Run it with the Debug Probe attached and no other probe-rs session.
+set -euo pipefail
+
+elf=${1:-target/thumbv6m-none-eabi/release/pod-fw}
+chip=${2:-RP2040}
+paint=cccccccc
+
+nm=$(echo "$(rustc --print sysroot)"/lib/rustlib/*/bin/llvm-nm)
+symbol() {
+    local address
+    address=$("$nm" "$elf" | awk -v name="$1" '$3 == name { print $1 }')
+    if [[ -z $address ]]; then
+        echo "stack-peak: no $1 in $elf" >&2
+        exit 1
+    fi
+    echo $((16#$address))
+}
+start=$(symbol _stack_start)
+end=$(symbol _stack_end)
+words=$(((start - end) / 4))
+
+probe-rs read --chip "$chip" b32 "$end" "$words" |
+    tr -s ' ' '\n' |
+    awk -v paint="$paint" -v start="$start" -v end="$end" -v words="$words" '
+        NF == 0 { next }
+        $1 != paint && first == "" { first = n }
+        { n++ }
+        END {
+            if (n != words) {
+                printf "stack-peak: read %d words of %d\n", n, words > "/dev/stderr"
+                exit 1
+            }
+            if (first == "") {
+                print "stack-peak: the stack is all paint: was the build painted?" > "/dev/stderr"
+                exit 1
+            }
+            peak = start - (end + 4 * first)
+            printf "stack peak: %d bytes of %d\n", peak, start - end
+        }'

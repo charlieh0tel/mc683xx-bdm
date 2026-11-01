@@ -293,8 +293,8 @@ the pod has its own.  Requests:
     and DFC, which the host sets.
   - Go, Call: the last word through `Link::transfer_exit`.
 
-The firmware's own sizes, release builds: 26120 bytes of text on the
-RP2040 and 25028 on the RP2350, 2740 bytes of statics on either.
+The firmware's own sizes, release builds: 26144 bytes of text on the
+RP2040 and 25052 on the RP2350, 2740 bytes of statics on either.
 
 Handle not-ready retries in firmware; report BERR and illegal-command
 errors to the host.  `pod-proto`'s `session` does both, over a `Link`
@@ -316,8 +316,10 @@ JST-SH SWD connector (SWCLK, GND, SWDIO, from the Pico's debug pads),
 with `probe-rs` (`cargo run` in `firmware/pod-fw`), which supports
 RP2040 and RP235x; without a probe, `picotool load -x` over BOOTSEL.
 
-Stack peak: paint the stack with a pattern at boot; a `stack`
-USB command reports the high-water mark.  Not written yet.
+Stack peak: cortex-m-rt's `paint-stack` fills the stack with
+0xCCCCCCCC at reset, and `firmware/pod-fw/stack-peak` reads it back
+over SWD (probe-rs) and reports the deepest word changed.  No firmware
+code and no `unsafe`; no USB request, so the protocol is unchanged.
 
 ## Host (Rust)
 

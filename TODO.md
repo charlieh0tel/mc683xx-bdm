@@ -11,7 +11,6 @@
 
 ## Firmware
 
-- `pod-fw`: stack painting and a `stack` request (PLAN.md, Firmware).
 - BERR sense, if a fifth input buffer is worth a part (PLAN.md,
   Firmware).
 - DSCLK above 4 MHz, once the throughput test measures the margin.
