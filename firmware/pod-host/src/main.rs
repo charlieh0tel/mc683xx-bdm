@@ -8,11 +8,14 @@ use anyhow::bail;
 use clap::Parser;
 use clap::Subcommand;
 use clap::ValueEnum;
+use mc683xx_target::Cpu32Target;
 use mc683xx_target::address::Address;
+use mc683xx_target::function_code::FunctionCode;
 use mc683xx_target::register::Register;
 use mc683xx_target::register::SystemRegister;
 use mc683xx_target::size::Size;
 use pod_host::pod::Pod;
+use pod_host::target::PodTarget;
 use pod_host::transport::StreamTransport;
 use pod_host::transport::Transport;
 use pod_host::transport::UsbTransport;
@@ -65,7 +68,7 @@ enum Command {
         #[arg(value_parser = number)]
         value: u32,
     },
-    /// Hex dump LENGTH bytes from ADDRESS, through SFC.
+    /// Hex dump LENGTH bytes from ADDRESS.
     Dump {
         #[arg(value_parser = number)]
         address: u32,
@@ -73,8 +76,12 @@ enum Command {
         length: u32,
         #[arg(long, value_enum, default_value_t = Width::Word)]
         size: Width,
+        /// Function code, the address space: 5 supervisor data, 6
+        /// supervisor program, 1 and 2 user, 7 CPU space.
+        #[arg(long, value_parser = function_code, default_value = "5")]
+        fc: FunctionCode,
     },
-    /// Write BYTES at ADDRESS, through DFC.
+    /// Write BYTES at ADDRESS.
     Write {
         #[arg(value_parser = number)]
         address: u32,
@@ -83,6 +90,9 @@ enum Command {
         bytes: Vec<u8>,
         #[arg(long, value_enum, default_value_t = Width::Byte)]
         size: Width,
+        /// Function code, as for dump.
+        #[arg(long, value_parser = function_code, default_value = "5")]
+        fc: FunctionCode,
     },
     /// Raw serial words, each answered with the 17 bits shifted in.
     /// With the target running, the clocks are BKPT pulses.
@@ -117,43 +127,29 @@ enum Named {
     System(SystemRegister),
 }
 
-/// System registers' names, in the order `regs` prints them.
-const SYSTEM_NAMES: [(&str, SystemRegister); 10] = [
-    ("rpc", SystemRegister::Rpc),
-    ("pcc", SystemRegister::Pcc),
-    ("sr", SystemRegister::Sr),
-    ("usp", SystemRegister::Usp),
-    ("ssp", SystemRegister::Ssp),
-    ("vbr", SystemRegister::Vbr),
-    ("sfc", SystemRegister::Sfc),
-    ("dfc", SystemRegister::Dfc),
-    ("far", SystemRegister::Far),
-    ("atemp", SystemRegister::Atemp),
+/// System registers in the order `regs` prints them; ATEMP is left
+/// out, as reading it after entry gives only a scratch value.
+const SYSTEM_REGISTERS: [SystemRegister; 9] = [
+    SystemRegister::Rpc,
+    SystemRegister::Pcc,
+    SystemRegister::Sr,
+    SystemRegister::Usp,
+    SystemRegister::Ssp,
+    SystemRegister::Vbr,
+    SystemRegister::Sfc,
+    SystemRegister::Dfc,
+    SystemRegister::Far,
 ];
 
+/// A register by name: `d0`-`a7`, `sp` for A7, or a system register.
 fn register(name: &str) -> Result<Named> {
-    let name = name.to_ascii_lowercase();
-    if name == "sp" {
+    if name.eq_ignore_ascii_case("sp") {
         return Ok(Named::Data(Register::A7));
     }
-    if let Some((_, register)) = SYSTEM_NAMES.iter().find(|(n, _)| *n == name) {
-        return Ok(Named::System(*register));
-    }
-    let (bank, number) = name.split_at_checked(1).context("empty register name")?;
-    let number: u16 =
-        number.parse().ok().filter(|n| *n < 8).with_context(|| format!("no register {name}"))?;
-    let code = match bank {
-        "d" => number,
-        "a" => number + 8,
-        _ => bail!("no register {name}"),
-    };
-    Ok(Named::Data(Register::from_code(code).context("register code")?))
-}
-
-/// The name `regs` prints for a data or address register.
-fn register_name(register: Register) -> String {
-    let code = register.code();
-    if code < 8 { format!("d{code}") } else { format!("a{}", code - 8) }
+    name.parse()
+        .map(Named::Data)
+        .or_else(|_| name.parse().map(Named::System))
+        .map_err(|_| anyhow::anyhow!("no register {name}"))
 }
 
 fn number(text: &str) -> Result<u32> {
@@ -173,15 +169,10 @@ fn word(text: &str) -> Result<u16> {
     u16::try_from(number(text)?).with_context(|| format!("not a 16-bit word: {text}"))
 }
 
-/// What ATEMP says about how the CPU entered background mode (CPU32RM
-/// Table 7-2).
-fn entry_source(atemp: u32) -> String {
-    match atemp {
-        0x0000_0000 => "hardware breakpoint".to_owned(),
-        0x0000_0001 => "BGND instruction".to_owned(),
-        _ if atemp & 0xFFFF == 0xFFFF => format!("double bus fault, SSW ${:04x}", atemp >> 16),
-        _ => "unknown".to_owned(),
-    }
+fn function_code(text: &str) -> Result<FunctionCode> {
+    let bits = number(text)?;
+    let code = FunctionCode::new(bits);
+    if u32::from(code.bits()) == bits { Ok(code) } else { bail!("not a function code, 0-7: {text}") }
 }
 
 /// The transport `--pod` names.
@@ -195,49 +186,56 @@ fn connect(pod: &str) -> Result<Box<dyn Transport>> {
 }
 
 fn run(pod: &str, command: Command) -> Result<()> {
-    let mut pod = Pod::new(connect(pod)?);
-    let version = pod.hello()?;
+    let mut target = PodTarget::new(Pod::new(connect(pod)?));
+    let version = target.pod().hello()?;
     if version != PROTOCOL_VERSION {
         bail!("the pod speaks protocol {version}, this bdm {PROTOCOL_VERSION}");
     }
+    let done = execute(&mut target, command);
+    // The next bdm starts knowing nothing: leave the program's SFC and
+    // DFC, whether or not the command worked.
+    let restored = target.restore_function_codes();
+    done?;
+    Ok(restored?)
+}
+
+fn execute<T: Transport>(target: &mut PodTarget<T>, command: Command) -> Result<()> {
     match command {
         Command::Pins => {
-            let pins = pod.pins()?;
+            let pins = target.pod().pins()?;
             let level = |high: bool| if high { "high" } else { "low" };
             println!("FREEZE {}", level(pins.freeze));
             println!("RESET  {}", level(pins.reset));
             println!("DS     {}", level(pins.ds));
             println!("VDD    {}.{:03} V", pins.vdd_mv / 1000, pins.vdd_mv % 1000);
         }
-        Command::Halt | Command::Reset => {
-            let atemp = if matches!(command, Command::Halt) { pod.halt()? } else { pod.reset_halt()? };
-            println!("halted: {} (ATEMP ${atemp:08x})", entry_source(atemp));
-        }
-        Command::Go => pod.go()?,
-        Command::Call { address } => pod.call(Address(address))?,
-        Command::Clock { hz } => println!("DSCLK {} Hz", pod.set_clock(hz)?),
+        Command::Halt => println!("halted: {}", target.halt()?),
+        Command::Reset => println!("halted: {}", target.reset_halted()?),
+        Command::Go => target.go()?,
+        Command::Call { address } => target.call(Address(address))?,
+        Command::Clock { hz } => println!("DSCLK {} Hz", target.pod().set_clock(hz)?),
         Command::Regs => {
             for register in Register::ALL {
-                println!("{:<5} ${:08x}", register_name(register), pod.read_register(register)?);
+                println!("{register:<5} ${:08x}", target.read_register(register)?);
             }
-            for (name, register) in SYSTEM_NAMES.iter().filter(|(_, r)| *r != SystemRegister::Atemp) {
-                println!("{name:<5} ${:08x}", pod.read_system_register(*register)?);
+            for register in SYSTEM_REGISTERS {
+                println!("{register:<5} ${:08x}", target.read_system_register(register)?);
             }
         }
         Command::Get { register: name } => {
             let value = match register(&name)? {
-                Named::Data(r) => pod.read_register(r)?,
-                Named::System(r) => pod.read_system_register(r)?,
+                Named::Data(r) => target.read_register(r)?,
+                Named::System(r) => target.read_system_register(r)?,
             };
             println!("${value:08x}");
         }
         Command::Set { register: name, value } => match register(&name)? {
-            Named::Data(r) => pod.write_register(r, value)?,
-            Named::System(r) => pod.write_system_register(r, value)?,
+            Named::Data(r) => target.write_register(r, value)?,
+            Named::System(r) => target.write_system_register(r, value)?,
         },
-        Command::Dump { address, length, size } => {
+        Command::Dump { address, length, size, fc } => {
             let mut data = vec![0; usize::try_from(length)?];
-            pod.read_memory(Address(address), size.into(), &mut data)?;
+            target.read_memory(Address(address), fc, size.into(), &mut data)?;
             for (n, line) in data.chunks(DUMP_LINE).enumerate() {
                 let at = address.wrapping_add(u32::try_from(n * DUMP_LINE)?);
                 let hex: Vec<String> = line.iter().map(|b| format!("{b:02x}")).collect();
@@ -248,9 +246,11 @@ fn run(pod: &str, command: Command) -> Result<()> {
                 println!("{at:08x}  {:<47}  {text}", hex.join(" "));
             }
         }
-        Command::Write { address, bytes, size } => pod.write_memory(Address(address), size.into(), &bytes)?,
+        Command::Write { address, bytes, size, fc } => {
+            target.write_memory(Address(address), fc, size.into(), &bytes)?
+        }
         Command::Xfer { words } => {
-            for (word, response) in words.iter().zip(pod.transfer(&words)?) {
+            for (word, response) in words.iter().zip(target.pod().transfer(&words)?) {
                 println!("{word:04x} -> {}:{:04x}", response >> 16, response & 0xFFFF);
             }
         }
@@ -271,13 +271,13 @@ fn main() -> ExitCode {
 
 #[cfg(test)]
 mod tests {
+    use super::FunctionCode;
     use super::Named;
     use super::Register;
     use super::SystemRegister;
-    use super::entry_source;
+    use super::function_code;
     use super::number;
     use super::register;
-    use super::register_name;
 
     #[test]
     fn numbers() {
@@ -291,21 +291,21 @@ mod tests {
     fn register_names() {
         assert_eq!(register("d0").unwrap(), Named::Data(Register::D0));
         assert_eq!(register("A7").unwrap(), Named::Data(Register::A7));
-        assert_eq!(register("sp").unwrap(), Named::Data(Register::A7));
+        assert_eq!(register("SP").unwrap(), Named::Data(Register::A7));
         assert_eq!(register("sfc").unwrap(), Named::System(SystemRegister::Sfc));
         assert!(register("d8").is_err());
         assert!(register("x1").is_err());
         assert!(register("").is_err());
         for r in Register::ALL {
-            assert_eq!(register(&register_name(r)).unwrap(), Named::Data(r));
+            assert_eq!(register(&r.to_string()).unwrap(), Named::Data(r));
         }
     }
 
     #[test]
-    fn entry_sources() {
-        assert_eq!(entry_source(0), "hardware breakpoint");
-        assert_eq!(entry_source(1), "BGND instruction");
-        assert_eq!(entry_source(0x1234_FFFF), "double bus fault, SSW $1234");
-        assert_eq!(entry_source(0x0000_0002), "unknown");
+    fn function_codes() {
+        assert_eq!(function_code("5").unwrap(), FunctionCode::SUPERVISOR_DATA);
+        assert_eq!(function_code("7").unwrap(), FunctionCode::CPU_SPACE);
+        assert!(function_code("8").is_err());
+        assert!(function_code("0xD").is_err());
     }
 }

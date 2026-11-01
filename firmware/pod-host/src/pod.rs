@@ -248,45 +248,16 @@ fn check_length(size: Size, length: usize) -> Result<(), Error> {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::VecDeque;
-
-    use pod_proto::usb::PACKET;
     use pod_proto::usb::ReplyError;
     use pod_proto::usb::Request;
     use pod_proto::usb::Status;
 
     use super::Address;
     use super::Error;
-    use super::Pod;
     use super::Register;
     use super::Size;
-    use super::Transport;
-    use super::TransportError;
-
-    /// A pod that records each request and answers from a script.
-    #[derive(Debug, Default)]
-    struct Script {
-        requests: Vec<Vec<u8>>,
-        replies: VecDeque<Vec<u8>>,
-    }
-
-    impl Transport for Script {
-        fn exchange(&mut self, request: &[u8], reply: &mut [u8; PACKET]) -> Result<usize, TransportError> {
-            self.requests.push(request.to_vec());
-            let answer = self.replies.pop_front().expect("script ended early");
-            reply[..answer.len()].copy_from_slice(&answer);
-            Ok(answer.len())
-        }
-    }
-
-    fn pod(replies: &[&[u8]]) -> Pod<Script> {
-        Pod::new(Script { requests: Vec::new(), replies: replies.iter().map(|r| r.to_vec()).collect() })
-    }
-
-    /// The request a packet carries.
-    fn parsed(packet: &[u8]) -> Request<'_> {
-        Request::parse(packet).unwrap()
-    }
+    use crate::script::parsed;
+    use crate::script::pod;
 
     #[test]
     fn halt_returns_atemp() {

@@ -315,15 +315,26 @@ USB command reports the high-water mark.  Not written yet.
 - `pod-host`'s `pod`: each USB request as a call.  Memory goes as
   56-byte requests and raw transfers as 15-word ones; a chunk never
   splits an access.  Tested against scripted replies.
+- `pod-host`'s `target`: `PodTarget`, `Cpu32Target` over a `Pod`.  It
+  keeps the entry source from ATEMP until the target resumes, and reads
+  ATEMP first when it finds the target halted (a poll of FREEZE, or a
+  register or memory call).  A memory call sets SFC or DFC to its
+  function code, reading the program's value first; SFC/DFC reads and
+  writes reach the program's value; go, call and
+  `restore_function_codes` put it back.  A `PodTarget` made for a
+  target already commanded in background mode reads a stale ATEMP.
 - `bdm`: pins, halt, reset, go, call, clock, regs, get, set, dump,
-  write, xfer.  Halt and reset print the entry source from ATEMP.
+  write, xfer, through `PodTarget`.  Halt and reset print the entry
+  source.  Dump and write take `--fc`, default 5 (supervisor data).
+  Each run restores SFC and DFC before it exits, since the next run
+  knows nothing of it.
 - Linux needs a udev rule for access without root (README.md).
 - `mc683xx-target` (m683xx-emu, no_std, MIT OR Apache-2.0) holds
   `Cpu32Target` and the types every crate here uses: Address, Size,
   Register, SystemRegister, FunctionCode, Entry.  Memory calls name
   their function code; halting returns the entry source decoded from
   ATEMP.  Taken by git at a pinned rev until its crates.io release
-  (0.3.0).  `pod-host` implements `Cpu32Target` over USB: to come.
+  (0.3.0).
 - To come: `bdm load <srec/elf>`, and a target init script (chip
   selects, SIM setup) run after each reset.
 
