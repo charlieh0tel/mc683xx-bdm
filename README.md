@@ -60,9 +60,12 @@ anything else using it.
 
 ## License
 
-GPL-3.0-only (`LICENSE`), the project's own work: firmware,
-hardware design and documentation.  The documents in `third_party/` are
-their owners' and not covered (`third_party/NOTICE`).
+- Hardware: CERN-OHL-S-2.0 (`hardware/LICENSE`): the KiCad designs in
+  `hardware/` and the release packages in `production/`.
+- Everything else of the project's own, firmware and documentation:
+  GPL-3.0-only (`LICENSE`).
+- The documents in `third_party/` are their owners' and not covered
+  (`third_party/NOTICE`).
 
 ## Contributing
 

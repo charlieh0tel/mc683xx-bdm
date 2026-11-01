@@ -20,7 +20,8 @@ Goals:
 Non-goals (for now): other BDM families (ColdFire, HCS08), real-time
 trace.
 
-License: GPL-3.0-only (`LICENSE`).
+License: the hardware design is CERN-OHL-S-2.0 (`hardware/LICENSE`);
+firmware and documentation are GPL-3.0-only (`LICENSE`).
 
 ---
 
