@@ -9,6 +9,8 @@ use std::sync::Mutex;
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering;
 use std::thread;
+use std::time::Duration;
+use std::time::Instant;
 
 use anyhow::Result;
 use anyhow::bail;
@@ -22,6 +24,13 @@ use pod_proto::pod::Pod;
 
 /// The model's RAM, in bytes.
 const RAM: usize = 64 * 1024;
+
+/// How long a new connection waits for the last client's thread to see
+/// its end of file before it is refused (docs/usb-protocol.md,
+/// Transport).
+const HANDOVER: Duration = Duration::from_millis(100);
+/// How often it looks.
+const HANDOVER_POLL: Duration = Duration::from_millis(5);
 
 type ModelPod = Pod<ModelBoard<RAM>>;
 
@@ -50,8 +59,8 @@ fn parse_address(text: &str) -> Result<u32> {
     Ok(u32::from_str_radix(digits, 16)?)
 }
 
-/// Serves each connection in its own thread, closing it at once if
-/// another is being served.
+/// Serves each connection in its own thread, closing it if another
+/// client is still connected after [`HANDOVER`].
 fn accept<S: std::io::Read + std::io::Write + Send + 'static>(
     connections: impl Iterator<Item = std::io::Result<S>>,
     pod: &Arc<Mutex<ModelPod>>,
@@ -59,6 +68,10 @@ fn accept<S: std::io::Read + std::io::Write + Send + 'static>(
     let busy = Arc::new(AtomicBool::new(false));
     for stream in connections {
         let stream = stream?;
+        let deadline = Instant::now() + HANDOVER;
+        while busy.load(Ordering::Acquire) && Instant::now() < deadline {
+            thread::sleep(HANDOVER_POLL);
+        }
         if busy.swap(true, Ordering::AcqRel) {
             eprintln!("bdm-stand-in: refused a second client");
             continue;

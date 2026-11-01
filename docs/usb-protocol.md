@@ -26,7 +26,12 @@ Stream (Unix or TCP socket):
   many bytes: the packet USB would carry.
 - A length byte of 0 or over 64 is a broken stream: the receiver
   closes the connection.
-- One client at a time; a server closes any other connection at once.
+- One client at a time; a server closes any other connection at once
+  while its client is connected.  A client that has closed its end is
+  gone even if the server has not yet read its end of file: before
+  refusing a connection, a server waits up to 100 ms for the current
+  client's end of file.  Each `bdm` run is one connection, so runs
+  follow each other within milliseconds.
 
 Either way:
 
