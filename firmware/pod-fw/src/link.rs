@@ -10,8 +10,8 @@ use embassy_rp::Peri;
 use embassy_rp::gpio::Level;
 use embassy_rp::peripherals::PIN_2;
 use embassy_rp::peripherals::PIN_3;
-use embassy_rp::peripherals::PIN_4;
-use embassy_rp::peripherals::PIN_11;
+use embassy_rp::peripherals::PIN_6;
+use embassy_rp::peripherals::PIN_8;
 use embassy_rp::peripherals::PIO0;
 use embassy_rp::pio::Common;
 use embassy_rp::pio::Config;
@@ -37,7 +37,7 @@ const WORD_MASK: u32 = (1 << WORD_BITS) - 1;
 const SHIFT_THRESHOLD: u8 = 32;
 
 /// The PIO's pins (PLAN.md, Hardware): DSCLK (BKPT) on GP2, DSI on GP3,
-/// DSO on GP4, and `DSI_EN` on GP11, high to let FREEZE enable DSI.
+/// DSO on GP6, and `DSI_EN` on GP8, high to let FREEZE enable DSI.
 pub(crate) struct PioLink<'d> {
     sm: StateMachine<'d, PIO0, 0>,
     dsclk: Pin<'d, PIO0>,
@@ -51,9 +51,9 @@ pub(crate) struct LinkPins<'d> {
     /// IFETCH/DSI.
     pub(crate) dsi: Peri<'d, PIN_3>,
     /// IPIPE/DSO.
-    pub(crate) dso: Peri<'d, PIN_4>,
+    pub(crate) dso: Peri<'d, PIN_6>,
     /// `DSI_EN`.
-    pub(crate) dsi_enable: Peri<'d, PIN_11>,
+    pub(crate) dsi_enable: Peri<'d, PIN_8>,
 }
 
 impl<'d> PioLink<'d> {

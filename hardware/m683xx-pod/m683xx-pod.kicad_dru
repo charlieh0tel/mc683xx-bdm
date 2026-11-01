@@ -1,0 +1,21 @@
+(version 1)
+
+# JLCPCB 2-layer capabilities, with margin: fabrication limits only.
+(rule "track width"
+	(constraint track_width (min 0.2mm)))
+(rule "clearance"
+	(constraint clearance (min 0.2mm)))
+(rule "via drill"
+	(condition "A.Type == 'Via'")
+	(constraint hole_size (min 0.3mm)))
+(rule "via diameter"
+	(condition "A.Type == 'Via'")
+	(constraint via_diameter (min 0.6mm)))
+(rule "annular ring"
+	(constraint annular_width (min 0.15mm)))
+(rule "hole to hole"
+	(constraint hole_to_hole (min 0.5mm)))
+(rule "silkscreen text"
+	(layer "?.Silkscreen")
+	(constraint text_height (min 0.8mm))
+	(constraint text_thickness (min 0.15mm)))

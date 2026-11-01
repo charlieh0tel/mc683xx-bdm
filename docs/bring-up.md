@@ -40,13 +40,13 @@ probe, hold BOOTSEL, plug in, and `picotool load -x` the ELF from
 bdm pins
 ```
 
-Expect FREEZE, RESET and DS low (no carrier: GP5 is pulled down, GP6 and
+Expect FREEZE, RESET and DS low (no carrier: GP5 is pulled down, GP4 and
 GP7 float and may read either way) and VDD near 0 V.  `bdm halt` fails
 with "no target power" (NoTarget): VDD is under 4.5 V.
 
 ## 2. Bare Pico: PIO loopback
 
-Jumper GP3 (DSI) to GP4 (DSO).  No carrier, no target.
+Jumper GP3 (DSI) to GP6 (DSO).  No carrier, no target.
 
 ```
 bdm loopback --rounds 100
@@ -81,7 +81,7 @@ The Pico on the carrier, the BDM cable unplugged.
 bdm pins
 ```
 
-Expect FREEZE, RESET and DS low (the 1 MOhm pull-downs on U2's inputs)
+Expect FREEZE, RESET and DS low (the 100 kOhm pull-downs on U2's inputs)
 and VDD near 0 V.  With a 5 V bench supply on J1 pin 9 (VDD) and pin 3
 (GND), VDD should read 5.0 V within a few percent (the 100k/100k
 divider and the Pico's 3.3 V reference).  Record the error.

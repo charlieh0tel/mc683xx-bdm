@@ -37,7 +37,8 @@ const VDD_DIVIDER: u32 = 2;
 /// The pod's side of the target connector.
 pub(crate) struct PicoBoard<'d> {
     link: PioLink<'d>,
-    /// 74AHCT125 output enable for BKPT/DSCLK, active low.
+    /// Q3's gate: high enables the 74AHCT125's BKPT/DSCLK output (its OE
+    /// is pulled up to target VDD and Q3 pulls it low).
     dsclk_enable: Output<'d>,
     /// 2N7002 gate: high pulls RESET low.
     reset_drive: Output<'d>,
@@ -73,7 +74,7 @@ impl<'d> PicoBoard<'d> {
     }
 
     fn bkpt_low(&mut self) {
-        self.dsclk_enable.set_low();
+        self.dsclk_enable.set_high();
         self.link.set_dsclk(Level::Low);
     }
 
@@ -133,7 +134,7 @@ impl Board for PicoBoard<'_> {
 
     fn drive_link(&mut self) {
         self.link.set_dsclk(Level::High);
-        self.dsclk_enable.set_low();
+        self.dsclk_enable.set_high();
         self.link.set_dsi_enabled(true);
     }
 

@@ -44,12 +44,12 @@ License: GPL-3.0-only (`LICENSE`).
 |---|---|---|
 | MCU | Pico (RP2040) or Pico 2 (RP2350), soldered flat by its castellated edge | USB to host; same footprint and pinout; hand-soldered, not in the assembly BOM |
 | 3.3 V → 5 V outputs | 74AHCT125, VCC = target VDD | BKPT/DSCLK, DSI; 100 Ω series, the most current limit if DSI and IFETCH overlap; each its own OE |
-| AHCT125 OE pull-up, BKPT/DSCLK | 10 kΩ to target VDD | Output tristated while the pod is unpowered or booting |
+| AHCT125 OE pull-up, BKPT/DSCLK | 10 kΩ to target VDD, pulled low by Q3 (2N7002, gate on GP11, 100 kΩ gate pull-down) | Output tristated while the pod is unpowered or booting.  Q3 keeps the target's 5 V off every Pico pin: a GPIO on this pull-up would see 5 V, over the RP2040's and RP2350's 3.63 V limit unpowered (RP2040 datasheet 5.5.2.1, RP2350 14.9.1) |
 | DSI enable gate | 74AHCT1G00, VCC = target VDD | Drives DSI's 74AHCT125 OE: NAND(FREEZE, DSI_EN), so DSI is driven only while FREEZE is high and the Pico enables it |
 | DSI_EN pull-down | 100 kΩ to GND | DSI off while the pod is unpowered or booting |
-| 3.3 V → 5 V outputs, spare | 74AHCT125, 2 channels | Unused; inputs tied to GND |
+| 3.3 V → 5 V outputs, spare | 74AHCT125, channels B and D | Unused; inputs tied to GND.  BKPT is channel A, DSI channel C: channels and Pico pins are chosen for the fewest crossings on the board |
 | 5 V → 3.3 V inputs | 74LVC125, VCC = 3.3 V | IPIPE/DSO, FREEZE, RESET sense, DS; inputs to 5.5 V at any VCC. IPIPE is pin 10 outside BDM, so its channel reads both |
-| 74LVC125 input pull-downs | 1 MΩ to GND, header side | Inputs defined with the cable unplugged; 5 µA load at 5 V |
+| 74LVC125 input pull-downs | 100 kΩ to GND, header side | Inputs low with the cable unplugged even at the 74LVC125A's worst-case 5 µA input leakage (SCAS290T 5.5); 50 µA load at 5 V |
 | RESET drive | 2N7002 (JSCJ, JLCPCB basic C8545), open-drain | Target also drives RESET; sense separately.  Vth(GS) at most 2.5 V against the Pico's 3.3 V gate drive |
 | BERR drive | 2N7002, open-drain | Abort hung bus cycles |
 | 2N7002 gate pull-downs | 100 kΩ to GND | RESET and BERR not asserted while the pod is unpowered or booting |
@@ -81,14 +81,14 @@ Pico pins (GPn):
 |---|---|---|
 | 2 | BKPT/DSCLK | PIO side-set and set |
 | 3 | DSI | PIO out |
-| 4 | IPIPE/DSO | PIO in |
+| 4 | DS | in |
 | 5 | FREEZE | in, pull-down |
-| 6 | RESET sense | in |
-| 7 | DS | in |
-| 8 | RESET drive (2N7002 gate) | out, high asserts RESET |
-| 9 | BERR drive (2N7002 gate) | out, high asserts BERR |
-| 10 | 74AHCT125 OE, BKPT/DSCLK | out, low enables |
-| 11 | DSI_EN, to the 74AHCT1G00 | PIO set, high enables |
+| 6 | IPIPE/DSO | PIO in |
+| 7 | RESET sense | in |
+| 8 | DSI_EN, to the 74AHCT1G00 | PIO set, high enables |
+| 9 | RESET drive (Q1 gate) | out, high asserts RESET |
+| 10 | BERR drive (Q2 gate) | out, high asserts BERR |
+| 11 | BKPT/DSCLK driver enable (Q3 gate) | out, high enables |
 | 25 | LED (on the Pico) | out |
 | 26 | VDD sense (ADC0) | analog |
 
@@ -191,7 +191,7 @@ keep:
 ```
 
 Config: out and in shift left, no autopull/autopush. `out` base = DSI,
-`in` base = DSO, side-set base = DSCLK, `set` base = DSI_EN (GP11,
+`in` base = DSO, side-set base = DSCLK, `set` base = DSI_EN (GP8,
 count 1).
 
 - The firmware pushes `word << 15`, with bit 14 set for the last word
@@ -399,7 +399,7 @@ How to run each item and what to expect: `docs/bring-up.md`.
 
 - [ ] Schematic, breadboard first (Pico + 74AHCT125 + 74LVC125 +
       2N7002s), then the carrier
-- [ ] PIO loopback (`bdm loopback`, GP3 to GP4): scope DSCLK/DSI,
+- [ ] PIO loopback (`bdm loopback`, GP3 to GP6): scope DSCLK/DSI,
       verify 17-bit framing and idle-high
 - [ ] Reset into BDM; confirm FREEZE asserts
 - [ ] RSREG ATEMP first (`0x2588`): confirms RSREG's `0x2580`
