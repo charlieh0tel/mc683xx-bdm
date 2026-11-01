@@ -79,6 +79,12 @@ impl<L: Link> Session<L> {
         self.link
     }
 
+    /// The link, for what lies outside a command: holding DSCLK low for
+    /// a halt, changing its rate.
+    pub const fn link_mut(&mut self) -> &mut L {
+        &mut self.link
+    }
+
     /// Carries out `command`, returning its result: the value for a
     /// read, 0 for anything else.  After GO or CALL nothing more is
     /// clocked: DSCLK is BKPT again once the CPU leaves background

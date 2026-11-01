@@ -1,0 +1,69 @@
+[package]
+name = "pod-fw"
+version = "0.1.0"
+edition = "2024"
+license = "GPL-3.0-only"
+
+[dependencies]
+cortex-m = { version = "0.7.10", features = ["inline-asm"] }
+cortex-m-rt = "0.7.7"
+cpu32-target = { version = "0.1.0", path = "../cpu32-target" }
+defmt = { version = "1.2.0", optional = true }
+defmt-rtt = { version = "1.3.1", optional = true }
+embassy-executor = { version = "0.10.0", features = ["platform-cortex-m", "executor-thread"] }
+embassy-futures = "0.1.2"
+embassy-rp = { version = "0.10.0", features = ["time-driver", "critical-section-impl"] }
+embassy-time = "0.5.1"
+embassy-usb = "0.6.0"
+fixed = "1.31.0"
+panic-halt = "1.0.0"
+panic-probe = { version = "1.0.0", features = ["print-defmt"], optional = true }
+# embassy-rp 0.10 loads pio 0.3 programs.
+pio = "0.3.0"
+pod-proto = { version = "0.1.0", path = "../pod-proto" }
+portable-atomic = { version = "1.15.0", features = ["critical-section"] }
+static_cell = "2.1.1"
+
+[features]
+default = ["rp2040", "rtt"]
+# The chip; choose exactly one, with its target (.cargo/config.toml):
+# rp2040 for the Pico (thumbv6m-none-eabi), rp235xa for the Pico 2
+# (thumbv8m.main-none-eabihf).
+rp2040 = ["embassy-rp/rp2040"]
+rp235xa = ["embassy-rp/rp235xa"]
+# Events and panics over RTT for an SWD probe (defmt).  Without it the
+# firmware logs nothing and halts on a panic: the production build,
+# `--no-default-features -F rp2040` (or rp235xa).
+rtt = [
+    "dep:defmt",
+    "dep:defmt-rtt",
+    "dep:panic-probe",
+    "embassy-executor/defmt",
+    "embassy-rp/defmt",
+    "embassy-time/defmt",
+    "embassy-usb/defmt",
+]
+
+# The workspace's lints (../Cargo.toml, ../clippy.toml): this crate is
+# its own workspace.
+[lints.rust]
+missing_debug_implementations = "warn"
+unsafe_code = "deny"
+
+[lints.clippy]
+doc_markdown = "warn"
+enum_glob_use = "deny"
+large_stack_arrays = "deny"
+large_types_passed_by_value = "deny"
+large_const_arrays = "deny"
+
+# Optimize for size.  Debug info stays on the host.
+[profile.release]
+opt-level = "z"
+lto = "fat"
+codegen-units = 1
+debug = 2
+panic = "abort"
+
+[profile.dev]
+opt-level = "s"

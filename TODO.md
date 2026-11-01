@@ -9,9 +9,8 @@
 
 ## Firmware
 
-- `pod-fw` (features `rp2040`, the default, and `rp235xa`): PIO
-  `Link`, USB vendor class.
-- `pod-proto`: USB commands between host and pod.
+- `pod-fw`: memory and register requests over USB; stack painting
+  and a `stack` request (PLAN.md, Firmware).
 - `pod-host`: `bdm` CLI over nusb; `Cpu32Target` over it.
 - m683xx-emu: depend on `cpu32-target` by git and implement it.
 - Bring-up, in order (PLAN.md, Bring-up checklist):

@@ -39,15 +39,38 @@ License: GPL-3.0-only (`LICENSE`).
 | Function | Part | Notes |
 |---|---|---|
 | MCU | Pico (RP2040) or Pico 2 (RP2350), socketed | USB to host; same footprint and pinout |
-| 3.3 V → 5 V outputs | 74AHCT125, VCC = target VDD | BKPT/DSCLK, DSI; series 47–100 Ω; OE tristates |
-| AHCT125 OE pull-up | 10 kΩ to target VDD | Outputs tristated while the pod is unpowered or booting |
+| 3.3 V → 5 V outputs | 74AHCT125, VCC = target VDD | BKPT/DSCLK, DSI; series 47–100 Ω; each its own OE |
+| AHCT125 OE pull-ups | 10 kΩ to target VDD, one per OE | Outputs tristated while the pod is unpowered or booting |
 | 3.3 V → 5 V outputs, spare | 74AHCT125, 2 channels | Unused; inputs tied to GND |
 | 5 V → 3.3 V inputs | 74LVC125, VCC = 3.3 V | IPIPE/DSO, FREEZE, RESET sense, DS; inputs to 5.5 V at any VCC. IPIPE is pin 10 outside BDM, so its channel reads both |
 | RESET drive | 2N7002, open-drain | Target also drives RESET; sense separately |
 | BERR drive | 2N7002, open-drain | Abort hung bus cycles |
 | 2N7002 gate pull-downs | 100 kΩ to GND | RESET and BERR not asserted while the pod is unpowered or booting |
-| VDD sense | Divider → ADC | Divider output ≤ 3.3 V at 5.5 V; high value to limit current into an unpowered RP2040. Keep AHCT outputs disabled until VDD present |
+| VDD sense | 100 kΩ / 100 kΩ divider → ADC0 | 2.75 V at 5.5 V; high value to limit current into an unpowered RP2040. Halt and reset refuse below 4.5 V |
 | BKPT pull-up | 10 kΩ to target VDD | Target runs normally with pod unpowered |
+
+Two output enables: BKPT must be driven to request a halt while DSI
+stays tristated, because pin 8 is IFETCH, a CPU output, until FREEZE
+(gotcha below).  After GO the firmware turns DSI off as soon as the
+transfer ends, a few microseconds; the CPU may drive IFETCH before then,
+and the series resistor limits that overlap's current.
+
+Pico pins (GPn):
+
+| GP | Signal | Direction |
+|---|---|---|
+| 2 | BKPT/DSCLK | PIO side-set and set |
+| 3 | DSI | PIO out |
+| 4 | IPIPE/DSO | PIO in |
+| 5 | FREEZE | in, pull-down |
+| 6 | RESET sense | in |
+| 7 | DS | in |
+| 8 | RESET drive (2N7002 gate) | out, high asserts RESET |
+| 9 | BERR drive (2N7002 gate) | out, high asserts BERR |
+| 10 | 74AHCT125 OE, BKPT/DSCLK | out, low enables |
+| 11 | 74AHCT125 OE, DSI | out, low enables |
+| 25 | LED (on the Pico) | out |
+| 26 | VDD sense (ADC0) | analog |
 
 Board: a 2-layer carrier with the translators and the BDM header; the
 Pico plugs in. A custom RP2040 PCB only if the carrier proves too
@@ -191,13 +214,26 @@ Reasons: async USB and PIO FIFO waits without a hand-written state
 machine; `embassy-usb` vendor class; matches the async rules in
 `AGENTS.md`.
 
-USB vendor class, bulk endpoints. Commands:
+USB: vendor class, one bulk OUT and one bulk IN endpoint, 64-byte
+packets, one request per packet and one reply per request
+(`pod-proto`'s `usb`).  VID:PID 1209:0001, pid.codes' test pair, until
+the pod has its own.  Requests:
 
-- `xfer(words[]) -> words[]`: raw 17-bit transfers, for bring-up.
-- `reset_bdm`, `halt`, `go`, `pins` (FREEZE, RESET, DS, IPIPE, VDD).
-- `read_mem(addr, len, size)` / `write_mem(addr, data, size)`: READ
-  then DUMP, WRITE then FILL, on-chip.
-- `set_clock(hz)`.
+- Transfer: up to 15 raw words, each answered with the 17 bits shifted
+  in, for bring-up and commands the pod does not sequence.
+- Pins: FREEZE, RESET, DS levels and VDD in millivolts.  DSO is a PIO
+  pin, which embassy-rp gives no way to read, so it is not reported.
+- ResetHalt, Halt: the sequences in Protocol summary; refused without
+  VDD, and NoFreeze if FREEZE does not assert in 100 ms.
+- Go: only with FREEZE asserted, else its clocks would be BKPT pulses.
+- SetClock: DSCLK's rate; the reply gives the rate set, never faster
+  than asked.
+
+To come: memory reads and writes (READ then DUMP, WRITE then FILL,
+on-chip) and register access.
+
+The firmware's own sizes, release builds: about 21 KB of flash and
+2.4 KB of statics on either chip.
 
 Handle not-ready retries in firmware; report BERR and illegal-command
 errors to the host.  `pod-proto`'s `session` does both, over a `Link`
@@ -208,11 +244,12 @@ Each result is collected with NOPs, so a DUMP or FILL block costs about
 two transfers per access.  Sending the next DUMP in place of the NOP
 would nearly halve that; done if the throughput test asks for it.
 
-Flash and debug: `probe-rs` over SWD (a Raspberry Pi Debug Probe),
-which supports RP2040 and RP235x; UF2 over BOOTSEL as a fallback.
+Flash and debug: `probe-rs` over SWD (`cargo run` in `firmware/pod-fw`),
+which supports RP2040 and RP235x; without a probe, `picotool load -x`
+over BOOTSEL.
 
 Stack peak: paint the stack with a pattern at boot; a `stack`
-USB command reports the high-water mark.
+USB command reports the high-water mark.  Not written yet.
 
 ## Host (Rust)
 
@@ -249,6 +286,7 @@ USB command reports the high-water mark.
 ## Open questions
 
 - RSREG `0x2580` on silicon (Protocol summary).
+- A VID:PID of the pod's own (pid.codes, or a vendor's).
 
 ## References
 

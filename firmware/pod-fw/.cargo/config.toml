@@ -1,0 +1,15 @@
+# The Pico (RP2040) by default; for the Pico 2 build with
+# `--no-default-features -F rp235xa,rtt --target thumbv8m.main-none-eabihf`.
+[build]
+target = "thumbv6m-none-eabi"
+
+[target.thumbv6m-none-eabi]
+runner = "probe-rs run --chip RP2040"
+rustflags = ["-C", "link-arg=-Tlink.x"]
+
+[target.thumbv8m.main-none-eabihf]
+runner = "probe-rs run --chip RP235x"
+rustflags = ["-C", "link-arg=-Tlink.x"]
+
+[env]
+DEFMT_LOG = "info"

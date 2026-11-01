@@ -6,7 +6,8 @@ Pico 2 on a carrier board with 5 V level translators and the standard
 10-pin BDM header.  PIO clocks the BDM serial link; firmware and host
 are Rust.
 
-Status: design.  No schematic, firmware or host code yet.
+Status: firmware written, not yet run on a Pico; no schematic or host
+CLI yet.
 
 ## Layout
 
@@ -18,6 +19,22 @@ Status: design.  No schematic, firmware or host code yet.
 | `production/` | each release as ordered |
 | `firmware/` | the Rust workspace: firmware, host CLI, shared crates |
 | `third_party/` | vendor documents and their provenance (`NOTICE`) |
+
+## Firmware
+
+```
+cd firmware
+cargo test                     # cpu32-target and pod-proto, on the host
+
+cd pod-fw
+cargo run --release            # Pico, defmt over RTT, through an SWD probe
+cargo build --release --no-default-features -F rp2040   # production
+cargo build --release --no-default-features -F rp235xa \
+    --target thumbv8m.main-none-eabihf                   # Pico 2
+
+cd ../..
+make lint                      # clippy on every build, before each commit
+```
 
 ## License
 
