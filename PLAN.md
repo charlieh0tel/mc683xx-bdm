@@ -346,7 +346,7 @@ USB command reports the high-water mark.  Not written yet.
   registers and memory.  Not the emulator: no instructions run, so a
   test enters background mode itself.
 - `bdm`: pins, halt, reset, go, call, clock, regs, get, set, dump,
-  write, xfer, through `PodTarget`.  Halt and reset print the entry
+  write, xfer, loopback, through `PodTarget`.  Halt and reset print the entry
   source.  Dump and write take `--fc`, default 5 (supervisor data).
   Each run restores SFC and DFC before it exits, since the next run
   knows nothing of it.
@@ -393,10 +393,12 @@ USB command reports the high-water mark.  Not written yet.
 
 ## Bring-up checklist
 
+How to run each item and what to expect: `docs/bring-up.md`.
+
 - [ ] Schematic, breadboard first (Pico + 74AHCT125 + 74LVC125 +
       2N7002s), then the carrier
-- [ ] PIO loopback: scope DSCLK/DSI, verify 17-bit framing and
-      idle-high
+- [ ] PIO loopback (`bdm loopback`, GP3 to GP4): scope DSCLK/DSI,
+      verify 17-bit framing and idle-high
 - [ ] Reset into BDM; confirm FREEZE asserts
 - [ ] RSREG ATEMP first (`0x2588`): confirms RSREG's `0x2580`
 - [ ] BGND and a breakpoint after GO: `bdm pins` reports a fresh ATEMP

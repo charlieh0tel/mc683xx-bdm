@@ -15,7 +15,7 @@ schematic drafted (`hardware/m683xx-pod/`), no board layout yet.
 |---|---|
 | `PLAN.md` | the design and why it is the way it is |
 | `TODO.md` | the work list |
-| `docs/` | the host-pod protocol (`usb-protocol.md`) |
+| `docs/` | the host-pod protocol (`usb-protocol.md`), bring-up steps (`bring-up.md`) |
 | `hardware/` | the KiCad carrier board, and `release.py`, which builds a JLCPCB order |
 | `production/` | each release as ordered |
 | `firmware/` | the Rust workspace: firmware, host CLI, shared crates |

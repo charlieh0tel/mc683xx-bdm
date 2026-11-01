@@ -26,6 +26,29 @@ use pod_proto::usb::PROTOCOL_VERSION;
 /// Bytes per hex dump line.
 const DUMP_LINE: usize = 16;
 
+/// Loopback words: all clear and all set, alternating bits, and a
+/// walking one and a walking zero, so a stuck, shorted or shifted bit
+/// shows.
+fn loopback_words() -> Vec<u16> {
+    let walking: Vec<u16> = (0..u16::BITS).map(|bit| 1 << bit).collect();
+    [0x0000, 0xFFFF, 0xA5A5, 0x5A5A]
+        .into_iter()
+        .chain(walking.iter().copied())
+        .chain(walking.iter().map(|w| !w))
+        .collect()
+}
+
+/// The first word that did not come back as sent: in loopback the 17th
+/// bit shifted in is the control bit sent, always clear.
+fn loopback_mismatch(words: &[u16], responses: &[u32]) -> Option<(usize, u16, u32)> {
+    words
+        .iter()
+        .zip(responses)
+        .enumerate()
+        .find(|(_, (word, response))| u32::from(**word) != **response)
+        .map(|(n, (word, response))| (n, *word, *response))
+}
+
 /// The CPU32 BDM pod (PLAN.md).
 #[derive(Debug, Parser)]
 #[command(name = "bdm", version)]
@@ -95,6 +118,14 @@ enum Command {
         /// Function code, as for dump.
         #[arg(long, value_parser = function_code, default_value = "5")]
         fc: FunctionCode,
+    },
+    /// With DSI jumpered to DSO (GP3 to GP4) on a bare Pico, no
+    /// target: each word should come back as sent.  Checks the PIO,
+    /// framing and USB (docs/bring-up.md).
+    Loopback {
+        /// Times through the test patterns.
+        #[arg(long, default_value_t = 1)]
+        rounds: u32,
     },
     /// Raw serial words, each answered with the 17 bits shifted in.
     /// With the target running, the clocks are BKPT pulses.
@@ -256,6 +287,25 @@ fn execute<T: Transport>(target: &mut PodTarget<T>, command: Command) -> Result<
         Command::Write { address, bytes, size, fc } => {
             target.write_memory(Address(address), fc, size.into(), &bytes)?
         }
+        Command::Loopback { rounds } => {
+            let words = loopback_words();
+            let started = std::time::Instant::now();
+            for round in 0..rounds {
+                let responses = target.pod().transfer(&words)?;
+                if responses.len() != words.len() {
+                    bail!("loopback: {} responses to {} words", responses.len(), words.len());
+                }
+                if let Some((n, word, response)) = loopback_mismatch(&words, &responses) {
+                    bail!(
+                        "loopback: round {round}, word {n}: sent {word:04x}, got {}:{:04x}",
+                        response >> 16,
+                        response & 0xFFFF
+                    );
+                }
+            }
+            let total = words.len() * usize::try_from(rounds)?;
+            println!("loopback: {total} words ok in {:.3} s", started.elapsed().as_secs_f64());
+        }
         Command::Xfer { words } => {
             for (word, response) in words.iter().zip(target.pod().transfer(&words)?) {
                 println!("{word:04x} -> {}:{:04x}", response >> 16, response & 0xFFFF);
@@ -283,6 +333,8 @@ mod tests {
     use super::Register;
     use super::SystemRegister;
     use super::function_code;
+    use super::loopback_mismatch;
+    use super::loopback_words;
     use super::number;
     use super::register;
 
@@ -306,6 +358,22 @@ mod tests {
         for r in Register::ALL {
             assert_eq!(register(&r.to_string()).unwrap(), Named::Data(r));
         }
+    }
+
+    #[test]
+    fn loopback_patterns_cover_every_bit_both_ways() {
+        let words = loopback_words();
+        for bit in 0..u16::BITS {
+            assert!(words.iter().any(|w| w & (1 << bit) != 0));
+            assert!(words.iter().any(|w| w & (1 << bit) == 0));
+        }
+    }
+
+    #[test]
+    fn loopback_finds_the_first_bad_word() {
+        let words = [0x1234, 0x5678, 0x9ABC];
+        assert_eq!(loopback_mismatch(&words, &[0x1234, 0x5678, 0x9ABC]), None);
+        assert_eq!(loopback_mismatch(&words, &[0x1234, 0x1_5678, 0x0000]), Some((1, 0x5678, 0x1_5678)));
     }
 
     #[test]
