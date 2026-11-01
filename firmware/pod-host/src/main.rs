@@ -10,6 +10,7 @@ use clap::Subcommand;
 use clap::ValueEnum;
 use mc683xx_target::Cpu32Target;
 use mc683xx_target::address::Address;
+use mc683xx_target::entry::Entry;
 use mc683xx_target::function_code::FunctionCode;
 use mc683xx_target::register::Register;
 use mc683xx_target::register::SystemRegister;
@@ -19,6 +20,7 @@ use pod_host::target::PodTarget;
 use pod_host::transport::StreamTransport;
 use pod_host::transport::Transport;
 use pod_host::transport::UsbTransport;
+use pod_proto::usb::Atemp;
 use pod_proto::usb::PROTOCOL_VERSION;
 
 /// Bytes per hex dump line.
@@ -39,7 +41,7 @@ struct Cli {
 /// What to do.  Numbers are decimal, or hex with `0x` or `$`.
 #[derive(Debug, Subcommand)]
 enum Command {
-    /// FREEZE, RESET and DS levels, and target VDD.
+    /// FREEZE, RESET and DS levels, target VDD, and ATEMP when halted.
     Pins,
     /// Stop the target in background mode.
     Halt,
@@ -208,6 +210,11 @@ fn execute<T: Transport>(target: &mut PodTarget<T>, command: Command) -> Result<
             println!("RESET  {}", level(pins.reset));
             println!("DS     {}", level(pins.ds));
             println!("VDD    {}.{:03} V", pins.vdd_mv / 1000, pins.vdd_mv % 1000);
+            match pins.atemp {
+                Atemp::None => {}
+                Atemp::Fresh(atemp) => println!("ATEMP  ${atemp:08x} ({})", Entry::from_atemp(atemp)),
+                Atemp::Stale(atemp) => println!("ATEMP  ${atemp:08x} (stale: the pod did not see the entry)"),
+            }
         }
         Command::Halt => println!("halted: {}", target.halt()?),
         Command::Reset => println!("halted: {}", target.reset_halted()?),

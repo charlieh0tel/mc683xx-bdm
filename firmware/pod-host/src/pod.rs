@@ -7,6 +7,7 @@ use mc683xx_target::register::Register;
 use mc683xx_target::register::SystemRegister;
 use mc683xx_target::size::Size;
 use pod_proto::bdm::byte_count;
+use pod_proto::usb::Atemp;
 use pod_proto::usb::MAX_MEMORY_BYTES;
 use pod_proto::usb::MAX_TRANSFER_WORDS;
 use pod_proto::usb::PACKET;
@@ -15,6 +16,7 @@ use pod_proto::usb::Pins;
 use pod_proto::usb::ReplyError;
 use pod_proto::usb::Request;
 use pod_proto::usb::encode_transfer;
+use pod_proto::usb::parse_atemp;
 use pod_proto::usb::parse_pins;
 use pod_proto::usb::parse_reply;
 use pod_proto::usb::parse_transfer_reply;
@@ -80,21 +82,21 @@ impl<T: Transport> Pod<T> {
         Ok(parse_pins(body)?)
     }
 
-    /// Stops the target in background mode; returns ATEMP, the entry
-    /// source (CPU32RM Table 7-2).
+    /// Stops the target in background mode, if it is not already;
+    /// returns ATEMP as the pod read it first after entry.
     ///
     /// # Errors
     /// As [`Error`].
-    pub fn halt(&mut self) -> Result<u32, Error> {
-        self.value(&Request::Halt)
+    pub fn halt(&mut self) -> Result<Atemp, Error> {
+        self.atemp(&Request::Halt)
     }
 
     /// Resets the target into background mode; returns ATEMP.
     ///
     /// # Errors
     /// As [`Error`].
-    pub fn reset_halt(&mut self) -> Result<u32, Error> {
-        self.value(&Request::ResetHalt)
+    pub fn reset_halt(&mut self) -> Result<Atemp, Error> {
+        self.atemp(&Request::ResetHalt)
     }
 
     /// Resumes at RPC.
@@ -213,6 +215,12 @@ impl<T: Transport> Pod<T> {
         Ok(parse_value(body)?)
     }
 
+    fn atemp(&mut self, request: &Request<'_>) -> Result<Atemp, Error> {
+        let mut reply = [0; PACKET];
+        let body = self.request(request, &mut reply)?;
+        Ok(parse_atemp(body)?)
+    }
+
     fn done(&mut self, request: &Request<'_>) -> Result<(), Error> {
         let mut reply = [0; PACKET];
         let body = self.request(request, &mut reply)?;
@@ -253,6 +261,7 @@ mod tests {
     use pod_proto::usb::Status;
 
     use super::Address;
+    use super::Atemp;
     use super::Error;
     use super::Register;
     use super::Size;
@@ -261,8 +270,8 @@ mod tests {
 
     #[test]
     fn halt_returns_atemp() {
-        let mut pod = pod(&[&[0, 1, 0, 0, 0]]);
-        assert_eq!(pod.halt().unwrap(), 1);
+        let mut pod = pod(&[&[0, 1, 1, 0, 0, 0]]);
+        assert_eq!(pod.halt().unwrap(), Atemp::Fresh(1));
         assert_eq!(parsed(&pod.into_transport().requests[0]), Request::Halt);
     }
 

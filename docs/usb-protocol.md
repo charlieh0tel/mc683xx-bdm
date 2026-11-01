@@ -5,7 +5,7 @@ anything that answers as the pod does (m683xx-emu's virtual BDM
 cable).  Source of truth: `firmware/pod-proto/src/usb.rs`; this
 document follows it.
 
-Protocol version: **1** (`PROTOCOL_VERSION`), raised on any change to a
+Protocol version: **2** (`PROTOCOL_VERSION`), raised on any change to a
 request or reply.
 
 ## Transport
@@ -40,9 +40,9 @@ clocks would otherwise be BKPT pulses that halt it.
 | Code | Request | Body | Reply body (status Ok) | FREEZE |
 |---|---|---|---|---|
 | 0x01 | Transfer | 1-15 words, u16 each | one u32 per word: the 17 bits shifted in, bit 16 the status bit | no |
-| 0x02 | Pins | none | u8 levels, u16 VDD in mV | no |
-| 0x03 | ResetHalt | none | u32 ATEMP | no |
-| 0x04 | Halt | none | u32 ATEMP | no |
+| 0x02 | Pins | none | u8 levels, u16 VDD in mV, ATEMP field | no |
+| 0x03 | ResetHalt | none | ATEMP field | no |
+| 0x04 | Halt | none | ATEMP field | no |
 | 0x05 | Go | none | none | yes |
 | 0x06 | SetClock | u32 DSCLK Hz | u32 DSCLK Hz set | no |
 | 0x07 | ReadRegister | u8 register code | u32 value | yes |
@@ -66,6 +66,12 @@ Fields:
   SFC, writes through DFC; the host sets them.
 - Pins levels: bit 0 FREEZE, bit 1 RESET, bit 2 DS; set means high.
   DSO is not reported; BERR is not sensed.
+- ATEMP field: u8 kind, then u32 ATEMP.  Kind 0: not in background
+  mode, ATEMP 0 (Pins with FREEZE low only).  Kind 1, fresh: read first
+  after entry, so the entry source.  Kind 2, stale: the pod did not see
+  the entry (it started with FREEZE high), so commands may have come
+  first and the value is not an entry source.  Pins carries kind 0
+  exactly when FREEZE is low; Halt and ResetHalt never carry it.
 
 Semantics:
 
@@ -73,11 +79,17 @@ Semantics:
   release.  Every other command is sequenced by the pod (CPU32RM 7.2.8):
   operands out, NOPs until the result, not-ready retried up to 1000
   NOPs.
-- Halt and ResetHalt read ATEMP as their first command after entry and
-  return it: 0 hardware breakpoint, 1 BGND, SSW in the high word and
-  0xFFFF in the low for a double bus fault (CPU32RM Table 7-2).  Both
-  are refused with NoTarget below 4.5 V VDD, and NoFreeze if FREEZE
-  does not assert within 100 ms.
+- Before carrying out any request, the pod reads ATEMP if FREEZE is
+  high and FREEZE has had an edge since its last read, so ATEMP is the
+  first command after every entry, the CPU's own (BGND, a breakpoint, a
+  double bus fault) included.  It keeps the value until FREEZE moves,
+  and reports it in Pins, Halt and ResetHalt: 0 hardware breakpoint, 1
+  BGND, SSW in the high word and 0xFFFF in the low for a double bus
+  fault (CPU32RM Table 7-2).
+- Halt on a target already in background mode returns the kept ATEMP
+  and does nothing else.  Otherwise Halt and ResetHalt are refused with
+  NoTarget below 4.5 V VDD, and NoFreeze if FREEZE does not assert
+  within 100 ms.
 - Halt works only if BDM was enabled at the target's last reset (BKPT
   low as RESET rises, MC68331UM 5.10.2.1), as ResetHalt does.  Without
   it BKPT is a breakpoint exception, vector $0C (MC68331UM 5.10.2.2.1,

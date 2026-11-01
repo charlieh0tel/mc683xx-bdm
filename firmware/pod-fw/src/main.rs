@@ -5,13 +5,14 @@
 #![no_std]
 #![no_main]
 
+mod freeze;
 mod link;
 mod pod;
 
 #[cfg(feature = "rtt")]
 use defmt_rtt as _;
 use embassy_executor::Spawner;
-use embassy_futures::join::join;
+use embassy_futures::join::join3;
 use embassy_rp::adc;
 use embassy_rp::adc::Adc;
 use embassy_rp::bind_interrupts;
@@ -86,10 +87,10 @@ async fn main(_spawner: Spawner) {
     let lines = Lines {
         dsclk_enable: Output::new(p.PIN_10, Level::High),
         reset_drive: Output::new(p.PIN_8, Level::Low),
-        freeze: Input::new(p.PIN_5, Pull::Down),
         reset: Input::new(p.PIN_6, Pull::None),
         ds: Input::new(p.PIN_7, Pull::None),
     };
+    let freeze = Input::new(p.PIN_5, Pull::Down);
     let _berr_drive = Output::new(p.PIN_9, Level::Low);
     let _led = Output::new(p.PIN_25, Level::High);
 
@@ -124,7 +125,8 @@ async fn main(_spawner: Spawner) {
 
     #[cfg(feature = "rtt")]
     defmt::info!("m683xx-pod up");
-    join(usb.run(), serve(&mut pod, &mut from_host, &mut to_host)).await;
+    // The watcher first, so FREEZE's level is in before a request.
+    join3(freeze::watch(freeze), usb.run(), serve(&mut pod, &mut from_host, &mut to_host)).await;
 }
 
 /// Answers each request packet with one reply packet, for as long as

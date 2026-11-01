@@ -259,12 +259,22 @@ the pod has its own.  Requests:
 - Transfer: up to 15 raw words, each answered with the 17 bits shifted
   in, for bring-up and commands the pod does not sequence.  Not
   guarded: with the target running its clocks are BKPT pulses.
-- Pins: FREEZE, RESET, DS levels and VDD in millivolts.  DSO is a PIO
+- Pins: FREEZE, RESET, DS levels, VDD in millivolts, and ATEMP for
+  the current stay in background mode (below).  DSO is a PIO
   pin, which embassy-rp gives no way to read, so it is not reported.
   BERR is driven but not sensed: the 74LVC125's four channels are used.
 - ResetHalt, Halt: the sequences in Protocol summary; refused without
-  VDD, and NoFreeze if FREEZE does not assert in 100 ms.  Each then
-  reads ATEMP, the entry source, as the first command, and returns it.
+  VDD, and NoFreeze if FREEZE does not assert in 100 ms.  Each returns
+  ATEMP.  Halt on a CPU already in background mode only returns it.
+- ATEMP holds the entry source only until the first command after
+  entry, and the CPU can enter on its own (BGND, a breakpoint, a double
+  bus fault).  A task watches FREEZE and counts its edges (`freeze.rs`);
+  before each request, if FREEZE is high and the count moved since the
+  last read, the pod drives DSCLK and DSI and reads ATEMP first
+  (`pod-proto`'s `entry`).  It reports it as fresh, or as stale when
+  the CPU was halted when the pod started and so may have been
+  commanded before.  This also turns DSI on after a self-entry: GO
+  turned it off.
 - SetClock: DSCLK's rate; the reply gives the rate set, never faster
   than asked and at most 4 MHz until the throughput test measures the
   margin (`pod-proto`'s `dsclk::MAX_HZ` has the arithmetic).
@@ -277,8 +287,8 @@ the pod has its own.  Requests:
     and DFC, which the host sets.
   - Go, Call: the last word through `Link::transfer_exit`.
 
-The firmware's own sizes, release builds: about 24 KB of flash and
-2.6 KB of statics on either chip.
+The firmware's own sizes, release builds: 26084 bytes of text on the
+RP2040 and 24896 on the RP2350, 2740 bytes of statics on either.
 
 Handle not-ready retries in firmware; report BERR and illegal-command
 errors to the host.  `pod-proto`'s `session` does both, over a `Link`
@@ -315,14 +325,13 @@ USB command reports the high-water mark.  Not written yet.
 - `pod-host`'s `pod`: each USB request as a call.  Memory goes as
   56-byte requests and raw transfers as 15-word ones; a chunk never
   splits an access.  Tested against scripted replies.
-- `pod-host`'s `target`: `PodTarget`, `Cpu32Target` over a `Pod`.  It
-  keeps the entry source from ATEMP until the target resumes, and reads
-  ATEMP first when it finds the target halted (a poll of FREEZE, or a
-  register or memory call).  A memory call sets SFC or DFC to its
-  function code, reading the program's value first; SFC/DFC reads and
-  writes reach the program's value; go, call and
-  `restore_function_codes` put it back.  A `PodTarget` made for a
-  target already commanded in background mode reads a stale ATEMP.
+- `pod-host`'s `target`: `PodTarget`, `Cpu32Target` over a `Pod`.  The
+  entry source is the pod's ATEMP (Pins, Halt, ResetHalt): fresh
+  decodes per Table 7-2, stale is `Entry::Unknown`.  It is kept until
+  the target resumes.  A memory call sets SFC or DFC to its function
+  code, reading the program's value first; SFC/DFC reads and writes
+  reach the program's value; go, call and `restore_function_codes` put
+  it back.
 - `bdm`: pins, halt, reset, go, call, clock, regs, get, set, dump,
   write, xfer, through `PodTarget`.  Halt and reset print the entry
   source.  Dump and write take `--fc`, default 5 (supervisor data).
@@ -348,6 +357,8 @@ USB command reports the high-water mark.  Not written yet.
       idle-high
 - [ ] Reset into BDM; confirm FREEZE asserts
 - [ ] RSREG ATEMP first (`0x2588`): confirms RSREG's `0x2580`
+- [ ] BGND and a breakpoint after GO: `bdm pins` reports a fresh ATEMP
+      of 1 and 0; DSI driven again
 - [ ] NOP / not-ready handling
 - [ ] RDREG D0; RSREG RPC
 - [ ] Read SIMCR (0xFFFA00) and other SIM regs; compare to reset

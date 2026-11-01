@@ -21,7 +21,7 @@ pub const PACKET: usize = 64;
 
 /// This protocol's version, in the Hello reply: raised on any change
 /// to a request or reply (docs/usb-protocol.md).
-pub const PROTOCOL_VERSION: u32 = 1;
+pub const PROTOCOL_VERSION: u32 = 2;
 
 /// Bytes a reply's status takes.
 const STATUS_BYTES: usize = 1;
@@ -57,6 +57,15 @@ const DS: u8 = 1 << 2;
 
 /// Bytes in a 32-bit field.
 const LONG: usize = 4;
+
+/// The kind byte of an ATEMP field (`Pins`, `Halt`, `ResetHalt` replies).
+const ATEMP_NONE: u8 = 0;
+const ATEMP_FRESH: u8 = 1;
+const ATEMP_STALE: u8 = 2;
+/// An ATEMP field: its kind byte, then the value.
+const ATEMP_BYTES: usize = 1 + LONG;
+/// A Pins reply's body: levels, VDD, ATEMP.
+const PINS_BYTES: usize = 3 + ATEMP_BYTES;
 
 /// What the host asks of the pod.  Everything from `ReadRegister` on
 /// needs the target in background mode, and so do Go and Call.
@@ -428,6 +437,48 @@ pub struct Pins {
     pub ds: bool,
     /// Target VDD, millivolts.
     pub vdd_mv: u16,
+    /// ATEMP for the CPU's current stay in background mode.
+    pub atemp: Atemp,
+}
+
+/// ATEMP as the pod read it for the CPU's current stay in background
+/// mode.  ATEMP holds the entry source only until the first command
+/// after entry (CPU32RM 7.2.3), so the pod reads it before any other
+/// command once FREEZE rises, and keeps it until the CPU leaves.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Atemp {
+    /// The CPU is not in background mode.
+    None,
+    /// Read first after entry: the entry source (CPU32RM Table 7-2).
+    Fresh(u32),
+    /// Read when the pod had not seen the entry (it started with the
+    /// CPU already halted), so commands may have come first: not an
+    /// entry source.
+    Stale(u32),
+}
+
+impl Atemp {
+    /// Its kind byte and value.
+    const fn to_bytes(self) -> [u8; ATEMP_BYTES] {
+        let (kind, value) = match self {
+            Self::None => (ATEMP_NONE, 0),
+            Self::Fresh(value) => (ATEMP_FRESH, value),
+            Self::Stale(value) => (ATEMP_STALE, value),
+        };
+        let [b0, b1, b2, b3] = value.to_le_bytes();
+        [kind, b0, b1, b2, b3]
+    }
+
+    const fn from_bytes(bytes: [u8; ATEMP_BYTES]) -> Option<Self> {
+        let [kind, b0, b1, b2, b3] = bytes;
+        let value = u32::from_le_bytes([b0, b1, b2, b3]);
+        match kind {
+            ATEMP_NONE if value == 0 => Some(Self::None),
+            ATEMP_FRESH => Some(Self::Fresh(value)),
+            ATEMP_STALE => Some(Self::Stale(value)),
+            _ => None,
+        }
+    }
 }
 
 /// Writes a reply that is only a status, returning its length.
@@ -456,7 +507,15 @@ pub fn encode_pins(pins: &Pins, packet: &mut [u8; PACKET]) -> usize {
     packet[0] = Status::Ok as u8;
     packet[1] = levels;
     packet[2..4].copy_from_slice(&pins.vdd_mv.to_le_bytes());
-    4
+    packet[4..STATUS_BYTES + PINS_BYTES].copy_from_slice(&pins.atemp.to_bytes());
+    STATUS_BYTES + PINS_BYTES
+}
+
+/// Writes a `Halt` or `ResetHalt` reply, returning its length.
+pub fn encode_atemp(atemp: Atemp, packet: &mut [u8; PACKET]) -> usize {
+    packet[0] = Status::Ok as u8;
+    packet[STATUS_BYTES..STATUS_BYTES + ATEMP_BYTES].copy_from_slice(&atemp.to_bytes());
+    STATUS_BYTES + ATEMP_BYTES
 }
 
 /// Writes a reply carrying one 32-bit value (a register, ATEMP, the
@@ -504,13 +563,31 @@ pub fn parse_transfer_reply(body: &[u8]) -> Result<impl Iterator<Item = u32> + '
 /// # Errors
 /// The wrong length.
 pub fn parse_pins(body: &[u8]) -> Result<Pins, ReplyError> {
-    let [levels, low, high] = exact::<3>(body).ok_or(ReplyError::Malformed)?;
+    let [levels, low, high, a0, a1, a2, a3, a4] = exact::<PINS_BYTES>(body).ok_or(ReplyError::Malformed)?;
+    let freeze = levels & FREEZE != 0;
+    let atemp = Atemp::from_bytes([a0, a1, a2, a3, a4]).ok_or(ReplyError::Malformed)?;
+    if freeze == (atemp == Atemp::None) {
+        return Err(ReplyError::Malformed);
+    }
     Ok(Pins {
-        freeze: levels & FREEZE != 0,
+        freeze,
         reset: levels & RESET != 0,
         ds: levels & DS != 0,
         vdd_mv: u16::from_le_bytes([low, high]),
+        atemp,
     })
+}
+
+/// A `Halt` or `ResetHalt` reply's ATEMP, from [`parse_reply`]'s result:
+/// never [`Atemp::None`].
+///
+/// # Errors
+/// The wrong length or kind.
+pub fn parse_atemp(body: &[u8]) -> Result<Atemp, ReplyError> {
+    match exact::<ATEMP_BYTES>(body).and_then(Atemp::from_bytes) {
+        Some(Atemp::None) | None => Err(ReplyError::Malformed),
+        Some(atemp) => Ok(atemp),
+    }
 }
 
 /// A one-value reply's value, from [`parse_reply`]'s result.
@@ -523,7 +600,11 @@ pub fn parse_value(body: &[u8]) -> Result<u32, ReplyError> {
 
 #[cfg(test)]
 mod tests {
+    use super::ATEMP_FRESH;
+    use super::ATEMP_NONE;
     use super::Address;
+    use super::Atemp;
+    use super::FREEZE;
     use super::MAX_MEMORY_BYTES;
     use super::MAX_TRANSFER_WORDS;
     use super::PACKET;
@@ -536,12 +617,14 @@ mod tests {
     use super::Status;
     use super::SystemRegister;
     use super::byte_count;
+    use super::encode_atemp;
     use super::encode_data;
     use super::encode_pins;
     use super::encode_status;
     use super::encode_transfer;
     use super::encode_transfer_reply;
     use super::encode_value;
+    use super::parse_atemp;
     use super::parse_pins;
     use super::parse_reply;
     use super::parse_transfer_reply;
@@ -662,11 +745,29 @@ mod tests {
 
     #[test]
     fn pins_reply() {
-        let pins = Pins { freeze: true, reset: true, ds: false, vdd_mv: 5012 };
         let mut packet = [0; PACKET];
-        let length = encode_pins(&pins, &mut packet);
-        assert_eq!(parse_pins(parse_reply(&packet[..length]).unwrap()), Ok(pins));
+        for (freeze, atemp) in [(true, Atemp::Fresh(1)), (true, Atemp::Stale(0)), (false, Atemp::None)] {
+            let pins = Pins { freeze, reset: true, ds: false, vdd_mv: 5012, atemp };
+            let length = encode_pins(&pins, &mut packet);
+            assert_eq!(parse_pins(parse_reply(&packet[..length]).unwrap()), Ok(pins));
+        }
         assert_eq!(parse_pins(&[0, 0]), Err(ReplyError::Malformed));
+        // ATEMP only in background mode, and always then.
+        assert_eq!(parse_pins(&[0, 0x88, 0x13, ATEMP_FRESH, 0, 0, 0, 0]), Err(ReplyError::Malformed));
+        assert_eq!(parse_pins(&[FREEZE, 0x88, 0x13, ATEMP_NONE, 0, 0, 0, 0]), Err(ReplyError::Malformed));
+    }
+
+    #[test]
+    fn atemp_reply() {
+        let mut packet = [0; PACKET];
+        for atemp in [Atemp::Fresh(0x1234_FFFF), Atemp::Stale(0xA7E3_A7E3)] {
+            let length = encode_atemp(atemp, &mut packet);
+            assert_eq!(parse_atemp(parse_reply(&packet[..length]).unwrap()), Ok(atemp));
+        }
+        let length = encode_atemp(Atemp::None, &mut packet);
+        assert_eq!(parse_atemp(parse_reply(&packet[..length]).unwrap()), Err(ReplyError::Malformed));
+        assert_eq!(parse_atemp(&[3, 0, 0, 0, 0]), Err(ReplyError::Malformed));
+        assert_eq!(parse_atemp(&[ATEMP_FRESH, 0, 0, 0]), Err(ReplyError::Malformed));
     }
 
     #[test]

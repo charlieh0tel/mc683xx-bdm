@@ -1,6 +1,7 @@
 //! [`Cpu32Target`] over the pod: the trait's halts, registers and
 //! memory, with what it needs kept between requests (the entry source,
-//! the program's SFC and DFC).
+//! the program's SFC and DFC).  The pod reads ATEMP first after each
+//! entry and reports it (`pod_proto::entry`); this never reads ATEMP.
 
 use mc683xx_target::Cpu32Target;
 use mc683xx_target::address::Address;
@@ -9,6 +10,9 @@ use mc683xx_target::function_code::FunctionCode;
 use mc683xx_target::register::Register;
 use mc683xx_target::register::SystemRegister;
 use mc683xx_target::size::Size;
+use pod_proto::usb::Atemp;
+use pod_proto::usb::ReplyError;
+use pod_proto::usb::Status;
 
 use crate::pod::Error;
 use crate::pod::Pod;
@@ -52,11 +56,8 @@ impl Halted {
 
 /// A CPU32 through the pod, as [`Cpu32Target`].
 ///
-/// It knows the entry source only if it saw the entry: by its own halt
-/// or reset, or by being the first to command the CPU after one.  Made
-/// for a target someone else has already commanded in background mode,
-/// it reads a stale ATEMP, which decodes as [`Entry::Unknown`] or as the
-/// wrong source.
+/// The entry source is the pod's: [`Entry::Unknown`] when the pod did
+/// not see the entry (it started with the CPU already halted).
 #[derive(Debug)]
 pub struct PodTarget<T> {
     pod: Pod<T>,
@@ -109,14 +110,24 @@ impl<T: Transport> PodTarget<T> {
         Ok(())
     }
 
-    /// The halted state, reading the entry source if this is the first
-    /// look since the target stopped.
+    /// The halted state, asking the pod for the entry source if this is
+    /// the first look since the target stopped.
+    ///
+    /// # Errors
+    /// As [`Error`]; the pod's `NoFreeze` if the target runs.
     fn halted_state(&mut self) -> Result<&mut Halted, Error> {
         if self.halted.is_none() {
-            let atemp = self.pod.read_system_register(SystemRegister::Atemp)?;
-            self.halted = Some(Halted::new(Entry::from_atemp(atemp)));
+            let entry = entry(self.pod.pins()?.atemp).ok_or(ReplyError::Failed(Status::NoFreeze))?;
+            self.halted = Some(Halted::new(entry));
         }
         Ok(self.halted.as_mut().expect("just set"))
+    }
+
+    /// Keeps the entry a halt or reset reported.
+    fn halted_at(&mut self, atemp: Atemp) -> Result<Entry, Error> {
+        let entry = entry(atemp).ok_or(ReplyError::Malformed)?;
+        self.halted = Some(Halted::new(entry));
+        Ok(entry)
     }
 
     /// Sets SFC or DFC to `function_code` for a memory call, reading the
@@ -148,28 +159,25 @@ impl<T: Transport> Cpu32Target for PodTarget<T> {
 
     fn reset_halted(&mut self) -> Result<Entry, Error> {
         self.halted = None;
-        let entry = Entry::from_atemp(self.pod.reset_halt()?);
-        self.halted = Some(Halted::new(entry));
-        Ok(entry)
+        let atemp = self.pod.reset_halt()?;
+        self.halted_at(atemp)
     }
 
     fn halt(&mut self) -> Result<Entry, Error> {
-        if let Some(entry) = self.halted()? {
-            return Ok(entry);
+        if let Some(halted) = self.halted {
+            return Ok(halted.entry);
         }
-        let entry = Entry::from_atemp(self.pod.halt()?);
-        self.halted = Some(Halted::new(entry));
-        Ok(entry)
+        let atemp = self.pod.halt()?;
+        self.halted_at(atemp)
     }
 
     fn halted(&mut self) -> Result<Option<Entry>, Error> {
         if let Some(halted) = self.halted {
             return Ok(Some(halted.entry));
         }
-        if !self.pod.pins()?.freeze {
-            return Ok(None);
-        }
-        Ok(Some(self.halted_state()?.entry))
+        let Some(entry) = entry(self.pod.pins()?.atemp) else { return Ok(None) };
+        self.halted = Some(Halted::new(entry));
+        Ok(Some(entry))
     }
 
     fn go(&mut self) -> Result<(), Error> {
@@ -236,6 +244,15 @@ impl<T: Transport> Cpu32Target for PodTarget<T> {
     }
 }
 
+/// The entry source a pod's ATEMP gives, `None` while the target runs.
+const fn entry(atemp: Atemp) -> Option<Entry> {
+    match atemp {
+        Atemp::None => None,
+        Atemp::Fresh(value) => Some(Entry::from_atemp(value)),
+        Atemp::Stale(value) => Some(Entry::Unknown { atemp: value }),
+    }
+}
+
 /// SFC's or DFC's state if `register` is one of them and the target is
 /// halted.
 fn function_code_register(
@@ -254,9 +271,17 @@ mod tests {
     use mc683xx_target::register::Register;
     use mc683xx_target::register::SystemRegister;
     use mc683xx_target::size::Size;
+    use pod_proto::usb::Atemp;
+    use pod_proto::usb::PACKET;
+    use pod_proto::usb::Pins;
+    use pod_proto::usb::ReplyError;
     use pod_proto::usb::Request;
+    use pod_proto::usb::Status;
+    use pod_proto::usb::encode_atemp;
+    use pod_proto::usb::encode_pins;
 
     use super::PodTarget;
+    use crate::pod::Error;
     use crate::script::Script;
     use crate::script::parsed;
     use crate::script::pod;
@@ -269,10 +294,20 @@ mod tests {
     /// A reply with no body.
     const DONE: &[u8] = &[0];
 
-    /// A Pins reply: FREEZE as given, RESET and DS high, 5 V.
-    fn pins(freeze: bool) -> Vec<u8> {
-        let levels = u8::from(freeze) | 0b110;
-        [&[0, levels][..], &5000_u16.to_le_bytes()].concat()
+    /// A Pins reply: RESET and DS high, 5 V, FREEZE high unless `atemp`
+    /// is `Atemp::None`.
+    fn pins(atemp: Atemp) -> Vec<u8> {
+        let mut packet = [0; PACKET];
+        let pins = Pins { freeze: atemp != Atemp::None, reset: true, ds: true, vdd_mv: 5000, atemp };
+        let length = encode_pins(&pins, &mut packet);
+        packet[..length].to_vec()
+    }
+
+    /// A `Halt` or `ResetHalt` reply.
+    fn halted(atemp: Atemp) -> Vec<u8> {
+        let mut packet = [0; PACKET];
+        let length = encode_atemp(atemp, &mut packet);
+        packet[..length].to_vec()
     }
 
     fn target(replies: &[&[u8]]) -> PodTarget<Script> {
@@ -285,7 +320,7 @@ mod tests {
 
     #[test]
     fn a_halt_is_kept_until_resumed() {
-        let mut target = target(&[&pins(false), &value(1), DONE, &pins(false)]);
+        let mut target = target(&[&halted(Atemp::Fresh(1)), DONE, &pins(Atemp::None)]);
         assert_eq!(target.halt().unwrap(), Entry::Background);
         assert_eq!(target.halt().unwrap(), Entry::Background);
         assert_eq!(target.halted().unwrap(), Some(Entry::Background));
@@ -293,43 +328,57 @@ mod tests {
         assert_eq!(target.halted().unwrap(), None);
         let sent = requests(target);
         let sent: Vec<_> = sent.iter().map(|r| parsed(r)).collect();
-        assert_eq!(sent, [Request::Pins, Request::Halt, Request::Go, Request::Pins]);
+        assert_eq!(sent, [Request::Halt, Request::Go, Request::Pins]);
     }
 
     #[test]
-    fn a_halt_seen_by_polling_reads_atemp_first() {
-        let mut target = target(&[&pins(true), &value(0), &value(0x55)]);
+    fn a_halt_seen_by_polling_is_the_pods() {
+        let mut target = target(&[&pins(Atemp::Fresh(0)), &value(0x55)]);
         assert_eq!(target.halted().unwrap(), Some(Entry::Breakpoint));
         assert_eq!(target.read_register(Register::D0).unwrap(), 0x55);
         let sent = requests(target);
-        assert_eq!(parsed(&sent[1]), Request::ReadSystemRegister(SystemRegister::Atemp));
-        assert_eq!(parsed(&sent[2]), Request::ReadRegister(Register::D0));
+        let sent: Vec<_> = sent.iter().map(|r| parsed(r)).collect();
+        assert_eq!(sent, [Request::Pins, Request::ReadRegister(Register::D0)]);
     }
 
     #[test]
-    fn a_register_read_after_an_unseen_halt_reads_atemp_first() {
-        let mut target = target(&[&value(1), &value(0x55)]);
+    fn a_register_call_asks_the_pod_why_first() {
+        let mut target = target(&[&pins(Atemp::Fresh(1)), &value(0x55)]);
         assert_eq!(target.read_register(Register::D0).unwrap(), 0x55);
         assert_eq!(target.halted().unwrap(), Some(Entry::Background));
-        assert_eq!(parsed(&requests(target)[0]), Request::ReadSystemRegister(SystemRegister::Atemp));
+    }
+
+    #[test]
+    fn a_register_call_while_running_is_refused() {
+        let mut target = target(&[&pins(Atemp::None)]);
+        assert!(matches!(
+            target.read_register(Register::D0),
+            Err(Error::Reply(ReplyError::Failed(Status::NoFreeze)))
+        ));
+    }
+
+    #[test]
+    fn an_unseen_entry_is_unknown() {
+        let mut target = target(&[&pins(Atemp::Stale(0))]);
+        assert_eq!(target.halted().unwrap(), Some(Entry::Unknown { atemp: 0 }));
     }
 
     #[test]
     fn an_unlisted_atemp_is_still_a_halt() {
-        let mut target = target(&[&value(0x1234)]);
+        let mut target = target(&[&halted(Atemp::Fresh(0x1234))]);
         assert_eq!(target.reset_halted().unwrap(), Entry::Unknown { atemp: 0x1234 });
     }
 
     #[test]
     fn memory_calls_set_sfc_and_go_restores_it() {
         let mut target = target(&[
-            &value(0),        // ResetHalt: ATEMP
-            &value(1),        // SFC, the program's
-            DONE,             // SFC = 5
-            &[0, 0xAB, 0xCD], // ReadMemory
-            &[0, 0xEF, 0x01], // ReadMemory, SFC already 5
-            DONE,             // SFC = 1, restored
-            DONE,             // Go
+            &halted(Atemp::Fresh(0)), // ResetHalt
+            &value(1),                // SFC, the program's
+            DONE,                     // SFC = 5
+            &[0, 0xAB, 0xCD],         // ReadMemory
+            &[0, 0xEF, 0x01],         // ReadMemory, SFC already 5
+            DONE,                     // SFC = 1, restored
+            DONE,                     // Go
         ]);
         target.reset_halted().unwrap();
         let mut data = [0; 2];
@@ -357,7 +406,7 @@ mod tests {
 
     #[test]
     fn a_written_dfc_is_the_programs_and_saves_a_write() {
-        let mut target = target(&[&value(0), DONE, DONE, DONE]);
+        let mut target = target(&[&halted(Atemp::Fresh(0)), DONE, DONE, DONE]);
         target.reset_halted().unwrap();
         target.write_system_register(SystemRegister::Dfc, 1).unwrap();
         target.write_memory(Address(0x200), FunctionCode::USER_DATA, Size::Byte, &[7]).unwrap();
@@ -377,7 +426,7 @@ mod tests {
 
     #[test]
     fn a_program_sfc_that_already_matches_is_left() {
-        let mut target = target(&[&value(0), &value(5), &[0, 9], DONE]);
+        let mut target = target(&[&halted(Atemp::Fresh(0)), &value(5), &[0, 9], DONE]);
         target.reset_halted().unwrap();
         let mut data = [0; 1];
         target.read_memory(Address(0), FunctionCode::SUPERVISOR_DATA, Size::Byte, &mut data).unwrap();

@@ -17,9 +17,6 @@
 - DSCLK above 4 MHz, once the throughput test measures the margin.
 - A `Link` adapter onto m683xx-emu's BDM serial exchange once it
   lands; then delete `bdm-model`.
-- `pod-fw`: read ATEMP when FREEZE rises, before any host command, and
-  report it, so a host that attaches to a halted target (each `bdm`
-  run) gets the true entry source rather than a stale ATEMP.
 - `bdm load <srec/elf>`; a target init script run after each reset.
 - A second Pico as a stand-in CPU32: a target-side PIO program around
   `bdm-model`, driving FREEZE and watching BKPT and RESET.
@@ -32,6 +29,8 @@
     against FREEZE falling and DSI's 74AHCT125 output turning off
     (PLAN.md, Hardware).
   - RSREG ATEMP first (`0x2588`): confirms RSREG's `0x2580` (PLAN.md).
+  - BGND and a breakpoint after GO: `bdm pins` gives a fresh ATEMP of 1
+    and 0, and commands work (DSI driven again).
   - NOP / not-ready handling.
   - RDREG D0; RSREG RPC.
   - SIMCR (0xFFFA00) and other SIM registers against reset values.

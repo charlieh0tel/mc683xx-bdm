@@ -15,8 +15,10 @@ use embassy_time::with_timeout;
 use mc683xx_target::register::SystemRegister;
 use pod_proto::bdm::Command;
 use pod_proto::dsclk::divider;
+use pod_proto::entry::EntryWatch;
 use pod_proto::session::Link;
 use pod_proto::session::Session;
+use pod_proto::usb::Atemp;
 use pod_proto::usb::MAX_MEMORY_BYTES;
 use pod_proto::usb::MAX_TRANSFER_WORDS;
 use pod_proto::usb::PACKET;
@@ -24,12 +26,14 @@ use pod_proto::usb::PROTOCOL_VERSION;
 use pod_proto::usb::Pins;
 use pod_proto::usb::Request;
 use pod_proto::usb::Status;
+use pod_proto::usb::encode_atemp;
 use pod_proto::usb::encode_data;
 use pod_proto::usb::encode_pins;
 use pod_proto::usb::encode_status;
 use pod_proto::usb::encode_transfer_reply;
 use pod_proto::usb::encode_value;
 
+use crate::freeze::FREEZE;
 use crate::link::PioLink;
 
 /// NOPs clocked while the target answers "not ready", about 17 ms at
@@ -55,6 +59,8 @@ enum Answer {
     Done,
     /// One 32-bit value.
     Value(u32),
+    /// ATEMP for the current stay in background mode.
+    Atemp(Atemp),
     /// Pin levels and VDD.
     Pins(Pins),
     /// The first `n` bytes of the memory buffer.
@@ -70,11 +76,12 @@ pub(crate) struct Pod<'d> {
     dsclk_enable: Output<'d>,
     /// 2N7002 gate: high pulls RESET low.
     reset_drive: Output<'d>,
-    freeze: Input<'d>,
     reset: Input<'d>,
     ds: Input<'d>,
     adc: Adc<'d, Async>,
     vdd: Channel<'d>,
+    /// ATEMP, read first after each entry (`pod_proto::entry`).
+    entry: EntryWatch,
 }
 
 /// The pod's pins, bundled for [`Pod::new`].
@@ -83,8 +90,6 @@ pub(crate) struct Lines<'d> {
     pub(crate) dsclk_enable: Output<'d>,
     /// See [`Pod`].
     pub(crate) reset_drive: Output<'d>,
-    /// FREEZE, high in background mode.
-    pub(crate) freeze: Input<'d>,
     /// RESET, low in reset.
     pub(crate) reset: Input<'d>,
     /// DS, low during a bus cycle's data phase.
@@ -97,11 +102,11 @@ impl<'d> Pod<'d> {
             session: Session::new(link, NOT_READY_RETRIES),
             dsclk_enable: lines.dsclk_enable,
             reset_drive: lines.reset_drive,
-            freeze: lines.freeze,
             reset: lines.reset,
             ds: lines.ds,
             adc,
             vdd,
+            entry: EntryWatch::new(),
         }
     }
 
@@ -111,11 +116,15 @@ impl<'d> Pod<'d> {
         let Ok(request) = Request::parse(packet) else {
             return encode_status(Status::BadRequest, reply);
         };
+        if let Err(status) = self.read_entry().await {
+            return encode_status(status, reply);
+        }
         let mut responses = [0; MAX_TRANSFER_WORDS];
         let mut data = [0; MAX_MEMORY_BYTES];
         match self.carry_out(request, &mut responses, &mut data).await {
             Ok(Answer::Done) => encode_status(Status::Ok, reply),
             Ok(Answer::Value(value)) => encode_value(value, reply),
+            Ok(Answer::Atemp(atemp)) => encode_atemp(atemp, reply),
             Ok(Answer::Pins(pins)) => encode_pins(&pins, reply),
             Ok(Answer::Data(n)) => encode_data(&data[..n], reply),
             Ok(Answer::Responses(n)) => encode_transfer_reply(&responses[..n], reply),
@@ -137,8 +146,8 @@ impl<'d> Pod<'d> {
                 Ok(Answer::Responses(words.len()))
             }
             Request::Pins => self.pins().await.map(Answer::Pins),
-            Request::ResetHalt => self.reset_halt().await.map(Answer::Value),
-            Request::Halt => self.halt().await.map(Answer::Value),
+            Request::ResetHalt => self.reset_halt().await.map(Answer::Atemp),
+            Request::Halt => self.halt().await.map(Answer::Atemp),
             Request::SetClock { dsclk_hz } => Ok(Answer::Value(self.set_clock(dsclk_hz))),
             Request::Go => self.command(&Command::Go).await.map(|_| Answer::Done),
             Request::Call(address) => self.command(&Command::Call(address)).await.map(|_| Answer::Done),
@@ -178,7 +187,7 @@ impl<'d> Pod<'d> {
     }
 
     fn require_frozen(&self) -> Result<(), Status> {
-        if self.freeze.is_low() {
+        if !FREEZE.is_high() {
             return Err(Status::NoFreeze);
         }
         Ok(())
@@ -189,12 +198,17 @@ impl<'d> Pod<'d> {
         bits
     }
 
+    /// FREEZE as of the ATEMP read: if it moves between the two, the
+    /// reply stays consistent and the next request catches up.
     async fn pins(&mut self) -> Result<Pins, Status> {
+        self.read_entry().await?;
+        let atemp = self.entry.atemp(FREEZE.is_high(), FREEZE.edges());
         Ok(Pins {
-            freeze: self.freeze.is_high(),
+            freeze: atemp != Atemp::None,
             reset: self.reset.is_high(),
             ds: self.ds.is_high(),
             vdd_mv: self.vdd_mv().await?,
+            atemp,
         })
     }
 
@@ -214,17 +228,19 @@ impl<'d> Pod<'d> {
 
     /// BKPT low until FREEZE; BKPT stays low after, and the first word's
     /// first rising edge releases it (PLAN.md, Protocol summary).
-    /// Returns ATEMP, the entry source.
-    async fn halt(&mut self) -> Result<u32, Status> {
-        self.require_target().await?;
-        self.bkpt_low();
-        self.wait_freeze(async |_| {}).await?;
-        self.read_atemp().await
+    /// Returns ATEMP: already read, if the CPU was in background mode.
+    async fn halt(&mut self) -> Result<Atemp, Status> {
+        if !FREEZE.is_high() {
+            self.require_target().await?;
+            self.bkpt_low();
+            self.wait_freeze(async |_| {}).await?;
+        }
+        self.entry_atemp().await
     }
 
     /// BKPT low across a RESET pulse, so the CPU comes out of reset in
     /// background mode (MC68331UM 5.10.2.1).  Returns ATEMP.
-    async fn reset_halt(&mut self) -> Result<u32, Status> {
+    async fn reset_halt(&mut self) -> Result<Atemp, Status> {
         self.require_target().await?;
         self.session.link_mut().set_dsi_enabled(false);
         self.bkpt_low();
@@ -232,13 +248,34 @@ impl<'d> Pod<'d> {
         Timer::after(RESET_PULSE).await;
         self.reset_drive.set_low();
         self.wait_freeze(async |pod| pod.reset.wait_for_high().await).await?;
-        self.read_atemp().await
+        self.entry_atemp().await
     }
 
-    /// ATEMP, the entry source, read first after entry because the
-    /// commands after overwrite it (CPU32RM 7.2.3, Table 7-2).
-    async fn read_atemp(&mut self) -> Result<u32, Status> {
-        Ok(self.session.read_system_register(SystemRegister::Atemp).await?)
+    /// ATEMP for this stay in background mode, read now if not yet.
+    async fn entry_atemp(&mut self) -> Result<Atemp, Status> {
+        self.read_entry().await?;
+        match self.entry.atemp(FREEZE.is_high(), FREEZE.edges()) {
+            Atemp::None => Err(Status::NoFreeze),
+            atemp => Ok(atemp),
+        }
+    }
+
+    /// Reads ATEMP if the CPU has entered background mode since the last
+    /// read, before any other command: ATEMP holds the entry source only
+    /// until the first command after entry (CPU32RM 7.2.3, Table 7-2).
+    /// The CPU may have entered on its own (BGND, a breakpoint, a double
+    /// bus fault) with DSI off since GO, so the link is driven first.
+    async fn read_entry(&mut self) -> Result<(), Status> {
+        let edges = FREEZE.edges();
+        let Some(take) = self.entry.read_needed(FREEZE.is_high(), edges) else {
+            return Ok(());
+        };
+        self.session.link_mut().set_dsclk(Level::High);
+        self.dsclk_enable.set_low();
+        self.session.link_mut().set_dsi_enabled(true);
+        let atemp = self.session.read_system_register(SystemRegister::Atemp).await?;
+        self.entry.record(edges, take(atemp));
+        Ok(())
     }
 
     fn set_clock(&mut self, dsclk_hz: u32) -> u32 {
@@ -258,7 +295,7 @@ impl<'d> Pod<'d> {
     async fn wait_freeze(&mut self, first: impl AsyncFnOnce(&mut Self)) -> Result<(), Status> {
         let frozen = with_timeout(FREEZE_TIMEOUT, async {
             first(self).await;
-            self.freeze.wait_for_high().await;
+            FREEZE.wait_high().await;
         })
         .await;
         if frozen.is_ok() {
