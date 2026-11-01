@@ -1,7 +1,8 @@
 //! The BDM serial link on PIO0's state machine 0 (PLAN.md, PIO
-//! program): 17-bit full-duplex words, DSCLK idling high, and DSI's
-//! output enable, which the program turns off itself after the last
-//! word before the CPU leaves background mode.
+//! program): 17-bit full-duplex words, DSCLK idling high, and `DSI_EN`,
+//! which the program drops itself after the last word before the CPU
+//! leaves background mode.  FREEZE gates DSI in hardware as well
+//! (PLAN.md, Hardware).
 
 use core::convert::Infallible;
 
@@ -27,7 +28,7 @@ use pod_proto::session::Link;
 const WORD_BITS: u32 = 17;
 /// The OSR shifts left, so a word goes in left-justified.
 const LEFT_JUSTIFY: u32 = u32::BITS - WORD_BITS;
-/// The bit after a word in the OSR: set to turn DSI off once the word is
+/// The bit after a word in the OSR: set to drop `DSI_EN` once the word is
 /// out.
 const RELEASE_DSI: u32 = 1 << (LEFT_JUSTIFY - 1);
 /// The 17 bits shifted in.
@@ -36,7 +37,7 @@ const WORD_MASK: u32 = (1 << WORD_BITS) - 1;
 const SHIFT_THRESHOLD: u8 = 32;
 
 /// The PIO's pins (PLAN.md, Hardware): DSCLK (BKPT) on GP2, DSI on GP3,
-/// DSO on GP4, and DSI's 74AHCT125 output enable on GP11, active low.
+/// DSO on GP4, and `DSI_EN` on GP11, high to let FREEZE enable DSI.
 pub(crate) struct PioLink<'d> {
     sm: StateMachine<'d, PIO0, 0>,
     dsclk: Pin<'d, PIO0>,
@@ -51,7 +52,7 @@ pub(crate) struct LinkPins<'d> {
     pub(crate) dsi: Peri<'d, PIN_3>,
     /// IPIPE/DSO.
     pub(crate) dso: Peri<'d, PIN_4>,
-    /// DSI's output enable.
+    /// `DSI_EN`.
     pub(crate) dsi_enable: Peri<'d, PIN_11>,
 }
 
@@ -67,8 +68,8 @@ impl<'d> PioLink<'d> {
         // Each phase is 8 cycles; DSO is sampled on the low phase's last
         // cycle, just before DSCLK rises.  The high phase's delay is on
         // the loop's back edge only, so after the 17th rise the OSR's
-        // next bit, RELEASE_DSI, is checked at once: if set, `set pins, 1`
-        // drives DSI's output enable high 3 cycles after the rise
+        // next bit, RELEASE_DSI, is checked at once: if set, `set pins, 0`
+        // drops DSI_EN 3 cycles after the rise
         // (PLAN.md, PIO program).
         let program = pio::pio_asm!(
             ".side_set 1 opt",
@@ -83,7 +84,7 @@ impl<'d> PioLink<'d> {
             "last:",
             "    out y, 1",
             "    jmp !y keep",
-            "    set pins, 1",
+            "    set pins, 0",
             "keep:",
             "    push block",
             ".wrap",
@@ -103,7 +104,8 @@ impl<'d> PioLink<'d> {
         config.shift_in = shift;
         config.clock_divider = FixedU32::from_bits(divider.bits);
         sm.set_config(&config);
-        sm.set_pins(Level::High, &[&dsclk, &dsi_enable]);
+        sm.set_pins(Level::High, &[&dsclk]);
+        sm.set_pins(Level::Low, &[&dsi_enable]);
         sm.set_pin_dirs(Direction::Out, &[&dsclk, &dsi, &dsi_enable]);
         sm.set_pin_dirs(Direction::In, &[&dso]);
         sm.set_enable(true);
@@ -115,9 +117,9 @@ impl<'d> PioLink<'d> {
         self.sm.set_pins(level, &[&self.dsclk]);
     }
 
-    /// Turns the DSI driver on (FREEZE asserted) or off.
+    /// Sets `DSI_EN`: DSI is driven while it is high and FREEZE is.
     pub(crate) fn set_dsi_enabled(&mut self, enabled: bool) {
-        let level = if enabled { Level::Low } else { Level::High };
+        let level = if enabled { Level::High } else { Level::Low };
         self.sm.set_pins(level, &[&self.dsi_enable]);
     }
 

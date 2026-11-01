@@ -40,7 +40,9 @@ License: GPL-3.0-only (`LICENSE`).
 |---|---|---|
 | MCU | Pico (RP2040) or Pico 2 (RP2350), socketed | USB to host; same footprint and pinout |
 | 3.3 V → 5 V outputs | 74AHCT125, VCC = target VDD | BKPT/DSCLK, DSI; series 47–100 Ω; each its own OE |
-| AHCT125 OE pull-ups | 10 kΩ to target VDD, one per OE | Outputs tristated while the pod is unpowered or booting |
+| AHCT125 OE pull-up, BKPT/DSCLK | 10 kΩ to target VDD | Output tristated while the pod is unpowered or booting |
+| DSI enable gate | 74AHCT1G00, VCC = target VDD | Drives DSI's 74AHCT125 OE: NAND(FREEZE, DSI_EN), so DSI is driven only while FREEZE is high and the Pico enables it |
+| DSI_EN pull-down | 100 kΩ to GND | DSI off while the pod is unpowered or booting |
 | 3.3 V → 5 V outputs, spare | 74AHCT125, 2 channels | Unused; inputs tied to GND |
 | 5 V → 3.3 V inputs | 74LVC125, VCC = 3.3 V | IPIPE/DSO, FREEZE, RESET sense, DS; inputs to 5.5 V at any VCC. IPIPE is pin 10 outside BDM, so its channel reads both |
 | RESET drive | 2N7002, open-drain | Target also drives RESET; sense separately |
@@ -50,12 +52,20 @@ License: GPL-3.0-only (`LICENSE`).
 | BKPT pull-up | 10 kΩ to target VDD | Target runs normally with pod unpowered |
 
 Two output enables: BKPT must be driven to request a halt while DSI
-stays tristated, because pin 8 is IFETCH, a CPU output, until FREEZE
-(gotcha below).  DSI's enable is a PIO pin: the program turns DSI off
-itself 3 PIO cycles after the last rising edge of GO's opcode or CALL's
-last word, about 190 ns at 1 MHz DSCLK (PIO program).  How soon the CPU
-drives IFETCH after that edge is not in the manuals: check on the scope
-at bring-up.  The series resistor limits any overlap's current.
+stays tristated, because pin 8 is IFETCH, a CPU output, whenever
+FREEZE is negated (gotcha below).  DSI's is gated in hardware by
+FREEZE itself, so DSI goes off whatever ends background mode: GO,
+CALL, a reset from the target's side, a watchdog, a raw Transfer.
+From FREEZE falling to DSI off is at most 20 ns: 10 ns through the
+74AHCT1G00 and 10 ns for the 74AHCT125 to disable, both at 50 pF over
+temperature (SCLS316P 5.6, SCLS264R 5.5).  The manuals give no bound
+on how soon IFETCH is driven after FREEZE negates (MC68331UM Table A-7,
+Figure A-14); the series resistor limits any overlap's current.
+
+The Pico's DSI_EN is a PIO pin as well: the program drops it 3 PIO
+cycles after the last rising edge of GO's opcode or CALL's last word,
+about 190 ns at 1 MHz DSCLK (PIO program), which may beat FREEZE
+negating.  The firmware raises it once FREEZE asserts.
 
 Pico pins (GPn):
 
@@ -70,7 +80,7 @@ Pico pins (GPn):
 | 8 | RESET drive (2N7002 gate) | out, high asserts RESET |
 | 9 | BERR drive (2N7002 gate) | out, high asserts BERR |
 | 10 | 74AHCT125 OE, BKPT/DSCLK | out, low enables |
-| 11 | 74AHCT125 OE, DSI | PIO set, low enables |
+| 11 | DSI_EN, to the 74AHCT1G00 | PIO set, high enables |
 | 25 | LED (on the Pico) | out |
 | 26 | VDD sense (ADC0) | analog |
 
@@ -86,6 +96,8 @@ unpowered.
 Unpowered sides (TI datasheets in `third_party/ti/`):
 - Target off, pod on: 74AHCT125 inputs at 3.3 V with VCC = 0 are within
   ratings: VI to 7 V at any VCC, clamp only below 0 V (SCLS264R, 5.1).
+- Target off, pod on: the 74AHCT1G00's DSI_EN input at 3.3 V with
+  VCC = 0 is within ratings: VI to 7 V at any VCC (SCLS316P, 5.1).
 - Pod off, target on: 74LVC125A inputs at 5 V with VCC = 0 are within
   ratings: VI to 6.5 V, 5.5 V recommended, at any VCC (SCAS290T, 5.1,
   5.3).  Its outputs face the unpowered Pico; no Ioff is specified,
@@ -162,15 +174,15 @@ bit:
 last:
     out y, 1                 ; release flag: the OSR bit after the word
     jmp !y keep
-    set pins, 1              ; DSI's output enable high: DSI off
+    set pins, 0              ; DSI_EN low: DSI off
 keep:
     push block               ; 17 bits, right-justified
 .wrap
 ```
 
 Config: out and in shift left, no autopull/autopush. `out` base = DSI,
-`in` base = DSO, side-set base = DSCLK, `set` base = DSI's output
-enable (GP11, count 1).
+`in` base = DSO, side-set base = DSCLK, `set` base = DSI_EN (GP11,
+count 1).
 
 - The firmware pushes `word << 15`, with bit 14 set for the last word
   before the CPU leaves background mode (`Link::transfer_exit`): DSI

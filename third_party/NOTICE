@@ -64,6 +64,13 @@ In `ti/`, (c) Texas Instruments Incorporated:
                    off (5.1).
                    SHA-256 66da72e586dbca7a1548164adf28e238
                            484c5c1ad250fcb28ec972e4732c6fc2
+  SN74AHCT1G00.pdf "SN74AHCT1G00 Single 2-Input Positive-NAND Gate",
+                   SCLS316P, revised February 2024.
+                   ti.com/lit/ds/symlink/sn74ahct1g00.pdf.  The DSI
+                   enable gate: input ratings with the supply off
+                   (5.1), propagation delay (5.6).
+                   SHA-256 37ed4656545c518f7be708cee064fe3d
+                           6121aa93446f30675fd2efbcfa35fea1
   SN74LVC125A.pdf  "SN74LVC125A Quadruple Bus Buffer Gate With 3-State
                    Outputs", SCAS290T, revised September 2024.
                    ti.com/lit/ds/symlink/sn74lvc125a.pdf.  The 5 V to

@@ -16,8 +16,9 @@
 - Bring-up, in order (PLAN.md, Bring-up checklist):
   - PIO loopback: scope DSCLK/DSI, 17-bit framing, idle high.
   - Reset into BDM; FREEZE asserts.
-  - GO on the scope: IFETCH driven by the CPU against DSI's enable
-    going high (PLAN.md, Hardware).
+  - GO and a target-side reset on the scope: IFETCH driven by the CPU
+    against FREEZE falling and DSI's 74AHCT125 output turning off
+    (PLAN.md, Hardware).
   - RSREG ATEMP first (`0x2588`): confirms RSREG's `0x2580` (PLAN.md).
   - NOP / not-ready handling.
   - RDREG D0; RSREG RPC.

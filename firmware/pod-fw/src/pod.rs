@@ -161,8 +161,8 @@ impl<'d> Pod<'d> {
         self.wait_freeze(async |pod| pod.reset.wait_for_high().await).await
     }
 
-    /// GO.  The PIO turns DSI off as the word ends (`Link::transfer_exit`):
-    /// pin 8 is IFETCH again.  Only in background mode: otherwise its
+    /// GO.  The PIO drops `DSI_EN` as the word ends (`Link::transfer_exit`)
+    /// and FREEZE negating gates DSI off: pin 8 is IFETCH again.  Only in background mode: otherwise its
     /// clocks would be BKPT pulses.
     async fn go(&mut self) -> Result<(), Status> {
         if self.freeze.is_low() {
