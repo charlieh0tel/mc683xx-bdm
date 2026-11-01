@@ -17,9 +17,13 @@
 - DSCLK above 4 MHz, once the throughput test measures the margin.
 - A `Link` adapter onto m683xx-emu's BDM serial exchange once it
   lands; then delete `bdm-model`.
-- `bdm load <srec/elf>`; a target init script run after each reset.
-  It sets SIMCR FRZSW or disables the watchdog: with FRZSW 0, the
+- `bdm load` and `bdm init` over m683xx-emu's `mc683xx-debug` once it
+  lands (PLAN.md, Host); tests against `bdm-stand-in`.  A board's init
+  script sets SIMCR FRZSW or disables the watchdog: with FRZSW 0, the
   68331's reset value, the watchdog runs while the CPU is halted.
+- gdb: `PodTarget::step` by T1 trace once `step()` is in `Cpu32Target`,
+  and `bdm gdb` serving m683xx-emu's adapter over `PodTarget` (PLAN.md,
+  Host, gdb).
 - `pod-host` integration test against `mc683xx-run --bdm` and its
   example image, once m683xx-emu's virtual cable lands.
 - A second Pico as a stand-in CPU32: a target-side PIO program around

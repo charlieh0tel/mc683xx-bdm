@@ -14,8 +14,11 @@ Goals:
   (github.com/charlieh0tel/mc683xx, crates/target); the pod depends on
   it by git, pinned to a rev.
 
-Non-goals (for now): other BDM families (ColdFire, HCS08), GDB stub,
-real-time trace.
+- gdb on silicon through the pod, with the same adapter as the
+  emulator (Host, gdb).
+
+Non-goals (for now): other BDM families (ColdFire, HCS08), real-time
+trace.
 
 License: GPL-3.0-only (`LICENSE`).
 
@@ -354,8 +357,37 @@ USB command reports the high-water mark.  Not written yet.
   their function code; halting returns the entry source decoded from
   ATEMP.  Taken by git at a pinned rev until its crates.io release
   (0.3.0).
-- To come: `bdm load <srec/elf>`, and a target init script (chip
-  selects, SIM setup) run after each reset.
+- Loading and init (agreed with m683xx-emu, 2026-11-01):
+  `mc683xx-debug`, in m683xx-emu (MIT OR Apache-2.0), over
+  `Cpu32Target`.
+  - Loading: S-records (checksums, S5/S6 counts), ELF32 big-endian
+    m68k PT_LOAD segments, and raw binary at an address.  Writes are
+    fc 5 by default, word writes with odd-edge bytes, an optional
+    read-back verify, RPC from the entry, and a report of ranges and
+    entry.
+  - Init script lines: `write_memory.b|w|l`, `write_register`,
+    `write_system_register`, `read_memory.w ADDRESS expect VALUE [mask
+    MASK] [fc]` and `poll_memory.w ADDRESS mask MASK expect VALUE
+    timeout_ms N`, in host time.
+  - The pod adds `bdm load` and `bdm init`, tested end to end against
+    `bdm-stand-in`.
+- gdb (agreed with m683xx-emu, 2026-11-01): one gdb remote adapter
+  over `Cpu32Target`, in m683xx-emu, with `m68k:cpu32` and no FPU.  An
+  optional capability trait gives the emulator ROM breakpoints,
+  watchpoints and a native step; the pod has `Cpu32Target` alone.
+  - Breakpoints: BGND ($4AFA) planted through memory writes, so RAM
+    only on the pod.
+  - Continue: go, then poll `halted()`; Ctrl-C is `halt()`.
+  - Memory: fc 5, with `monitor` fc, reset, init and load.
+  - `step()` joins `Cpu32Target`.  `PodTarget::step` sets SR's T1 and
+    GOs, with the trace vector on a BGND stub in scratch RAM.  It then
+    unwinds the format $2 frame and restores the vector, or VBR when
+    the table had to be copied to RAM because it is in ROM (CPU32RM
+    6.3.8).  So step works on code in ROM.  An illegal or privileged
+    instruction is not traced: the step times out and halts, and
+    reports where it stopped.
+  - Its test needs a CPU that runs instructions: the integration test
+    against `mc683xx-run --bdm`, not `bdm-stand-in`.
 
 ---
 
