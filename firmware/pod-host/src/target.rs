@@ -79,7 +79,7 @@ impl<T: Transport> PodTarget<T> {
         &mut self.pod
     }
 
-    /// Stacks RPC and runs from `address` (CPU32RM 7.2.8.12), the
+    /// Stacks RPC and runs from `address` (CPU32RM 7.2.8.13), the
     /// program's SFC and DFC restored first.
     ///
     /// # Errors
