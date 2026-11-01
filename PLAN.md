@@ -227,7 +227,7 @@ m683xx-pod/
 │   ├── cpu32-target/    # Cpu32Target trait, no_std; shared with the emulator
 │   ├── pod-proto/       # BDM words and command sequences; USB commands; no_std
 │   ├── pod-fw/          # Pico / Pico 2 firmware, embassy-rp, PIO
-│   └── pod-host/        # Rust library + `bdm` CLI (nusb); Cpu32Target impl
+│   └── pod-host/        # Rust library + `bdm` CLI (nusb)
 ├── third_party/         # vendor manuals + NOTICE
 ├── README.md
 ├── PLAN.md
@@ -298,13 +298,22 @@ USB command reports the high-water mark.  Not written yet.
 
 ## Host (Rust)
 
-- `nusb` transport, `pod-proto` types.
-- `Cpu32Target` trait: `halt`, `go`, `reset`, `read_reg`/`write_reg`,
-  `read_mem`/`write_mem`. Defined in `cpu32-target`; implemented here
-  and by the emulator.
-- CLI: `bdm reset`, `bdm regs`, `bdm dump <addr> <len>`, `bdm load
-  <srec/elf>`, `bdm go [addr]`.
-- Target init script (chip selects, SIM setup) run after each reset.
+- `pod-host`'s `transport`: a `Transport` trait, one request packet
+  out and one reply back; `UsbTransport` over `nusb`, blocking, 1 s
+  timeout, the first device with the pod's VID:PID.
+- `pod-host`'s `pod`: each USB request as a call.  Memory goes as
+  56-byte requests and raw transfers as 15-word ones; a chunk never
+  splits an access.  Tested against scripted replies.
+- `bdm`: pins, halt, reset, go, call, clock, regs, get, set, dump,
+  write, xfer.  Halt and reset print the entry source from ATEMP.
+- Linux needs a udev rule for access without root (README.md).
+- `Cpu32Target`: moves to m683xx-emu as `mc683xx-target` (no_std,
+  MIT OR Apache-2.0), with explicit function codes on memory calls and
+  a way to wait for a halt; the CPU32's BDM goes there too (agreed with
+  m683xx-emu, 2026-10-31).  `pod-host` implements it over USB once it
+  lands, and `cpu32-target` here goes.
+- To come: `bdm load <srec/elf>`, and a target init script (chip
+  selects, SIM setup) run after each reset.
 
 ---
 

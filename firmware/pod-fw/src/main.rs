@@ -37,7 +37,9 @@ use panic_probe as _;
 use pod_proto::dsclk::DEFAULT_HZ;
 use pod_proto::dsclk::divider;
 use pod_proto::usb::PACKET;
+use pod_proto::usb::PID;
 use pod_proto::usb::Status;
+use pod_proto::usb::VID;
 use pod_proto::usb::encode_status;
 use static_cell::ConstStaticCell;
 
@@ -66,10 +68,6 @@ bind_interrupts!(struct Irqs {
     ADC_IRQ_FIFO => adc::InterruptHandler;
 });
 
-/// pid.codes' test VID and PID, for private use until the pod has its
-/// own (PLAN.md, Open questions).
-const VID: u16 = 0x1209;
-const PID: u16 = 0x0001;
 /// Vendor-specific interface class.
 const VENDOR_CLASS: u8 = 0xFF;
 /// Bus power drawn: the Pico and the translators' 3.3 V side.

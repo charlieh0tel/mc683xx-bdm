@@ -1,0 +1,20 @@
+[package]
+name = "pod-host"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+anyhow = "1.0.104"
+clap = { version = "4.6.7", features = ["derive"] }
+cpu32-target = { version = "0.1.0", path = "../cpu32-target" }
+nusb = "0.2.9"
+pod-proto = { version = "0.1.0", path = "../pod-proto" }
+thiserror = "2.0.21"
+
+[lints]
+workspace = true
+
+[[bin]]
+name = "bdm"
+path = "src/main.rs"

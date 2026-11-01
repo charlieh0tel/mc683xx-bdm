@@ -36,6 +36,23 @@ cd ../..
 make lint                      # clippy on every build, before each commit
 ```
 
+## Host
+
+```
+cd firmware
+cargo run -p pod-host --bin bdm -- pins     # or halt, regs, dump 0xfffa00 64, ...
+```
+
+Without root on Linux, the pod needs a udev rule, e.g.
+`/etc/udev/rules.d/70-m683xx-pod.rules`:
+
+```
+SUBSYSTEM=="usb", ATTRS{idVendor}=="1209", ATTRS{idProduct}=="0001", TAG+="uaccess"
+```
+
+1209:0001 is pid.codes' shared test pair, so the rule also matches
+anything else using it.
+
 ## License
 
 GPL-3.0-only (`LICENSE`), the project's own work: firmware,

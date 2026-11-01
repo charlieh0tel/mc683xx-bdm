@@ -9,6 +9,12 @@ use cpu32_target::SystemRegister;
 
 use crate::session;
 
+/// pid.codes' VID, with its test PID below, for private use until the
+/// pod has its own (PLAN.md, Open questions).
+pub const VID: u16 = 0x1209;
+/// pid.codes' test PID.
+pub const PID: u16 = 0x0001;
+
 /// A full-speed bulk packet.
 pub const PACKET: usize = 64;
 
