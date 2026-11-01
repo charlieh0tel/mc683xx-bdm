@@ -61,6 +61,14 @@ impl<T: Transport> Pod<T> {
         self.transport
     }
 
+    /// The pod's protocol version.
+    ///
+    /// # Errors
+    /// As [`Error`].
+    pub fn hello(&mut self) -> Result<u32, Error> {
+        self.value(&Request::Hello)
+    }
+
     /// FREEZE, RESET and DS levels, and VDD.
     ///
     /// # Errors

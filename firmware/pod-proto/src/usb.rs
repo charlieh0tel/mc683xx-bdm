@@ -18,6 +18,10 @@ pub const PID: u16 = 0x0001;
 /// A full-speed bulk packet.
 pub const PACKET: usize = 64;
 
+/// This protocol's version, in the Hello reply: raised on any change
+/// to a request or reply (docs/usb-protocol.md).
+pub const PROTOCOL_VERSION: u32 = 1;
+
 /// Bytes a reply's status takes.
 const STATUS_BYTES: usize = 1;
 /// Bytes per 17-bit word in a Transfer reply.
@@ -43,6 +47,7 @@ const WRITE_SYSTEM_REGISTER: u8 = 0x0A;
 const READ_MEMORY: u8 = 0x0B;
 const WRITE_MEMORY: u8 = 0x0C;
 const CALL: u8 = 0x0D;
+const HELLO: u8 = 0x0E;
 
 /// Pin level bits in a Pins reply: set for high.
 const FREEZE: u8 = 1 << 0;
@@ -101,6 +106,9 @@ pub enum Request<'a> {
     },
     /// CALL: stack RPC and run from an address.
     Call(Address),
+    /// The protocol version, [`PROTOCOL_VERSION`]; first, to check the
+    /// pod speaks this protocol.
+    Hello,
 }
 
 /// A Transfer's words, as they lie in the packet: two bytes each.
@@ -201,6 +209,7 @@ impl<'a> Request<'a> {
                 Ok(Self::WriteMemory { address: Address(long([a, b, c, d])), size, data })
             }
             CALL => Ok(Self::Call(Address(long(exact::<LONG>(body).ok_or(length)?)))),
+            HELLO => empty(Self::Hello),
             other => Err(ParseError::Unknown(other)),
         }
     }
@@ -260,6 +269,9 @@ impl<'a> Request<'a> {
             }
             Self::Call(Address(address)) => {
                 out.put(&[CALL]).put(&address.to_le_bytes());
+            }
+            Self::Hello => {
+                out.put(&[HELLO]);
             }
         }
         Ok(out.length)
@@ -552,6 +564,7 @@ mod tests {
             data: &[1, 2, 3, 4],
         });
         round_trip(Request::Call(Address(0x0004_0000)));
+        round_trip(Request::Hello);
     }
 
     #[test]

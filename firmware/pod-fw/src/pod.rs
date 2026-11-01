@@ -20,6 +20,7 @@ use pod_proto::session::Session;
 use pod_proto::usb::MAX_MEMORY_BYTES;
 use pod_proto::usb::MAX_TRANSFER_WORDS;
 use pod_proto::usb::PACKET;
+use pod_proto::usb::PROTOCOL_VERSION;
 use pod_proto::usb::Pins;
 use pod_proto::usb::Request;
 use pod_proto::usb::Status;
@@ -141,6 +142,7 @@ impl<'d> Pod<'d> {
             Request::SetClock { dsclk_hz } => Ok(Answer::Value(self.set_clock(dsclk_hz))),
             Request::Go => self.command(&Command::Go).await.map(|_| Answer::Done),
             Request::Call(address) => self.command(&Command::Call(address)).await.map(|_| Answer::Done),
+            Request::Hello => Ok(Answer::Value(PROTOCOL_VERSION)),
             Request::ReadRegister(register) => {
                 self.command(&Command::ReadRegister(register)).await.map(Answer::Value)
             }

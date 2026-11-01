@@ -300,7 +300,11 @@ USB command reports the high-water mark.  Not written yet.
 
 - `pod-host`'s `transport`: a `Transport` trait, one request packet
   out and one reply back; `UsbTransport` over `nusb`, blocking, 1 s
-  timeout, the first device with the pod's VID:PID.
+  timeout, the first device with the pod's VID:PID; `StreamTransport`
+  on a Unix or TCP socket, each message a length byte and the packet,
+  for m683xx-emu's virtual BDM cable (`bdm --pod unix:PATH`).  The
+  protocol is `docs/usb-protocol.md`; this repo owns it.  `bdm` sends
+  Hello first and stops on another protocol version.
 - `pod-host`'s `pod`: each USB request as a call.  Memory goes as
   56-byte requests and raw transfers as 15-word ones; a chunk never
   splits an access.  Tested against scripted replies.

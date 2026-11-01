@@ -13,7 +13,10 @@ use cpu32_target::Register;
 use cpu32_target::Size;
 use cpu32_target::SystemRegister;
 use pod_host::pod::Pod;
+use pod_host::transport::StreamTransport;
+use pod_host::transport::Transport;
 use pod_host::transport::UsbTransport;
+use pod_proto::usb::PROTOCOL_VERSION;
 
 /// Bytes per hex dump line.
 const DUMP_LINE: usize = 16;
@@ -22,6 +25,10 @@ const DUMP_LINE: usize = 16;
 #[derive(Debug, Parser)]
 #[command(name = "bdm", version)]
 struct Cli {
+    /// The pod: `usb`, or a stand-in on `unix:PATH` or `tcp:HOST:PORT`
+    /// (docs/usb-protocol.md).
+    #[arg(long, default_value = "usb")]
+    pod: String,
     #[command(subcommand)]
     command: Command,
 }
@@ -177,8 +184,22 @@ fn entry_source(atemp: u32) -> String {
     }
 }
 
-fn run(command: Command) -> Result<()> {
-    let mut pod = Pod::new(UsbTransport::open()?);
+/// The transport `--pod` names.
+fn connect(pod: &str) -> Result<Box<dyn Transport>> {
+    Ok(match pod.split_once(':') {
+        None if pod == "usb" => Box::new(UsbTransport::open()?),
+        Some(("unix", path)) => Box::new(StreamTransport::unix(path)?),
+        Some(("tcp", address)) => Box::new(StreamTransport::tcp(address)?),
+        _ => bail!("--pod is usb, unix:PATH or tcp:HOST:PORT, not {pod}"),
+    })
+}
+
+fn run(pod: &str, command: Command) -> Result<()> {
+    let mut pod = Pod::new(connect(pod)?);
+    let version = pod.hello()?;
+    if version != PROTOCOL_VERSION {
+        bail!("the pod speaks protocol {version}, this bdm {PROTOCOL_VERSION}");
+    }
     match command {
         Command::Pins => {
             let pins = pod.pins()?;
@@ -238,7 +259,8 @@ fn run(command: Command) -> Result<()> {
 }
 
 fn main() -> ExitCode {
-    match run(Cli::parse().command) {
+    let cli = Cli::parse();
+    match run(&cli.pod, cli.command) {
         Ok(()) => ExitCode::SUCCESS,
         Err(error) => {
             eprintln!("bdm: {error:#}");

@@ -15,6 +15,7 @@ CLI yet.
 |---|---|
 | `PLAN.md` | the design and why it is the way it is |
 | `TODO.md` | the work list |
+| `docs/` | the host-pod protocol (`usb-protocol.md`) |
 | `hardware/` | the KiCad carrier board, and `release.py`, which builds a JLCPCB order |
 | `production/` | each release as ordered |
 | `firmware/` | the Rust workspace: firmware, host CLI, shared crates |
@@ -41,6 +42,7 @@ make lint                      # clippy on every build, before each commit
 ```
 cd firmware
 cargo run -p pod-host --bin bdm -- pins     # or halt, regs, dump 0xfffa00 64, ...
+cargo run -p pod-host --bin bdm -- --pod unix:/path/to/socket regs   # a stand-in pod
 ```
 
 Without root on Linux, the pod needs a udev rule, e.g.
