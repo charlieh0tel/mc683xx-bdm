@@ -250,20 +250,28 @@ packets, one request per packet and one reply per request
 the pod has its own.  Requests:
 
 - Transfer: up to 15 raw words, each answered with the 17 bits shifted
-  in, for bring-up and commands the pod does not sequence.
+  in, for bring-up and commands the pod does not sequence.  Not
+  guarded: with the target running its clocks are BKPT pulses.
 - Pins: FREEZE, RESET, DS levels and VDD in millivolts.  DSO is a PIO
   pin, which embassy-rp gives no way to read, so it is not reported.
+  BERR is driven but not sensed: the 74LVC125's four channels are used.
 - ResetHalt, Halt: the sequences in Protocol summary; refused without
-  VDD, and NoFreeze if FREEZE does not assert in 100 ms.
-- Go: only with FREEZE asserted, else its clocks would be BKPT pulses.
+  VDD, and NoFreeze if FREEZE does not assert in 100 ms.  Each then
+  reads ATEMP, the entry source, as the first command, and returns it.
 - SetClock: DSCLK's rate; the reply gives the rate set, never faster
-  than asked.
+  than asked and at most 4 MHz until the throughput test measures the
+  margin (`pod-proto`'s `dsclk::MAX_HZ` has the arithmetic).
+- Every BDM command, refused with NoFreeze unless FREEZE is asserted,
+  since its clocks would otherwise be BKPT pulses:
+  - ReadRegister, WriteRegister: D0-D7, A0-A7.
+  - ReadSystemRegister, WriteSystemRegister: by select code.
+  - ReadMemory, WriteMemory: up to 56 bytes in byte, word or long
+    accesses, READ then DUMP or WRITE then FILL, on-chip.  Through SFC
+    and DFC, which the host sets.
+  - Go, Call: the last word through `Link::transfer_exit`.
 
-To come: memory reads and writes (READ then DUMP, WRITE then FILL,
-on-chip) and register access.
-
-The firmware's own sizes, release builds: about 21 KB of flash and
-2.4 KB of statics on either chip.
+The firmware's own sizes, release builds: about 24 KB of flash and
+2.6 KB of statics on either chip.
 
 Handle not-ready retries in firmware; report BERR and illegal-command
 errors to the host.  `pod-proto`'s `session` does both, over a `Link`

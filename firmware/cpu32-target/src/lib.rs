@@ -70,6 +70,12 @@ impl Register {
     pub const fn code(self) -> u16 {
         self as u16
     }
+
+    /// The register with this code, if it is 0-15.
+    #[must_use]
+    pub fn from_code(code: u16) -> Option<Self> {
+        Self::ALL.get(usize::from(code)).copied()
+    }
 }
 
 /// A system register, with its RSREG/WSREG select code (CPU32RM
@@ -101,10 +107,30 @@ pub enum SystemRegister {
 }
 
 impl SystemRegister {
+    /// Every system register, in select-code order.
+    pub const ALL: [Self; 10] = [
+        Self::Rpc,
+        Self::Pcc,
+        Self::Atemp,
+        Self::Far,
+        Self::Vbr,
+        Self::Sr,
+        Self::Usp,
+        Self::Ssp,
+        Self::Sfc,
+        Self::Dfc,
+    ];
+
     /// The 4-bit select code.
     #[must_use]
     pub const fn code(self) -> u16 {
         self as u16
+    }
+
+    /// The system register with this select code, if there is one.
+    #[must_use]
+    pub fn from_code(code: u16) -> Option<Self> {
+        Self::ALL.into_iter().find(|register| register.code() == code)
     }
 }
 
@@ -121,10 +147,19 @@ pub enum Size {
 }
 
 impl Size {
+    /// Every size, in field order.
+    pub const ALL: [Self; 3] = [Self::Byte, Self::Word, Self::Long];
+
     /// The 2-bit size field.
     #[must_use]
     pub const fn code(self) -> u16 {
         self as u16
+    }
+
+    /// The size with this field, if it is not the reserved 0b11.
+    #[must_use]
+    pub fn from_code(code: u16) -> Option<Self> {
+        Self::ALL.into_iter().find(|size| size.code() == code)
     }
 
     /// Bytes in one operand.
@@ -236,6 +271,24 @@ mod tests {
         assert_eq!(SystemRegister::Ssp.code(), 0b1101);
         assert_eq!(SystemRegister::Sfc.code(), 0b1110);
         assert_eq!(SystemRegister::Dfc.code(), 0b1111);
+    }
+
+    #[test]
+    fn codes_round_trip() {
+        for register in Register::ALL {
+            assert_eq!(Register::from_code(register.code()), Some(register));
+        }
+        assert_eq!(Register::from_code(16), None);
+        for register in SystemRegister::ALL {
+            assert_eq!(SystemRegister::from_code(register.code()), Some(register));
+        }
+        for unused in 2..8 {
+            assert_eq!(SystemRegister::from_code(unused), None);
+        }
+        for size in Size::ALL {
+            assert_eq!(Size::from_code(size.code()), Some(size));
+        }
+        assert_eq!(Size::from_code(0b11), None);
     }
 
     #[test]

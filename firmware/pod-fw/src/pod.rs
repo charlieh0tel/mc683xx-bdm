@@ -2,6 +2,7 @@
 //! around the serial link (PLAN.md, Protocol summary) and the USB
 //! requests that call them (`pod_proto::usb`).
 
+use cpu32_target::SystemRegister;
 use embassy_rp::adc::Adc;
 use embassy_rp::adc::Async;
 use embassy_rp::adc::Channel;
@@ -16,15 +17,17 @@ use pod_proto::bdm::Command;
 use pod_proto::dsclk::divider;
 use pod_proto::session::Link;
 use pod_proto::session::Session;
+use pod_proto::usb::MAX_MEMORY_BYTES;
 use pod_proto::usb::MAX_TRANSFER_WORDS;
 use pod_proto::usb::PACKET;
 use pod_proto::usb::Pins;
 use pod_proto::usb::Request;
 use pod_proto::usb::Status;
-use pod_proto::usb::encode_clock;
+use pod_proto::usb::encode_data;
 use pod_proto::usb::encode_pins;
 use pod_proto::usb::encode_status;
 use pod_proto::usb::encode_transfer_reply;
+use pod_proto::usb::encode_value;
 
 use crate::link::PioLink;
 
@@ -44,6 +47,20 @@ const ADC_REFERENCE_MV: u32 = 3300;
 const VDD_DIVIDER: u32 = 2;
 /// The 68331 runs from 5.0 V +-10% (MC68331UM Table A-7's conditions).
 const VDD_PRESENT_MV: u16 = 4500;
+
+/// What a request produced, before it is encoded.
+enum Answer {
+    /// Status only.
+    Done,
+    /// One 32-bit value.
+    Value(u32),
+    /// Pin levels and VDD.
+    Pins(Pins),
+    /// The first `n` bytes of the memory buffer.
+    Data(usize),
+    /// The first `n` responses of the transfer buffer.
+    Responses(usize),
+}
 
 /// The pod's side of the target connector.
 pub(crate) struct Pod<'d> {
@@ -93,24 +110,76 @@ impl<'d> Pod<'d> {
         let Ok(request) = Request::parse(packet) else {
             return encode_status(Status::BadRequest, reply);
         };
-        let done = match request {
+        let mut responses = [0; MAX_TRANSFER_WORDS];
+        let mut data = [0; MAX_MEMORY_BYTES];
+        match self.carry_out(request, &mut responses, &mut data).await {
+            Ok(Answer::Done) => encode_status(Status::Ok, reply),
+            Ok(Answer::Value(value)) => encode_value(value, reply),
+            Ok(Answer::Pins(pins)) => encode_pins(&pins, reply),
+            Ok(Answer::Data(n)) => encode_data(&data[..n], reply),
+            Ok(Answer::Responses(n)) => encode_transfer_reply(&responses[..n], reply),
+            Err(status) => encode_status(status, reply),
+        }
+    }
+
+    async fn carry_out(
+        &mut self,
+        request: Request<'_>,
+        responses: &mut [u32; MAX_TRANSFER_WORDS],
+        data: &mut [u8; MAX_MEMORY_BYTES],
+    ) -> Result<Answer, Status> {
+        match request {
             Request::Transfer(words) => {
-                let mut responses = [0; MAX_TRANSFER_WORDS];
                 for (word, response) in words.iter().zip(responses.iter_mut()) {
                     *response = self.transfer(word).await;
                 }
-                return encode_transfer_reply(&responses[..words.len()], reply);
+                Ok(Answer::Responses(words.len()))
             }
-            Request::Pins => match self.pins().await {
-                Ok(pins) => return encode_pins(&pins, reply),
-                Err(status) => Err(status),
-            },
-            Request::ResetHalt => self.reset_halt().await,
-            Request::Halt => self.halt().await,
-            Request::Go => self.go().await,
-            Request::SetClock { dsclk_hz } => return encode_clock(self.set_clock(dsclk_hz), reply),
-        };
-        encode_status(done.err().unwrap_or(Status::Ok), reply)
+            Request::Pins => self.pins().await.map(Answer::Pins),
+            Request::ResetHalt => self.reset_halt().await.map(Answer::Value),
+            Request::Halt => self.halt().await.map(Answer::Value),
+            Request::SetClock { dsclk_hz } => Ok(Answer::Value(self.set_clock(dsclk_hz))),
+            Request::Go => self.command(&Command::Go).await.map(|_| Answer::Done),
+            Request::Call(address) => self.command(&Command::Call(address)).await.map(|_| Answer::Done),
+            Request::ReadRegister(register) => {
+                self.command(&Command::ReadRegister(register)).await.map(Answer::Value)
+            }
+            Request::WriteRegister(register, value) => {
+                self.command(&Command::WriteRegister(register, value)).await.map(|_| Answer::Done)
+            }
+            Request::ReadSystemRegister(register) => {
+                self.command(&Command::ReadSystemRegister(register)).await.map(Answer::Value)
+            }
+            Request::WriteSystemRegister(register, value) => {
+                self.command(&Command::WriteSystemRegister(register, value)).await.map(|_| Answer::Done)
+            }
+            Request::ReadMemory { address, size, length } => {
+                self.require_frozen()?;
+                self.session.read_block(address, size, &mut data[..length]).await?;
+                Ok(Answer::Data(length))
+            }
+            Request::WriteMemory { address, size, data } => {
+                self.require_frozen()?;
+                self.session.write_block(address, size, data).await?;
+                Ok(Answer::Done)
+            }
+        }
+    }
+
+    /// A BDM command, only in background mode: otherwise its clocks would
+    /// be BKPT pulses.  GO and CALL go out through `Link::transfer_exit`,
+    /// so the PIO drops `DSI_EN` as the word ends, and FREEZE negating
+    /// gates DSI off: pin 8 is IFETCH again.
+    async fn command(&mut self, command: &Command) -> Result<u32, Status> {
+        self.require_frozen()?;
+        Ok(self.session.execute(command).await?)
+    }
+
+    fn require_frozen(&self) -> Result<(), Status> {
+        if self.freeze.is_low() {
+            return Err(Status::NoFreeze);
+        }
+        Ok(())
     }
 
     async fn transfer(&mut self, word: u16) -> u32 {
@@ -143,32 +212,31 @@ impl<'d> Pod<'d> {
 
     /// BKPT low until FREEZE; BKPT stays low after, and the first word's
     /// first rising edge releases it (PLAN.md, Protocol summary).
-    async fn halt(&mut self) -> Result<(), Status> {
+    /// Returns ATEMP, the entry source.
+    async fn halt(&mut self) -> Result<u32, Status> {
         self.require_target().await?;
         self.bkpt_low();
-        self.wait_freeze(async |_| {}).await
+        self.wait_freeze(async |_| {}).await?;
+        self.read_atemp().await
     }
 
     /// BKPT low across a RESET pulse, so the CPU comes out of reset in
-    /// background mode (MC68331UM 5.10.2.1).
-    async fn reset_halt(&mut self) -> Result<(), Status> {
+    /// background mode (MC68331UM 5.10.2.1).  Returns ATEMP.
+    async fn reset_halt(&mut self) -> Result<u32, Status> {
         self.require_target().await?;
         self.session.link_mut().set_dsi_enabled(false);
         self.bkpt_low();
         self.reset_drive.set_high();
         Timer::after(RESET_PULSE).await;
         self.reset_drive.set_low();
-        self.wait_freeze(async |pod| pod.reset.wait_for_high().await).await
+        self.wait_freeze(async |pod| pod.reset.wait_for_high().await).await?;
+        self.read_atemp().await
     }
 
-    /// GO.  The PIO drops `DSI_EN` as the word ends (`Link::transfer_exit`)
-    /// and FREEZE negating gates DSI off: pin 8 is IFETCH again.  Only in background mode: otherwise its
-    /// clocks would be BKPT pulses.
-    async fn go(&mut self) -> Result<(), Status> {
-        if self.freeze.is_low() {
-            return Err(Status::NoFreeze);
-        }
-        self.session.execute(&Command::Go).await.map(|_| ()).map_err(Status::from)
+    /// ATEMP, the entry source, read first after entry because the
+    /// commands after overwrite it (CPU32RM 7.2.3, Table 7-2).
+    async fn read_atemp(&mut self) -> Result<u32, Status> {
+        Ok(self.session.read_system_register(SystemRegister::Atemp).await?)
     }
 
     fn set_clock(&mut self, dsclk_hz: u32) -> u32 {

@@ -9,8 +9,10 @@
 
 ## Firmware
 
-- `pod-fw`: memory and register requests over USB; stack painting
-  and a `stack` request (PLAN.md, Firmware).
+- `pod-fw`: stack painting and a `stack` request (PLAN.md, Firmware).
+- BERR sense, if a fifth input buffer is worth a part (PLAN.md,
+  Firmware).
+- DSCLK above 4 MHz, once the throughput test measures the margin.
 - `pod-host`: `bdm` CLI over nusb; `Cpu32Target` over it.
 - m683xx-emu: depend on `cpu32-target` by git and implement it.
 - Bring-up, in order (PLAN.md, Bring-up checklist):
