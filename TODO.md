@@ -2,8 +2,10 @@
 
 ## Hardware
 
-- Schematic: carrier for the Pico / Pico 2 footprint (PLAN.md,
-  Hardware).
+- Schematic: owner's KiCad pass on the draft (`hardware/m683xx-pod/`).
+- Layout: the Pico's USB end and J2 (SWD) at the carrier's edge.
+- USB PID from Raspberry Pi (PLAN.md, Open questions); then
+  `pod-proto`'s VID and PID, and the README's udev rule.
 - Breadboard first: Pico + 74AHCT125 + 74LVC125 + 2N7002s.
 - Carrier layout, then a release (`jlcpcb-release` skill).
 

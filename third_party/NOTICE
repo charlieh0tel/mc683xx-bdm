@@ -82,9 +82,20 @@ In `diodes/`, (c) Diodes Incorporated:
 
   2N7002.pdf       "2N7002 N-Channel Enhancement Mode MOSFET",
                    DS11303 Rev. 33-2.  diodes.com/assets/Datasheets/
-                   ds11303.pdf.  The RESET and BERR drivers.
+                   ds11303.pdf.  An alternative for the RESET and BERR
+                   drivers; the fitted part is JSCJ's (below).
                    SHA-256 3984debf5b29376201b1042ba3d174c3
                            8f6dc6023ffec218d2f95ea843dc4d20
+
+In `jscj/`, (c) Jiangsu Changjiang Electronics Technology Co., Ltd.:
+
+  2N7002.pdf       "2N7002 MOSFET (N-Channel)", SOT-23, the file's PDF
+                   metadata dated 2008-11-09.  JLCPCB's datasheet for
+                   LCSC C8545, as served on 2026-10-31.  The part fitted
+                   as Q1 and Q2 (RESET and BERR drive): Vth(GS) 1 to
+                   2.5 V at 250 uA.
+                   SHA-256 7941fb423af7c6c6c8979063a7e8819b
+                           b19217ece275efcce18948950a41d9f6
 
 In `raspberrypi/`, (c) Raspberry Pi Ltd:
 

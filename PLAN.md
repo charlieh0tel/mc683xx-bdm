@@ -38,17 +38,21 @@ License: GPL-3.0-only (`LICENSE`).
 
 | Function | Part | Notes |
 |---|---|---|
-| MCU | Pico (RP2040) or Pico 2 (RP2350), socketed | USB to host; same footprint and pinout |
-| 3.3 V → 5 V outputs | 74AHCT125, VCC = target VDD | BKPT/DSCLK, DSI; series 47–100 Ω; each its own OE |
+| MCU | Pico (RP2040) or Pico 2 (RP2350), soldered flat by its castellated edge | USB to host; same footprint and pinout; hand-soldered, not in the assembly BOM |
+| 3.3 V → 5 V outputs | 74AHCT125, VCC = target VDD | BKPT/DSCLK, DSI; 100 Ω series, the most current limit if DSI and IFETCH overlap; each its own OE |
 | AHCT125 OE pull-up, BKPT/DSCLK | 10 kΩ to target VDD | Output tristated while the pod is unpowered or booting |
 | DSI enable gate | 74AHCT1G00, VCC = target VDD | Drives DSI's 74AHCT125 OE: NAND(FREEZE, DSI_EN), so DSI is driven only while FREEZE is high and the Pico enables it |
 | DSI_EN pull-down | 100 kΩ to GND | DSI off while the pod is unpowered or booting |
 | 3.3 V → 5 V outputs, spare | 74AHCT125, 2 channels | Unused; inputs tied to GND |
 | 5 V → 3.3 V inputs | 74LVC125, VCC = 3.3 V | IPIPE/DSO, FREEZE, RESET sense, DS; inputs to 5.5 V at any VCC. IPIPE is pin 10 outside BDM, so its channel reads both |
-| RESET drive | 2N7002, open-drain | Target also drives RESET; sense separately |
+| 74LVC125 input pull-downs | 1 MΩ to GND, header side | Inputs defined with the cable unplugged; 5 µA load at 5 V |
+| RESET drive | 2N7002 (JSCJ, JLCPCB basic C8545), open-drain | Target also drives RESET; sense separately.  Vth(GS) at most 2.5 V against the Pico's 3.3 V gate drive |
 | BERR drive | 2N7002, open-drain | Abort hung bus cycles |
 | 2N7002 gate pull-downs | 100 kΩ to GND | RESET and BERR not asserted while the pod is unpowered or booting |
-| VDD sense | 100 kΩ / 100 kΩ divider → ADC0 | 2.75 V at 5.5 V; high value to limit current into an unpowered RP2040. Halt and reset refuse below 4.5 V |
+| VDD sense | 100 kΩ / 100 kΩ divider → ADC0, 100 nF to GND | 2.75 V at 5.5 V; high value to limit current into an unpowered RP2040; the capacitor holds GP26 while the ADC samples from the divider's 50 kΩ.  Halt and reset refuse below 4.5 V |
+| BDM header | 2x5 0.1" shrouded, keyed | A reversed cable cannot put VDD on BERR |
+| SWD connector, J2 | JST SH 3-pin horizontal, SM03B-SRSS-TB (LCSC C160403) | From the Pico's debug pads: 1 SWCLK, 2 GND, 3 SWDIO, Raspberry Pi's debug connector order (RP-003139-SP); the Debug Probe's JST-SH cable plugs in.  The RP2040's internal pull-ups, no external ones |
+| Decoupling | 100 nF X7R at each IC | No bulk capacitor on target VDD, so plugging in does not load the target's supply |
 | BKPT pull-up | 10 kΩ to target VDD | Target runs normally with pod unpowered |
 
 Two output enables: BKPT must be driven to request a halt while DSI
@@ -85,7 +89,7 @@ Pico pins (GPn):
 | 26 | VDD sense (ADC0) | analog |
 
 Board: a 2-layer carrier with the translators and the BDM header; the
-Pico plugs in. A custom RP2040 PCB only if the carrier proves too
+Pico is soldered on flat. A custom RP2040 PCB only if the carrier proves too
 bulky.
 
 Translators stay on either Pico: the RP2350's GPIOs are "5 V-tolerant
@@ -291,9 +295,10 @@ Each result is collected with NOPs, so a DUMP or FILL block costs about
 two transfers per access.  Sending the next DUMP in place of the NOP
 would nearly halve that; done if the throughput test asks for it.
 
-Flash and debug: `probe-rs` over SWD (`cargo run` in `firmware/pod-fw`),
-which supports RP2040 and RP235x; without a probe, `picotool load -x`
-over BOOTSEL.
+Flash and debug: a Raspberry Pi Debug Probe on J2, the carrier's 3-pin
+JST-SH SWD connector (SWCLK, GND, SWDIO, from the Pico's debug pads),
+with `probe-rs` (`cargo run` in `firmware/pod-fw`), which supports
+RP2040 and RP235x; without a probe, `picotool load -x` over BOOTSEL.
 
 Stack peak: paint the stack with a pattern at boot; a `stack`
 USB command reports the high-water mark.  Not written yet.
@@ -346,7 +351,10 @@ USB command reports the high-water mark.  Not written yet.
 ## Open questions
 
 - RSREG `0x2580` on silicon (Protocol summary).
-- A VID:PID of the pod's own (pid.codes, or a vendor's).
+- A VID:PID of the pod's own: Raspberry Pi's PID program under VID
+  0x2E8A, for RP2040 and RP2350 products (github.com/raspberrypi/usb-pid,
+  request form there); the owner applies.  pid.codes needs a public
+  open-source project.
 
 ## References
 

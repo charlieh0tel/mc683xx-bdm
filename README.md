@@ -6,8 +6,8 @@ Pico 2 on a carrier board with 5 V level translators and the standard
 10-pin BDM header.  PIO clocks the BDM serial link; firmware and host
 are Rust.
 
-Status: firmware written, not yet run on a Pico; no schematic or host
-CLI yet.
+Status: firmware and host CLI written, not yet run on a Pico; carrier
+schematic drafted (`hardware/m683xx-pod/`), no board layout yet.
 
 ## Layout
 
