@@ -5,9 +5,9 @@
 #![no_std]
 #![no_main]
 
+mod board;
 mod freeze;
 mod link;
-mod pod;
 
 #[cfg(feature = "rtt")]
 use defmt_rtt as _;
@@ -37,6 +37,7 @@ use panic_halt as _;
 use panic_probe as _;
 use pod_proto::dsclk::DEFAULT_HZ;
 use pod_proto::dsclk::divider;
+use pod_proto::pod::Pod;
 use pod_proto::usb::PACKET;
 use pod_proto::usb::PID;
 use pod_proto::usb::Status;
@@ -44,10 +45,10 @@ use pod_proto::usb::VID;
 use pod_proto::usb::encode_status;
 use static_cell::ConstStaticCell;
 
+use crate::board::Lines;
+use crate::board::PicoBoard;
 use crate::link::LinkPins;
 use crate::link::PioLink;
-use crate::pod::Lines;
-use crate::pod::Pod;
 
 #[cfg(all(feature = "rp2040", feature = "rp235xa"))]
 compile_error!("choose one chip feature, not both");
@@ -99,7 +100,7 @@ async fn main(_spawner: Spawner) {
     let link = PioLink::new(&mut common, sm0, pins, divider(clk_sys_freq(), DEFAULT_HZ));
     let adc = Adc::new(p.ADC, Irqs, adc::Config::default());
     let vdd = adc::Channel::new_pin(p.PIN_26, Pull::None);
-    let mut pod = Pod::new(link, lines, adc, vdd);
+    let mut pod = Pod::new(PicoBoard::new(link, lines, adc, vdd));
 
     let mut config = embassy_usb::Config::new(VID, PID);
     config.manufacturer = Some("m683xx-pod");
@@ -131,7 +132,11 @@ async fn main(_spawner: Spawner) {
 
 /// Answers each request packet with one reply packet, for as long as
 /// the host is connected, and again after it reconnects.
-async fn serve(pod: &mut Pod<'_>, from_host: &mut impl EndpointOut, to_host: &mut impl EndpointIn) {
+async fn serve(
+    pod: &mut Pod<PicoBoard<'_>>,
+    from_host: &mut impl EndpointOut,
+    to_host: &mut impl EndpointIn,
+) {
     let mut request = [0; PACKET];
     let mut reply = [0; PACKET];
     loop {

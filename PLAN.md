@@ -253,7 +253,10 @@ machine; `embassy-usb` vendor class; matches the async rules in
 
 USB: vendor class, one bulk OUT and one bulk IN endpoint, 64-byte
 packets, one request per packet and one reply per request
-(`pod-proto`'s `usb`).  VID:PID 1209:0001, pid.codes' test pair, until
+(`pod-proto`'s `usb`).  The answer to each request is `pod-proto`'s
+`pod`, over a `Board` trait: the firmware's board (`board.rs`) is the
+Pico's pins, ADC, PIO link and timeouts, so the request rules run in
+host tests too.  VID:PID 1209:0001, pid.codes' test pair, until
 the pod has its own.  Requests:
 
 - Transfer: up to 15 raw words, each answered with the 17 bits shifted
@@ -287,8 +290,8 @@ the pod has its own.  Requests:
     and DFC, which the host sets.
   - Go, Call: the last word through `Link::transfer_exit`.
 
-The firmware's own sizes, release builds: 26084 bytes of text on the
-RP2040 and 24896 on the RP2350, 2740 bytes of statics on either.
+The firmware's own sizes, release builds: 26120 bytes of text on the
+RP2040 and 25028 on the RP2350, 2740 bytes of statics on either.
 
 Handle not-ready retries in firmware; report BERR and illegal-command
 errors to the host.  `pod-proto`'s `session` does both, over a `Link`
