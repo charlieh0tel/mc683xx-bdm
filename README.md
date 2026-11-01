@@ -7,7 +7,7 @@ Pico 2 on a carrier board with 5 V level translators and the standard
 are Rust.
 
 Status: firmware and host CLI written, not yet run on a Pico; carrier
-schematic drafted (`hardware/m683xx-pod/`), no board layout yet.
+schematic drafted and parts placed (`hardware/m683xx-pod/`), not yet routed.
 
 ## Layout
 
@@ -16,7 +16,7 @@ schematic drafted (`hardware/m683xx-pod/`), no board layout yet.
 | `PLAN.md` | the design and why it is the way it is |
 | `TODO.md` | the work list |
 | `docs/` | the host-pod protocol (`usb-protocol.md`), bring-up steps (`bring-up.md`) |
-| `hardware/` | the KiCad carrier board, and `release.py`, which builds a JLCPCB order |
+| `hardware/` | the KiCad carrier board; `ee_tooling/`, the shared tooling (a submodule following its `main`), whose `jlcpcb-release` builds a JLCPCB order |
 | `production/` | each release as ordered |
 | `firmware/` | the Rust workspace: firmware, host CLI, shared crates |
 | `third_party/` | vendor documents and their provenance (`NOTICE`) |
@@ -69,4 +69,7 @@ anything else using it.
 
 ## Contributing
 
-`make hooks` once per clone; `AGENTS.md` has the rules.
+Once per clone: `git submodule update --init` (ee_tooling, which the
+commit hook runs from), then `make hooks`.  For the hardware tools,
+`cd hardware && uv venv --system-site-packages --python /usr/bin/python3
+&& uv sync`.  `AGENTS.md` has the rules.

@@ -1,3 +1,5 @@
+# The hardware tools' environment: jlcpcb-release and kicad-style-check,
+# from the ee_tooling submodule.
 [project]
 name = "m683xx-pod-hardware"
 version = "0.1.0"
@@ -5,17 +7,7 @@ requires-python = ">=3.12"
 dependencies = []
 
 [dependency-groups]
-dev = [
-    "mypy==2.4.0",
-    "ruff==0.17.0",
-]
+dev = ["ee-tooling"]
 
-[tool.ruff]
-line-length = 100
-target-version = "py312"
-
-[tool.ruff.lint]
-select = ["E", "F", "W", "I", "UP", "B", "ANN", "RUF"]
-
-[tool.mypy]
-strict = true
+[tool.uv.sources]
+ee-tooling = { path = "ee_tooling", editable = true }

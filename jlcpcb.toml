@@ -1,0 +1,9 @@
+# The boards jlcpcb-release (hardware/ee_tooling) builds; the first is the
+# default.  Paths are from the repository root.
+
+[[board]]
+name = "m683xx-pod"
+directory = "hardware/m683xx-pod"
+copper = ["F.Cu", "B.Cu"]
+production = "production"
+sources = ["hardware/m683xx-pod/m683xx-pod.kicad_sym", "PLAN.md", "docs"]

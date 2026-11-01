@@ -1,5 +1,5 @@
 # Repository chores.  The firmware and host build with cargo in
-# firmware/, the hardware release with hardware/release.py.
+# firmware/; the hardware release is ee_tooling's jlcpcb-release.
 
 .PHONY: hooks lint
 
@@ -12,7 +12,8 @@ hooks:
 BUILDS = rp2040:thumbv6m-none-eabi rp235xa:thumbv8m.main-none-eabihf
 
 # Before each commit (AGENTS.md): rustfmt, clippy on the workspace and on
-# every firmware build, warnings as errors, and the hardware tooling's checks.
+# every firmware build, warnings as errors, and ee_tooling's schematic
+# drawing-rule check.
 lint:
 	@# No wildcard imports, `use super::*` in tests included (AGENTS.md):
 	@# clippy's wildcard_imports does not report these.
@@ -27,4 +28,4 @@ lint:
 				-F $$chip$$extra --target $$target --bins -- -D warnings) || exit 1; \
 		done; \
 	done
-	cd hardware && uv run ruff format --check . && uv run ruff check . && uv run mypy .
+	cd hardware && uv run kicad-style-check m683xx-pod/m683xx-pod.kicad_sch

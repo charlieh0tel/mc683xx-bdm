@@ -82,37 +82,10 @@
 ## Schematics and PCB
 
 - Each KiCad project has its own directory under `hardware/`, named as
-  the project: `hardware/m683xx-pod/`.  The Python tooling is in
-  `hardware/` itself.
-- `hardware/` needs KiCad's pcbnew, so its venv is made with
-  `uv venv --system-site-packages --python /usr/bin/python3`.
-
-Schematic drawing:
-
-- Every coordinate chosen on the 2.54 mm grid, so it reads as drawn by
-  hand: signal left to right, supplies up, ground down.
-- A wire of at least one grid unit off every pin before it joins
-  anything.  No pin on a rail, no power or ground symbol on a pin, no
-  pin touching a pin.
-- A junction dot on every join of three or more.
-- Wires, not labels.  A label only where a wire can't reasonably go,
-  and then it lies on the net, on a wire's run with its text along the
-  wire; never hung off a wire's end to the left or right.
-- Reference and value text level and clear of wires.  Every bought part
-  carries Manufacturer, MPN and LCSC fields; every capacitor shows its
-  dielectric type and working voltage ("50V X7R").
+  the project: `hardware/m683xx-pod/`.  The house style, tools and
+  skills are ee_tooling's (the ee_tooling section).
 - The schematic's notes and title block are documentation: keep them
   current in the same commit as the change.
-
-Board layout:
-
-- Decoupling capacitors placed and turned for the shortest connections
-  to their part's VDD (or VCC) and GND pins.  With several on one pin,
-  the smallest value goes closest to the package.
-- Plane nets get a short N/S/E/W stub to a via; no autorouter
-  artifacts (meanders, mixed widths, needless jogs, stubs).
-- Mounting holes in the board's corners; corners rounded.  Keep the
-  board clear of the drawing sheet's title block.
 
 ## Rust Rules
 
@@ -193,3 +166,25 @@ Board layout:
 - **Refactor first**: when working on anything significant, make a
   refactor pass first and commit that first.  If in doubt if a
   refactor is required, ask.
+
+<!-- ee_tooling: begin; written by ee-tooling-adopt -->
+## ee_tooling
+
+@hardware/ee_tooling/docs/kicad-style.md
+
+- Read `hardware/ee_tooling/docs/kicad-style.md` (schematic drawing, board
+  layout, silkscreen) before touching a board.
+- `hardware/ee_tooling` is the ee_tooling submodule, following its `main`:
+  its tools, house style and agent skills.  Change it there and push
+  there, then `git submodule update --remote hardware/ee_tooling`,
+  `hardware/ee_tooling/adopt --yes`, and commit the new pointer here.
+- `hardware/`'s venv is made with `uv venv --system-site-packages
+  --python /usr/bin/python3`, for KiCad's pcbnew.
+- Before writing new tooling here (a script, a checker, a skill, a
+  style rule), consider whether it could be made generic and generally
+  useful.  If so, ask whether it should be made in ee_tooling instead,
+  then taken here.
+- `hardware/ee_tooling/adopt` wrote this section, `.githooks/commit-msg` and
+  `.github/workflows/ee-tooling.yml`; rerun it with `--yes` rather
+  than editing them.
+<!-- ee_tooling: end -->

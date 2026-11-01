@@ -231,7 +231,7 @@ only for the Pico targets, so it has its own `Cargo.lock`.
 m683xx-pod/
 ├── hardware/
 │   ├── m683xx-pod/      # KiCad schematic + board
-│   └── release.py       # JLCPCB release package (uv)
+│   └── ee_tooling/      # shared KiCad tooling and house style (submodule, follows main)
 ├── production/          # each release as ordered
 ├── firmware/
 │   ├── bdm-model/       # a CPU32 in background mode at the serial word, and a board around it; no_std; test target
