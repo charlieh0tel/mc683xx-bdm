@@ -6,8 +6,10 @@ Pico 2 on a carrier board with 5 V level translators and the standard
 10-pin BDM header.  PIO clocks the BDM serial link; firmware and host
 are Rust.
 
-Status: firmware and host CLI written, not yet run on a Pico; carrier
-schematic drafted and parts placed (`hardware/m683xx-pod/`), not yet routed.
+Status: firmware and host CLI pass a PIO loopback on a bare RP2040, no
+target yet (`docs/bring-up.md`, steps 1-2); the carrier
+(`hardware/m683xx-pod/`) is routed, 68 x 59 mm on 2 layers, DRC clean,
+not yet ordered.
 
 ## Layout
 

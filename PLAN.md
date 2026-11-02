@@ -95,7 +95,10 @@ Pico pins (GPn):
 
 Board: a 2-layer carrier with the translators and the BDM header; the
 Pico is soldered on flat. A custom RP2040 PCB only if the carrier proves too
-bulky.
+bulky.  68 x 59 mm; GND poured on both layers, stitched along the edge
+and on a grid.  DSCLK and DSI run on F.Cu over the B.Cu pour, DSO partly
+on B.Cu; every crossing and via on them has a GND via within about
+1.5 mm (`hardware/fastcheck.py` reports them).
 
 Translators stay on either Pico: the RP2350's GPIOs are "5 V-tolerant
 (powered) and 3.3 V-failsafe (unpowered)" (RP2350 datasheet, chapter 1
