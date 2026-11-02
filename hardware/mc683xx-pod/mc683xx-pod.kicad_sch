@@ -3748,124 +3748,36 @@
 	)
 	(wire
 		(pts
-			(xy 127 172.72)
-			(xy 132.08 172.72)
+			(xy 104.14 259.08)
+			(xy 104.14 261.62)
 		)
 		(stroke
 			(width 0)
 			(type default)
 		)
-		(uuid "c32a39bd-dfee-5de2-9a51-54a17ee63343")
+		(uuid "5a30da52-c02b-547e-a044-ad891b88a7b1")
 	)
 	(wire
 		(pts
-			(xy 132.08 172.72)
-			(xy 132.08 119.38)
+			(xy 111.76 254)
+			(xy 114.3 254)
 		)
 		(stroke
 			(width 0)
 			(type default)
 		)
-		(uuid "38aa9dbb-2861-58fc-82c9-79ab3ec4882a")
+		(uuid "d352c8aa-0c21-500b-9a0e-7e54c5566209")
 	)
 	(wire
 		(pts
-			(xy 132.08 119.38)
-			(xy 119.38 119.38)
+			(xy 114.3 254)
+			(xy 114.3 256.54)
 		)
 		(stroke
 			(width 0)
 			(type default)
 		)
-		(uuid "0fd167d2-7f5f-548c-a3e6-ad14bfde6212")
-	)
-	(wire
-		(pts
-			(xy 127 175.26)
-			(xy 129.54 175.26)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "5cf1b663-d520-5f09-a3db-7b60f550ea5a")
-	)
-	(wire
-		(pts
-			(xy 129.54 175.26)
-			(xy 129.54 165.1)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "d5a36698-8cf0-5954-b6ce-923ea1ff5b81")
-	)
-	(wire
-		(pts
-			(xy 129.54 165.1)
-			(xy 121.92 165.1)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "9dc1faae-1838-53f4-8985-ed72d780ccbd")
-	)
-	(wire
-		(pts
-			(xy 121.92 165.1)
-			(xy 121.92 124.46)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "5ebea628-cfa2-5421-a4e5-be1b7dadac66")
-	)
-	(wire
-		(pts
-			(xy 121.92 124.46)
-			(xy 119.38 124.46)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "5d40dcdb-3704-5552-a015-bbd8392c248b")
-	)
-	(wire
-		(pts
-			(xy 119.38 121.92)
-			(xy 127 121.92)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "586478c0-1734-51f1-b7dd-47b73ef6477b")
-	)
-	(wire
-		(pts
-			(xy 127 121.92)
-			(xy 127 127)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "49c70f35-107a-5b84-922e-cdd7def8cdb7")
-	)
-	(wire
-		(pts
-			(xy 114.3 129.54)
-			(xy 114.3 132.08)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "f39f6a8a-b208-5b47-b60b-a2d1b88d6698")
+		(uuid "aeb62511-c6c7-5192-ba1a-e3374e8e8452")
 	)
 	(wire
 		(pts
@@ -4727,6 +4639,50 @@
 	)
 	(wire
 		(pts
+			(xy 127 172.72)
+			(xy 144.78 172.72)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "f0570628-ff2b-5fcb-a993-e88e6fd0ac19")
+	)
+	(wire
+		(pts
+			(xy 101.6 259.08)
+			(xy 101.6 276.86)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "162fef1f-6f80-5927-b89f-7c795bce0bae")
+	)
+	(wire
+		(pts
+			(xy 127 175.26)
+			(xy 144.78 175.26)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "d3b80017-d1e7-5efb-991a-fca030508422")
+	)
+	(wire
+		(pts
+			(xy 106.68 259.08)
+			(xy 106.68 276.86)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "69165f9f-4c45-5bfe-8f44-f21be499cb29")
+	)
+	(wire
+		(pts
 			(xy 274.32 91.44)
 			(xy 309.88 91.44)
 		)
@@ -5442,47 +5398,47 @@
 	)
 	(wire
 		(pts
-			(xy 91.44 63.5)
-			(xy 91.44 66.04)
+			(xy 35.56 373.38)
+			(xy 35.56 375.92)
 		)
 		(stroke
 			(width 0)
 			(type default)
 		)
-		(uuid "9ce83c90-c327-5d86-a05a-279ed6f1a814")
+		(uuid "bece0d99-02f9-5d9f-bb30-d1239968e251")
 	)
 	(wire
 		(pts
-			(xy 106.68 63.5)
-			(xy 106.68 66.04)
+			(xy 50.8 373.38)
+			(xy 50.8 375.92)
 		)
 		(stroke
 			(width 0)
 			(type default)
 		)
-		(uuid "50cfebf8-e123-5888-a8f0-7a312a25c458")
+		(uuid "82630bde-d3c5-5711-a9db-fcc4f0fb3c0f")
 	)
 	(wire
 		(pts
-			(xy 121.92 63.5)
-			(xy 121.92 66.04)
+			(xy 66.04 373.38)
+			(xy 66.04 375.92)
 		)
 		(stroke
 			(width 0)
 			(type default)
 		)
-		(uuid "8e2ef622-9eba-506e-b0bc-88f101d10067")
+		(uuid "99f4a5b2-a103-526b-8d8b-06c3383ee36d")
 	)
 	(wire
 		(pts
-			(xy 137.16 63.5)
-			(xy 137.16 66.04)
+			(xy 81.28 373.38)
+			(xy 81.28 375.92)
 		)
 		(stroke
 			(width 0)
 			(type default)
 		)
-		(uuid "9c52fcb4-8dd6-573e-a824-cdb34be9877b")
+		(uuid "e8b8dd33-5e23-524c-a959-5b18bdb17818")
 	)
 	(label "DSO_IN"
 		(at 144.78 193.04 180)
@@ -5704,6 +5660,46 @@
 		)
 		(uuid "8ec321bb-4504-5f1a-aff0-53b1394642cd")
 	)
+	(label "SWCLK"
+		(at 144.78 172.72 180)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right bottom)
+		)
+		(uuid "72a03bdc-a135-5211-93bd-1f4d6fd97e97")
+	)
+	(label "SWCLK"
+		(at 101.6 276.86 90)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "bae07332-82b4-52f3-ac19-12a473957673")
+	)
+	(label "SWDIO"
+		(at 144.78 175.26 180)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right bottom)
+		)
+		(uuid "46b93d14-338e-5929-8521-3e70000e3acd")
+	)
+	(label "SWDIO"
+		(at 106.68 276.86 90)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "89b587f0-71d2-5051-a4b0-cff18e68063f")
+	)
 	(label "DSCLK_DRV"
 		(at 254 91.44 0)
 		(effects
@@ -5824,36 +5820,16 @@
 		)
 		(uuid "70ad9fc1-6131-59d1-b5f5-9c3b2e7d899b")
 	)
-	(label "SWCLK"
-		(at 121.92 119.38 0)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left bottom)
-		)
-		(uuid "8b990acd-71b0-583e-ac49-08d3a628db93")
-	)
-	(label "SWDIO"
-		(at 121.92 162.56 90)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left bottom)
-		)
-		(uuid "42914e9a-1a31-5cf8-ad0b-c5d580b7a75c")
-	)
 	(text "NOTES (PLAN.md, Hardware and Target connector)\n\n1. A1 is a Raspberry Pi Pico or Pico 2, soldered flat by its castellated\n   edge (Module:RaspberryPi_Pico_SMD_HandSolder; same for both), by hand:\n   JLCPCB does not place it, so it is excluded from the BOM.  USB to the\n   host; 3V3 is its regulator's output.  GP25 is the Pico's own LED.\n2. J1 is the CPU32 BDM header, drawn by function: 1 DS, 2 BERR, 3 GND,\n   4 BKPT/DSCLK, 5 GND, 6 FREEZE, 7 RESET, 8 IFETCH/DSI, 9 VDD, 10 IPIPE/DSO.\n   VDD is the target's supply (about 5 V); it powers U1, U2 and U3 only.\n3. 3.3 V to 5 V: U1, U2 (74AHCT1G125, VCC = VDD) drive BKPT/DSCLK and DSI\n   through R1, R2 (220 ohm), which limit the current to about 20 mA if\n   DSI overlaps IFETCH or the cable's signals meet before its VDD, and\n   source-terminate the cable.  R4 (1k) pulls U1's output enable up to\n   VDD, an edge within the 74AHCT1G125's 20 ns/V; Q3 pulls it low when\n   GP11 is high, so no Pico pin is ever tied to the target's 5 V.  R15,\n   R16 (100k) hold U1's and U2's inputs low while the Pico is unpowered.\n4. U3 enables DSI only for NAND(FREEZE, DSI_EN), so DSI turns off within\n   20 ns of FREEZE falling, whatever ends background mode.  Pin 8 is\n   IFETCH, a CPU output, whenever FREEZE is negated.  U3 takes FREEZE\n   from J1, the 5 V side.\n5. 5 V to 3.3 V: U4-U8 (74LVC1G17, Schmitt trigger, VCC = 3V3) buffer\n   RESET, IPIPE/DSO, FREEZE, DS and BERR to GP7, GP2, GP5, GP6 and GP12.\n   RESET and BERR are open drain on the target and rise as its pull-ups\n   let them.  Inputs take 5.5 V at any VCC.  R10-R13, R17 (100k) hold the\n   inputs low with the cable unplugged, against at most 5 uA of input\n   leakage; 50 uA at 5 V is negligible load on the target.\n6. Q1, Q2 (BSS138BK, RDS(on) specified at VGS = 2.5 V) pull RESET and BERR\n   low, open drain, from GP9 and GP10.\n7. Unpowered pod, target running: R3 holds BKPT/DSCLK high so the target\n   runs; R4 holds U1 disabled, with Q3 off (R14); R5 holds DSI_EN low, so\n   U2 is disabled; R6, R7 hold Q1, Q2 off.  The same holds while the Pico\n   boots.\n8. Unpowered target, pod running: U1, U2 and U3 inputs at 3.3 V with\n   VCC = 0 are within ratings (to 7 V at any VCC).\n9. VDD sense: R8 / R9 halve VDD into GP26 (ADC0), 2.75 V at 5.5 V; 100k\n   limits current into an unpowered Pico.  Firmware refuses halt and reset\n   below 4.5 V.  The divider returns to AGND, which is tied to GND.\n   C4 (100 nF) holds GP26 against the RP2040 ADC's sampling, which the\n   divider's 50k source impedance could not recharge in time.\n10. Net labels name the nets for routing.  Each GPIO joins its circuit\n   by label alone: to move a signal to another GPIO, move its label on\n   A1's side, and its pin in the firmware.  DSCLK_OUT, DSCLK_DRV,\n   BKPT_DSCLK, DSI_OUT, DSI_DRV, IFETCH_DSI, IPIPE_DSO and DSO_IN are the\n   Fast net class.\n11. C1-C3 decouple U1-U3 on VDD, C5-C9 U4-U8 on 3V3, each at its VCC pin.\n   No bulk capacitor on VDD: the pod draws a few mA from the target, and\n   a bulk capacitor would load the target's supply when the pod is\n   plugged in.\n12. Pico GND, AGND and J1 pins 3 and 5 are one net.\n13. SWD: the Pico's debug pads (D1 SWCLK, D2 GND, D3 SWDIO) to J2, the\n   Raspberry Pi 3-pin debug connector (JST SH: 1 SWCLK, 2 GND, 3 SWDIO), for\n   the Debug Probe's cable.  The RP2040 pulls SWDIO and SWCLK up internally,\n   about 60k (Pico datasheet 4.8), so there are no external pull-ups.\n14. Layout: the Pico's USB connector end and J2 at the carrier's edge, both\n   reachable with the Pico soldered flat.\n15. H1-H4: M3 mounting holes in the corners, plated, each ringed with\n   vias, on GND."
 		(exclude_from_sim no)
-		(at 370.84 116.84 0)
+		(at 474.98 254 0)
 		(effects
 			(font
 				(size 1.27 1.27)
 			)
 			(justify left top)
 		)
-		(uuid "9b06435b-59d6-5d03-8f6c-1a879b4aad98")
+		(uuid "4cc76fd2-c903-5d86-969d-ee438f9f0906")
 	)
 	(symbol
 		(lib_id "mc683xx-pod:RaspberryPi_Pico")
@@ -6095,8 +6071,7 @@
 	)
 	(symbol
 		(lib_id "Connector_Generic_MountingPin:Conn_01x03_MountingPin")
-		(at 114.3 121.92 0)
-		(mirror y)
+		(at 104.14 254 90)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -6106,29 +6081,29 @@
 		(dnp no)
 		(uuid "e58c3da4-671e-5f26-bd3a-0516cff50f70")
 		(property "Reference" "J2"
-			(at 110.49 120.396 0)
+			(at 96.52 252.476 270)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
-				(justify left)
+				(justify right)
 			)
 		)
 		(property "Value" "SWD"
-			(at 110.49 123.444 0)
+			(at 96.52 255.524 270)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
-				(justify left)
+				(justify right)
 			)
 		)
 		(property "Footprint" "Connector_JST:JST_SH_SM03B-SRSS-TB_1x03-1MP_P1.00mm_Horizontal"
-			(at 114.3 121.92 0)
+			(at 104.14 254 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -6139,7 +6114,7 @@
 			)
 		)
 		(property "Datasheet" "https://datasheets.raspberrypi.com/debug/debug-connector-specification.pdf"
-			(at 114.3 121.92 0)
+			(at 104.14 254 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -6150,7 +6125,7 @@
 			)
 		)
 		(property "Description" "Generic connectable mounting pin connector, single row, 01x03, script generated (kicad-library-utils/schlib/autogen/connector/)"
-			(at 114.3 121.92 0)
+			(at 104.14 254 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -6161,7 +6136,7 @@
 			)
 		)
 		(property "Manufacturer" "JST"
-			(at 114.3 121.92 0)
+			(at 104.14 254 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -6172,7 +6147,7 @@
 			)
 		)
 		(property "MPN" "SM03B-SRSS-TB(LF)(SN)"
-			(at 114.3 121.92 0)
+			(at 104.14 254 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -6183,7 +6158,7 @@
 			)
 		)
 		(property "LCSC" "C160403"
-			(at 114.3 121.92 0)
+			(at 104.14 254 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -6216,7 +6191,7 @@
 	)
 	(symbol
 		(lib_id "power:GND")
-		(at 127 127 0)
+		(at 104.14 261.62 0)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -6226,7 +6201,7 @@
 		(dnp no)
 		(uuid "54eb6df9-0439-582d-99c8-5a45ec6fcd47")
 		(property "Reference" "#PWR01"
-			(at 127 127 0)
+			(at 104.14 261.62 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -6237,7 +6212,7 @@
 			)
 		)
 		(property "Value" "GND"
-			(at 127 130.81 0)
+			(at 104.14 265.43 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -6247,7 +6222,7 @@
 			)
 		)
 		(property "Footprint" ""
-			(at 127 127 0)
+			(at 104.14 261.62 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -6258,7 +6233,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 127 127 0)
+			(at 104.14 261.62 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -6269,7 +6244,7 @@
 			)
 		)
 		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
-			(at 127 127 0)
+			(at 104.14 261.62 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -6293,7 +6268,7 @@
 	)
 	(symbol
 		(lib_id "power:GND")
-		(at 114.3 132.08 0)
+		(at 114.3 256.54 0)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -6303,7 +6278,7 @@
 		(dnp no)
 		(uuid "37a6cbe4-0893-52b6-8d35-ec0169aefaf3")
 		(property "Reference" "#PWR02"
-			(at 114.3 132.08 0)
+			(at 114.3 256.54 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -6314,7 +6289,7 @@
 			)
 		)
 		(property "Value" "GND"
-			(at 114.3 135.89 0)
+			(at 114.3 260.35 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -6324,7 +6299,7 @@
 			)
 		)
 		(property "Footprint" ""
-			(at 114.3 132.08 0)
+			(at 114.3 256.54 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -6335,7 +6310,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 114.3 132.08 0)
+			(at 114.3 256.54 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -6346,7 +6321,7 @@
 			)
 		)
 		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
-			(at 114.3 132.08 0)
+			(at 114.3 256.54 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -15043,7 +15018,7 @@
 	)
 	(symbol
 		(lib_id "Mechanical:MountingHole_Pad")
-		(at 91.44 60.96 0)
+		(at 35.56 370.84 0)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -15053,7 +15028,7 @@
 		(dnp no)
 		(uuid "f65d0615-add8-5365-accc-de21daac7648")
 		(property "Reference" "H1"
-			(at 95.25 57.404 0)
+			(at 39.37 367.284 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -15064,7 +15039,7 @@
 			)
 		)
 		(property "Value" "M3"
-			(at 95.25 60.452 0)
+			(at 39.37 370.332 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -15075,7 +15050,7 @@
 			)
 		)
 		(property "Footprint" "MountingHole:MountingHole_3.2mm_M3_Pad_Via"
-			(at 91.44 60.96 0)
+			(at 35.56 370.84 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -15086,7 +15061,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 91.44 60.96 0)
+			(at 35.56 370.84 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -15097,7 +15072,7 @@
 			)
 		)
 		(property "Description" "Mounting Hole with connection"
-			(at 91.44 60.96 0)
+			(at 35.56 370.84 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -15108,7 +15083,7 @@
 			)
 		)
 		(property "Manufacturer" ""
-			(at 91.44 60.96 0)
+			(at 35.56 370.84 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -15119,7 +15094,7 @@
 			)
 		)
 		(property "MPN" ""
-			(at 91.44 60.96 0)
+			(at 35.56 370.84 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -15130,7 +15105,7 @@
 			)
 		)
 		(property "LCSC" ""
-			(at 91.44 60.96 0)
+			(at 35.56 370.84 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -15154,7 +15129,7 @@
 	)
 	(symbol
 		(lib_id "power:GND")
-		(at 91.44 66.04 0)
+		(at 35.56 375.92 0)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -15164,7 +15139,7 @@
 		(dnp no)
 		(uuid "6faa2920-a3e1-5928-945a-300916d7314b")
 		(property "Reference" "#PWR58"
-			(at 91.44 66.04 0)
+			(at 35.56 375.92 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -15175,7 +15150,7 @@
 			)
 		)
 		(property "Value" "GND"
-			(at 91.44 69.85 0)
+			(at 35.56 379.73 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -15185,7 +15160,7 @@
 			)
 		)
 		(property "Footprint" ""
-			(at 91.44 66.04 0)
+			(at 35.56 375.92 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -15196,7 +15171,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 91.44 66.04 0)
+			(at 35.56 375.92 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -15207,7 +15182,7 @@
 			)
 		)
 		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
-			(at 91.44 66.04 0)
+			(at 35.56 375.92 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -15231,7 +15206,7 @@
 	)
 	(symbol
 		(lib_id "Mechanical:MountingHole_Pad")
-		(at 106.68 60.96 0)
+		(at 50.8 370.84 0)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -15241,7 +15216,7 @@
 		(dnp no)
 		(uuid "808c3a4c-f33f-5298-afda-bbb0ffa0e576")
 		(property "Reference" "H2"
-			(at 110.49 57.404 0)
+			(at 54.61 367.284 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -15252,7 +15227,7 @@
 			)
 		)
 		(property "Value" "M3"
-			(at 110.49 60.452 0)
+			(at 54.61 370.332 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -15263,7 +15238,7 @@
 			)
 		)
 		(property "Footprint" "MountingHole:MountingHole_3.2mm_M3_Pad_Via"
-			(at 106.68 60.96 0)
+			(at 50.8 370.84 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -15274,7 +15249,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 106.68 60.96 0)
+			(at 50.8 370.84 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -15285,7 +15260,7 @@
 			)
 		)
 		(property "Description" "Mounting Hole with connection"
-			(at 106.68 60.96 0)
+			(at 50.8 370.84 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -15296,7 +15271,7 @@
 			)
 		)
 		(property "Manufacturer" ""
-			(at 106.68 60.96 0)
+			(at 50.8 370.84 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -15307,7 +15282,7 @@
 			)
 		)
 		(property "MPN" ""
-			(at 106.68 60.96 0)
+			(at 50.8 370.84 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -15318,7 +15293,7 @@
 			)
 		)
 		(property "LCSC" ""
-			(at 106.68 60.96 0)
+			(at 50.8 370.84 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -15342,7 +15317,7 @@
 	)
 	(symbol
 		(lib_id "power:GND")
-		(at 106.68 66.04 0)
+		(at 50.8 375.92 0)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -15352,7 +15327,7 @@
 		(dnp no)
 		(uuid "cc70c7ce-d4b5-5d6d-b6de-9c10a30be79d")
 		(property "Reference" "#PWR59"
-			(at 106.68 66.04 0)
+			(at 50.8 375.92 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -15363,7 +15338,7 @@
 			)
 		)
 		(property "Value" "GND"
-			(at 106.68 69.85 0)
+			(at 50.8 379.73 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -15373,7 +15348,7 @@
 			)
 		)
 		(property "Footprint" ""
-			(at 106.68 66.04 0)
+			(at 50.8 375.92 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -15384,7 +15359,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 106.68 66.04 0)
+			(at 50.8 375.92 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -15395,7 +15370,7 @@
 			)
 		)
 		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
-			(at 106.68 66.04 0)
+			(at 50.8 375.92 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -15419,7 +15394,7 @@
 	)
 	(symbol
 		(lib_id "Mechanical:MountingHole_Pad")
-		(at 121.92 60.96 0)
+		(at 66.04 370.84 0)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -15429,7 +15404,7 @@
 		(dnp no)
 		(uuid "01c5adca-d76d-5ed2-9c9c-c1f48a1a418d")
 		(property "Reference" "H3"
-			(at 125.73 57.404 0)
+			(at 69.85 367.284 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -15440,7 +15415,7 @@
 			)
 		)
 		(property "Value" "M3"
-			(at 125.73 60.452 0)
+			(at 69.85 370.332 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -15451,7 +15426,7 @@
 			)
 		)
 		(property "Footprint" "MountingHole:MountingHole_3.2mm_M3_Pad_Via"
-			(at 121.92 60.96 0)
+			(at 66.04 370.84 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -15462,7 +15437,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 121.92 60.96 0)
+			(at 66.04 370.84 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -15473,7 +15448,7 @@
 			)
 		)
 		(property "Description" "Mounting Hole with connection"
-			(at 121.92 60.96 0)
+			(at 66.04 370.84 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -15484,7 +15459,7 @@
 			)
 		)
 		(property "Manufacturer" ""
-			(at 121.92 60.96 0)
+			(at 66.04 370.84 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -15495,7 +15470,7 @@
 			)
 		)
 		(property "MPN" ""
-			(at 121.92 60.96 0)
+			(at 66.04 370.84 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -15506,7 +15481,7 @@
 			)
 		)
 		(property "LCSC" ""
-			(at 121.92 60.96 0)
+			(at 66.04 370.84 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -15530,7 +15505,7 @@
 	)
 	(symbol
 		(lib_id "power:GND")
-		(at 121.92 66.04 0)
+		(at 66.04 375.92 0)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -15540,7 +15515,7 @@
 		(dnp no)
 		(uuid "6c4e44fb-f0a7-5ca6-8cb0-73cd964f7329")
 		(property "Reference" "#PWR60"
-			(at 121.92 66.04 0)
+			(at 66.04 375.92 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -15551,7 +15526,7 @@
 			)
 		)
 		(property "Value" "GND"
-			(at 121.92 69.85 0)
+			(at 66.04 379.73 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -15561,7 +15536,7 @@
 			)
 		)
 		(property "Footprint" ""
-			(at 121.92 66.04 0)
+			(at 66.04 375.92 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -15572,7 +15547,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 121.92 66.04 0)
+			(at 66.04 375.92 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -15583,7 +15558,7 @@
 			)
 		)
 		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
-			(at 121.92 66.04 0)
+			(at 66.04 375.92 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -15607,7 +15582,7 @@
 	)
 	(symbol
 		(lib_id "Mechanical:MountingHole_Pad")
-		(at 137.16 60.96 0)
+		(at 81.28 370.84 0)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -15617,7 +15592,7 @@
 		(dnp no)
 		(uuid "50d52c23-836e-5065-8083-a1ee1fe0d8c8")
 		(property "Reference" "H4"
-			(at 140.97 57.404 0)
+			(at 85.09 367.284 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -15628,7 +15603,7 @@
 			)
 		)
 		(property "Value" "M3"
-			(at 140.97 60.452 0)
+			(at 85.09 370.332 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -15639,7 +15614,7 @@
 			)
 		)
 		(property "Footprint" "MountingHole:MountingHole_3.2mm_M3_Pad_Via"
-			(at 137.16 60.96 0)
+			(at 81.28 370.84 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -15650,7 +15625,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 137.16 60.96 0)
+			(at 81.28 370.84 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -15661,7 +15636,7 @@
 			)
 		)
 		(property "Description" "Mounting Hole with connection"
-			(at 137.16 60.96 0)
+			(at 81.28 370.84 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -15672,7 +15647,7 @@
 			)
 		)
 		(property "Manufacturer" ""
-			(at 137.16 60.96 0)
+			(at 81.28 370.84 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -15683,7 +15658,7 @@
 			)
 		)
 		(property "MPN" ""
-			(at 137.16 60.96 0)
+			(at 81.28 370.84 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -15694,7 +15669,7 @@
 			)
 		)
 		(property "LCSC" ""
-			(at 137.16 60.96 0)
+			(at 81.28 370.84 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -15718,7 +15693,7 @@
 	)
 	(symbol
 		(lib_id "power:GND")
-		(at 137.16 66.04 0)
+		(at 81.28 375.92 0)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -15728,7 +15703,7 @@
 		(dnp no)
 		(uuid "29fecde9-e7df-5ce8-bddf-78caf0824c2f")
 		(property "Reference" "#PWR61"
-			(at 137.16 66.04 0)
+			(at 81.28 375.92 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -15739,7 +15714,7 @@
 			)
 		)
 		(property "Value" "GND"
-			(at 137.16 69.85 0)
+			(at 81.28 379.73 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -15749,7 +15724,7 @@
 			)
 		)
 		(property "Footprint" ""
-			(at 137.16 66.04 0)
+			(at 81.28 375.92 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -15760,7 +15735,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 137.16 66.04 0)
+			(at 81.28 375.92 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -15771,7 +15746,7 @@
 			)
 		)
 		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
-			(at 137.16 66.04 0)
+			(at 81.28 375.92 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
