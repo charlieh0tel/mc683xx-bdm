@@ -32,17 +32,28 @@ cd firmware/pod-fw
 cargo run --release              # flashes over SWD, then shows defmt logs
 ```
 
-Expect `m683xx-pod up` in the log, and the Pico's LED on.  Without a
-probe, hold BOOTSEL, plug in, and `picotool load -x` the ELF from
-`target/thumbv6m-none-eabi/release/pod-fw`.
+Expect `m683xx-pod up` in the log, and the Pico's LED (GP25) on; an
+RP2040-Zero has none there (its RGB LED on GP16 stays dark).
+
+Without a probe, flash a build without RTT over USB (`-f` reboots a
+running Pico into BOOTSEL; a blank one is there already):
+
+```
+cargo build --release --no-default-features -F rp2040
+picotool load -x -f -t elf target/thumbv6m-none-eabi/release/pod-fw
+```
+
+It logs nothing; the pod enumerating as 1209:0001 (`lsusb`) stands in
+for the log line.
 
 ```
 bdm pins
 ```
 
 Expect FREEZE, RESET and DS low (no carrier: GP5 is pulled down, GP4 and
-GP7 float and may read either way) and VDD near 0 V.  `bdm halt` fails
-with "no target power" (NoTarget): VDD is under 4.5 V.
+GP7 float and may read either way).  VDD reads wherever GP26 floats
+without the carrier's divider: 1.06-1.14 V on an RP2040-Zero.  `bdm halt`
+fails with "no target power" (NoTarget): VDD is under 4.5 V.
 
 ## 2. Bare Pico: PIO loopback
 
