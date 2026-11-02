@@ -401,7 +401,11 @@ How to run each item and what to expect: `docs/bring-up.md`.
 - [ ] Schematic, breadboard first (Pico + 74AHCT125 + 74LVC125 +
       2N7002s), then the carrier
 - [ ] PIO loopback (`bdm loopback`, GP3 to GP6): scope DSCLK/DSI,
-      verify 17-bit framing and idle-high
+      verify 17-bit framing and idle-high.  Data checked on an
+      RP2040-Zero, unscoped: 36000 words ok at 1 MHz (1.745 s) and
+      4 MHz (1.297 s), 36 words a USB round trip: 1.3 ms a round trip
+      at 4 MHz against 0.15 ms on the wire, so USB-limited, about
+      28k words/s
 - [ ] Reset into BDM; confirm FREEZE asserts
 - [ ] RSREG ATEMP first (`0x2588`): confirms RSREG's `0x2580`
 - [ ] BGND and a breakpoint after GO: `bdm pins` reports a fresh ATEMP
