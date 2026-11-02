@@ -5,13 +5,13 @@
 - Schematic: owner's KiCad pass on the draft (`hardware/mc683xx-pod/`).
 - USB PID from Raspberry Pi (PLAN.md, Open questions); then
   `pod-proto`'s VID and PID, and the README's udev rule.
-- Breadboard first: Pico + 74AHCT125 + 74LVC125 + 2N7002s.
+- Breadboard first: Pico + 74AHCT125 + 74LVC125 + 74LVC1G17 + BSS138BKs.
 - Carrier release (`jlcpcb-release` skill).
 
 ## Firmware
 
-- BERR sense, if a fifth input buffer is worth a part (PLAN.md,
-  Firmware).
+- BERR sense on the 74LVC125's spare channel B (PLAN.md, Firmware):
+  a schematic and board change.
 - DSCLK above 4 MHz, once the throughput test measures the margin.
 - A `Link` adapter onto m683xx-emu's BDM serial exchange once it
   lands; then delete `bdm-model`.

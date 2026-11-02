@@ -44,16 +44,18 @@ firmware and documentation are GPL-3.0-only (`LICENSE`).
 | Function | Part | Notes |
 |---|---|---|
 | MCU | Pico (RP2040) or Pico 2 (RP2350), soldered flat by its castellated edge | USB to host; same footprint and pinout; hand-soldered, not in the assembly BOM |
-| 3.3 V → 5 V outputs | 74AHCT125, VCC = target VDD | BKPT/DSCLK, DSI; 100 Ω series, the most current limit if DSI and IFETCH overlap; each its own OE |
-| AHCT125 OE pull-up, BKPT/DSCLK | 10 kΩ to target VDD, pulled low by Q3 (2N7002, gate on GP11, 100 kΩ gate pull-down) | Output tristated while the pod is unpowered or booting.  Q3 keeps the target's 5 V off every Pico pin: a GPIO on this pull-up would see 5 V, over the RP2040's and RP2350's 3.63 V limit unpowered (RP2040 datasheet 5.5.2.1, RP2350 14.9.1) |
+| 3.3 V → 5 V outputs | 74AHCT125, VCC = target VDD | BKPT/DSCLK, DSI; 220 Ω series (R1, R2): about 20 mA if DSI and IFETCH overlap (MC68331UM Table A-1: 25 mA per pin), or into the unpowered 74AHCT125's output clamp if the cable's signals meet before its VDD (SCLS264R 5.1: ±20 mA); each its own OE |
+| 74AHCT125 input pull-downs | 100 kΩ to GND on GP2 and GP3 (R15, R16) | The 74AHCT125's inputs must not float (SCLS264R 8.4.1); the Pico's own pull-downs need it powered |
+| AHCT125 OE pull-up, BKPT/DSCLK | 1 kΩ to target VDD (R4), pulled low by Q3 (BSS138BK, gate on GP11, 100 kΩ gate pull-down) | The OE edge within the 74AHCT125's 20 ns/V (SCLS264R 5.3): about 8 ns/V into its 10 pF and Q3's 7 pF; 5 mA from VDD while Q3 is on.  Output tristated while the pod is unpowered or booting.  Q3 keeps the target's 5 V off every Pico pin: a GPIO on this pull-up would see 5 V, over the RP2040's and RP2350's 3.63 V limit unpowered (RP2040 datasheet 5.5.2.1, RP2350 14.9.1) |
 | DSI enable gate | 74AHCT1G00, VCC = target VDD | Drives DSI's 74AHCT125 OE: NAND(FREEZE, DSI_EN), so DSI is driven only while FREEZE is high and the Pico enables it |
 | DSI_EN pull-down | 100 kΩ to GND | DSI off while the pod is unpowered or booting |
 | 3.3 V → 5 V outputs, spare | 74AHCT125, channels B and D | Unused; inputs tied to GND.  BKPT is channel A, DSI channel C: channels and Pico pins are chosen for the fewest crossings on the board |
-| 5 V → 3.3 V inputs | 74LVC125, VCC = 3.3 V | IPIPE/DSO, FREEZE, RESET sense, DS; inputs to 5.5 V at any VCC. IPIPE is pin 10 outside BDM, so its channel reads both |
-| 74LVC125 input pull-downs | 100 kΩ to GND, header side | Inputs low with the cable unplugged even at the 74LVC125A's worst-case 5 µA input leakage (SCAS290T 5.5); 50 µA load at 5 V |
-| RESET drive | 2N7002 (JSCJ, JLCPCB basic C8545), open-drain | Target also drives RESET; sense separately.  Vth(GS) at most 2.5 V against the Pico's 3.3 V gate drive |
-| BERR drive | 2N7002, open-drain | Abort hung bus cycles |
-| 2N7002 gate pull-downs | 100 kΩ to GND | RESET and BERR not asserted while the pod is unpowered or booting |
+| 5 V → 3.3 V inputs | 74LVC125, VCC = 3.3 V | IPIPE/DSO, FREEZE, DS; inputs to 5.5 V at any VCC. IPIPE is pin 10 outside BDM, so its channel reads both.  Channel B is a spare: input and OE to GND |
+| RESET sense | 74LVC1G17 (U4), Schmitt trigger, VCC = 3.3 V | The target's RESET rises as fast as its pull-up lets it, slower than the 74LVC125A's 8 ns/V input limit (SCAS290T 5.3); the Schmitt input has none.  5.5 V inputs and Ioff (SCES351Y) |
+| 74LVC125 and 74LVC1G17 input pull-downs | 100 kΩ to GND, header side | Inputs low with the cable unplugged even at the 74LVC125A's worst-case 5 µA input leakage (SCAS290T 5.5); 50 µA load at 5 V |
+| RESET drive | BSS138BK (Nexperia, LCSC C282529), open-drain | Target also drives RESET; sense separately.  RDS(on) at most 6.5 Ω at VGS = 2.5 V, VGSth at most 1.6 V (BSS138BK datasheet, Table 7): specified below the Pico's 3.3 V gate drive |
+| BERR drive | BSS138BK, open-drain | Abort hung bus cycles |
+| FET gate pull-downs | 100 kΩ to GND | RESET and BERR not asserted while the pod is unpowered or booting |
 | VDD sense | 100 kΩ / 100 kΩ divider → ADC0, 100 nF to GND | 2.75 V at 5.5 V; high value to limit current into an unpowered RP2040; the capacitor holds GP26 while the ADC samples from the divider's 50 kΩ.  Halt and reset refuse below 4.5 V |
 | BDM header | 2x5 0.1" shrouded, keyed | A reversed cable cannot put VDD on BERR |
 | SWD connector, J2 | JST SH 3-pin horizontal, SM03B-SRSS-TB (LCSC C160403) | From the Pico's debug pads: 1 SWCLK, 2 GND, 3 SWDIO, Raspberry Pi's debug connector order (RP-003139-SP); the Debug Probe's JST-SH cable plugs in.  The RP2040's internal pull-ups, no external ones |
@@ -272,7 +274,8 @@ the pod has its own.  Requests:
 - Pins: FREEZE, RESET, DS levels, VDD in millivolts, and ATEMP for
   the current stay in background mode (below).  DSO is a PIO
   pin, which embassy-rp gives no way to read, so it is not reported.
-  BERR is driven but not sensed: the 74LVC125's four channels are used.
+  BERR is driven but not sensed.  The 74LVC125's channel B is a spare
+  that could sense it (TODO.md).
 - ResetHalt, Halt: the sequences in Protocol summary; refused without
   VDD, and NoFreeze if FREEZE does not assert in 100 ms.  Each returns
   ATEMP.  Halt on a CPU already in background mode only returns it.
@@ -402,7 +405,7 @@ code and no `unsafe`; no USB request, so the protocol is unchanged.
 How to run each item and what to expect: `docs/bring-up.md`.
 
 - [ ] Schematic, breadboard first (Pico + 74AHCT125 + 74LVC125 +
-      2N7002s), then the carrier
+      74LVC1G17 + BSS138BKs), then the carrier
 - [ ] PIO loopback (`bdm loopback`, GP3 to GP6): scope DSCLK/DSI,
       verify 17-bit framing and idle-high.  Data checked on an
       RP2040-Zero, unscoped: 36000 words ok at 1 MHz (1.745 s) and
@@ -447,7 +450,7 @@ How to run each item and what to expect: `docs/bring-up.md`.
 - `third_party/motorola/MC68331UM.pdf`: BDM (5.10.2), timing (Table
   A-7), connector (Figure 5-11), SIM, reset configuration
 - `third_party/motorola/SIMRM.pdf`: SIM reference, BKPT timing at reset
-- `third_party/ti/`, `third_party/diodes/`: translator and MOSFET data
+- `third_party/ti/`, `third_party/nexperia/`: translator and MOSFET data
   sheets
 - `third_party/raspberrypi/`: RP2040, RP2350, Pico and Pico 2 data
   sheets (PIO, GPIO ratings)
