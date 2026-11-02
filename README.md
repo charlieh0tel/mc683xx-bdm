@@ -16,7 +16,7 @@ schematic drafted and parts placed (`hardware/m683xx-pod/`), not yet routed.
 | `PLAN.md` | the design and why it is the way it is |
 | `TODO.md` | the work list |
 | `docs/` | the host-pod protocol (`usb-protocol.md`), bring-up steps (`bring-up.md`) |
-| `hardware/` | the KiCad carrier board; `ee_tooling/`, the shared tooling (a submodule following its `main`), whose `jlcpcb-release` builds a JLCPCB order |
+| `hardware/` | the KiCad carrier board; `ee_tooling/`, the shared tooling (a submodule following its `main`), whose `jlcpcb-release` builds a JLCPCB order; `fastcheck.py`, a report on the BDM link's fast nets (`uv run python fastcheck.py m683xx-pod/m683xx-pod.kicad_pcb`) |
 | `production/` | each release as ordered |
 | `firmware/` | the Rust workspace: firmware, host CLI, shared crates |
 | `third_party/` | vendor documents and their provenance (`NOTICE`) |

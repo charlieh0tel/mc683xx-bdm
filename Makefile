@@ -12,8 +12,8 @@ hooks:
 BUILDS = rp2040:thumbv6m-none-eabi rp235xa:thumbv8m.main-none-eabihf
 
 # Before each commit (AGENTS.md): rustfmt, clippy on the workspace and on
-# every firmware build, warnings as errors, and ee_tooling's schematic
-# drawing-rule check.
+# every firmware build, warnings as errors, ee_tooling's schematic
+# drawing-rule check, and ruff and pytest on hardware/'s own Python.
 lint:
 	@# No wildcard imports, `use super::*` in tests included (AGENTS.md):
 	@# clippy's wildcard_imports does not report these.
@@ -29,3 +29,4 @@ lint:
 		done; \
 	done
 	cd hardware && uv run kicad-style-check m683xx-pod/m683xx-pod.kicad_sch
+	cd hardware && uv run ruff format --check && uv run ruff check && uv run pytest -q
