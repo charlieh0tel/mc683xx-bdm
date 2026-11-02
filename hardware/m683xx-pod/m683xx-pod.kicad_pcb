@@ -11757,7 +11757,7 @@
 		(layer "Dwgs.User")
 		(uuid "1c4983bf-1368-4ac8-860c-8aeed580794d")
 		(pts
-			(xy 50 50) (xy 108 50)
+			(xy 50 50) (xy 118 50)
 		)
 		(height -6)
 		(format
@@ -11776,8 +11776,8 @@
 			(extension_offset 0)
 			(keep_text_aligned yes)
 		)
-		(gr_text "58.0 mm"
-			(at 79 42.57125 0)
+		(gr_text "68.0 mm"
+			(at 84 42.57125 0)
 			(layer "Dwgs.User")
 			(uuid "1c4983bf-1368-4ac8-860c-8aeed580794d")
 			(effects
