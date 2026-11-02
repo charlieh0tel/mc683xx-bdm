@@ -2,7 +2,7 @@ import math
 
 import pytest
 
-from fastcheck import crossing, nearest
+from fastcheck import crossing, nearest, runs
 
 
 def test_crossing_at_the_intersection() -> None:
@@ -39,3 +39,11 @@ def test_nearest_fewer_points_than_asked() -> None:
 
 def test_nearest_no_points() -> None:
     assert nearest((0, 0), [], 1) == []
+
+
+def test_runs_groups_consecutive_values() -> None:
+    assert runs(["GND", "GND", None, "VDD", "VDD"]) == [("GND", 2), (None, 1), ("VDD", 2)]
+
+
+def test_runs_empty() -> None:
+    assert runs([]) == []
