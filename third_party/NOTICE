@@ -57,13 +57,15 @@ served on 2026-10-31.
 
 In `ti/`, (c) Texas Instruments Incorporated:
 
-  SN74AHCT125.pdf  "SNx4AHCT125 Quadruple Bus Buffer Gates With
-                   3-State Outputs", SCLS264R, revised February 2024.
-                   ti.com/lit/ds/symlink/sn74ahct125.pdf.  The
-                   3.3 V to 5 V outputs: input ratings with the supply
-                   off (5.1).
-                   SHA-256 66da72e586dbca7a1548164adf28e238
-                           484c5c1ad250fcb28ec972e4732c6fc2
+  SN74AHCT1G125.pdf
+                   "SN74AHCT1G125 Single Bus Buffer Gate With 3-State
+                   Output", SCLS378P, revised March 2024, as served on
+                   2026-11-02.  ti.com/lit/ds/symlink/sn74ahct1g125.pdf.
+                   U1 and U2, the 3.3 V to 5 V outputs: input ratings
+                   with the supply off (5.1), input edge rate (5.3),
+                   disable time (5.6).
+                   SHA-256 564b239f73ff629f960832fa7e1c64f6
+                           a651eea28f64115ecefcdb7af22ca416
   SN74AHCT1G00.pdf "SN74AHCT1G00 Single 2-Input Positive-NAND Gate",
                    SCLS316P, revised February 2024.
                    ti.com/lit/ds/symlink/sn74ahct1g00.pdf.  The DSI
@@ -71,16 +73,11 @@ In `ti/`, (c) Texas Instruments Incorporated:
                    (5.1), propagation delay (5.6).
                    SHA-256 37ed4656545c518f7be708cee064fe3d
                            6121aa93446f30675fd2efbcfa35fea1
-  SN74LVC125A.pdf  "SN74LVC125A Quadruple Bus Buffer Gate With 3-State
-                   Outputs", SCAS290T, revised September 2024.
-                   ti.com/lit/ds/symlink/sn74lvc125a.pdf.  The 5 V to
-                   3.3 V inputs: 5.5 V inputs (5.1, 5.3).
-                   SHA-256 06ff124c6c762b7c8e0e6f2df79edd1d
-                           acb1368a40039542da0b5cedb7c54b28
   SN74LVC1G17.pdf  "SN74LVC1G17 Single Schmitt-Trigger Buffer",
                    SCES351Y, revised October 2025, as served on
                    2026-11-01.  ti.com/lit/ds/symlink/sn74lvc1g17.pdf.
-                   U4, RESET sense: 5.5 V inputs at any VCC and Ioff.
+                   U4-U8, the 5 V to 3.3 V inputs: 5.5 V inputs at any
+                   VCC, Ioff and input leakage (5.3, 5.5), delay (5.6).
                    SHA-256 74ff979da5dcaf2b3695cf9a500b4696
                            2bb8489033db989b5537ec5cef88c61d
 

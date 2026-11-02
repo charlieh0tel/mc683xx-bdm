@@ -5,13 +5,13 @@
 - Schematic: owner's KiCad pass on the draft (`hardware/mc683xx-pod/`).
 - USB PID from Raspberry Pi (PLAN.md, Open questions); then
   `pod-proto`'s VID and PID, and the README's udev rule.
-- Breadboard first: Pico + 74AHCT125 + 74LVC125 + 74LVC1G17 + BSS138BKs.
+- Breadboard first: Pico + 74AHCT1G125s + 74LVC1G17s + BSS138BKs.
 - Carrier release (`jlcpcb-release` skill).
 
 ## Firmware
 
-- BERR sense on the 74LVC125's spare channel B (PLAN.md, Firmware):
-  a schematic and board change.
+- BERR sense: read GP12 (U8) and report it in Pins (PLAN.md, Firmware;
+  docs/usb-protocol.md).
 - DSCLK above 4 MHz, once the throughput test measures the margin.
 - A `Link` adapter onto m683xx-emu's BDM serial exchange once it
   lands; then delete `bdm-model`.
@@ -32,7 +32,7 @@
   - PIO loopback: scope DSCLK/DSI, 17-bit framing, idle high.
   - Reset into BDM; FREEZE asserts.
   - GO and a target-side reset on the scope: IFETCH driven by the CPU
-    against FREEZE falling and DSI's 74AHCT125 output turning off
+    against FREEZE falling and U2's (74AHCT1G125) output turning off
     (PLAN.md, Hardware).
   - RSREG ATEMP first (`0x2588`): confirms RSREG's `0x2580` (PLAN.md).
   - BGND and a breakpoint after GO: `bdm pins` gives a fresh ATEMP of 1

@@ -44,15 +44,13 @@ firmware and documentation are GPL-3.0-only (`LICENSE`).
 | Function | Part | Notes |
 |---|---|---|
 | MCU | Pico (RP2040) or Pico 2 (RP2350), soldered flat by its castellated edge | USB to host; same footprint and pinout; hand-soldered, not in the assembly BOM |
-| 3.3 V → 5 V outputs | 74AHCT125, VCC = target VDD | BKPT/DSCLK, DSI; 220 Ω series (R1, R2): about 20 mA if DSI and IFETCH overlap (MC68331UM Table A-1: 25 mA per pin), or into the unpowered 74AHCT125's output clamp if the cable's signals meet before its VDD (SCLS264R 5.1: ±20 mA); each its own OE |
-| 74AHCT125 input pull-downs | 100 kΩ to GND on GP2 and GP3 (R15, R16) | The 74AHCT125's inputs must not float (SCLS264R 8.4.1); the Pico's own pull-downs need it powered |
-| AHCT125 OE pull-up, BKPT/DSCLK | 1 kΩ to target VDD (R4), pulled low by Q3 (BSS138BK, gate on GP11, 100 kΩ gate pull-down) | The OE edge within the 74AHCT125's 20 ns/V (SCLS264R 5.3): about 8 ns/V into its 10 pF and Q3's 7 pF; 5 mA from VDD while Q3 is on.  Output tristated while the pod is unpowered or booting.  Q3 keeps the target's 5 V off every Pico pin: a GPIO on this pull-up would see 5 V, over the RP2040's and RP2350's 3.63 V limit unpowered (RP2040 datasheet 5.5.2.1, RP2350 14.9.1) |
-| DSI enable gate | 74AHCT1G00, VCC = target VDD | Drives DSI's 74AHCT125 OE: NAND(FREEZE, DSI_EN), so DSI is driven only while FREEZE is high and the Pico enables it |
+| 3.3 V → 5 V outputs | 74AHCT1G125 ×2 (U1 BKPT/DSCLK, U2 DSI), VCC = target VDD | 220 Ω series (R1, R2): about 20 mA if DSI and IFETCH overlap (MC68331UM Table A-1: 25 mA per pin), or into an unpowered 74AHCT1G125's output clamp if the cable's signals meet before its VDD (SCLS378P 5.1: ±20 mA); each its own OE |
+| 74AHCT1G125 input pull-downs | 100 kΩ to GND on GP2 and GP3 (R15, R16) | The inputs must not float (SCLS378P 5.3, note 1); the Pico's own pull-downs need it powered |
+| U1 OE pull-up, BKPT/DSCLK | 1 kΩ to target VDD (R4), pulled low by Q3 (BSS138BK, gate on GP11, 100 kΩ gate pull-down) | The OE edge within the 74AHCT1G125's 20 ns/V (SCLS378P 5.3): about 8 ns/V into its 10 pF (5.5) and Q3's 7 pF; 5 mA from VDD while Q3 is on.  Output tristated while the pod is unpowered or booting.  Q3 keeps the target's 5 V off every Pico pin: a GPIO on this pull-up would see 5 V, over the RP2040's and RP2350's 3.63 V limit unpowered (RP2040 datasheet 5.5.2.1, RP2350 14.9.1) |
+| DSI enable gate | 74AHCT1G00 (U3), VCC = target VDD | Drives U2's OE: NAND(FREEZE, DSI_EN), so DSI is driven only while FREEZE is high and the Pico enables it |
 | DSI_EN pull-down | 100 kΩ to GND | DSI off while the pod is unpowered or booting |
-| 3.3 V → 5 V outputs, spare | 74AHCT125, channels B and D | Unused; inputs tied to GND.  BKPT is channel A, DSI channel C: channels and Pico pins are chosen for the fewest crossings on the board |
-| 5 V → 3.3 V inputs | 74LVC125, VCC = 3.3 V | IPIPE/DSO, FREEZE, DS; inputs to 5.5 V at any VCC. IPIPE is pin 10 outside BDM, so its channel reads both.  Channel B is a spare: input and OE to GND |
-| RESET sense | 74LVC1G17 (U4), Schmitt trigger, VCC = 3.3 V | The target's RESET rises as fast as its pull-up lets it, slower than the 74LVC125A's 8 ns/V input limit (SCAS290T 5.3); the Schmitt input has none.  5.5 V inputs and Ioff (SCES351Y) |
-| 74LVC125 and 74LVC1G17 input pull-downs | 100 kΩ to GND, header side | Inputs low with the cable unplugged even at the 74LVC125A's worst-case 5 µA input leakage (SCAS290T 5.5); 50 µA load at 5 V |
+| 5 V → 3.3 V inputs | 74LVC1G17 ×5, Schmitt trigger, VCC = 3.3 V: U4 RESET, U5 IPIPE/DSO, U6 FREEZE, U7 DS, U8 BERR | One SOT-23-5 per input, each placed at its J1 pin.  RESET and BERR are open drain on the target and rise as its pull-ups let them; a Schmitt input sets no transition-rate limit.  5.5 V inputs at any VCC and Ioff (SCES351Y 5.3, 5.5).  IPIPE is pin 10 outside BDM, so U5 reads both.  4.6 ns max A to Y at 3.3 V (SCES351Y 5.6) |
+| 74LVC1G17 input pull-downs | 100 kΩ to GND, header side (R10-R13, R17) | Inputs low with the cable unplugged even at the 74LVC1G17's worst-case 5 µA input leakage (SCES351Y 5.5); 50 µA load at 5 V |
 | RESET drive | BSS138BK (Nexperia, LCSC C282529), open-drain | Target also drives RESET; sense separately.  RDS(on) at most 6.5 Ω at VGS = 2.5 V, VGSth at most 1.6 V (BSS138BK datasheet, Table 7): specified below the Pico's 3.3 V gate drive |
 | BERR drive | BSS138BK, open-drain | Abort hung bus cycles |
 | FET gate pull-downs | 100 kΩ to GND | RESET and BERR not asserted while the pod is unpowered or booting |
@@ -68,8 +66,8 @@ FREEZE is negated (gotcha below).  DSI's is gated in hardware by
 FREEZE itself, so DSI goes off whatever ends background mode: GO,
 CALL, a reset from the target's side, a watchdog, a raw Transfer.
 From FREEZE falling to DSI off is at most 20 ns: 10 ns through the
-74AHCT1G00 and 10 ns for the 74AHCT125 to disable, both at 50 pF over
-temperature (SCLS316P 5.6, SCLS264R 5.5).  The manuals give no bound
+74AHCT1G00 and 10 ns for the 74AHCT1G125 to disable, both at 50 pF over
+temperature (SCLS316P 5.6, SCLS378P 5.6).  The manuals give no bound
 on how soon IFETCH is driven after FREEZE negates (MC68331UM Table A-7,
 Figure A-14); the series resistor limits any overlap's current.
 
@@ -92,6 +90,7 @@ Pico pins (GPn):
 | 9 | RESET drive (Q1 gate) | out, high asserts RESET |
 | 10 | BERR drive (Q2 gate) | out, high asserts BERR |
 | 11 | BKPT/DSCLK driver enable (Q3 gate) | out, high enables |
+| 12 | BERR sense | in |
 | 25 | LED (on the Pico) | out |
 | 26 | VDD sense (ADC0) | analog |
 
@@ -108,14 +107,13 @@ features), and the pod must sit harmlessly on a running target while
 unpowered.
 
 Unpowered sides (TI datasheets in `third_party/ti/`):
-- Target off, pod on: 74AHCT125 inputs at 3.3 V with VCC = 0 are within
-  ratings: VI to 7 V at any VCC, clamp only below 0 V (SCLS264R, 5.1).
+- Target off, pod on: 74AHCT1G125 inputs at 3.3 V with VCC = 0 are within
+  ratings: VI to 7 V at any VCC, clamp only below 0 V (SCLS378P, 5.1).
 - Target off, pod on: the 74AHCT1G00's DSI_EN input at 3.3 V with
   VCC = 0 is within ratings: VI to 7 V at any VCC (SCLS316P, 5.1).
-- Pod off, target on: 74LVC125A inputs at 5 V with VCC = 0 are within
-  ratings: VI to 6.5 V, 5.5 V recommended, at any VCC (SCAS290T, 5.1,
-  5.3).  Its outputs face the unpowered Pico; no Ioff is specified,
-  and none is needed with both sides off.
+- Pod off, target on: 74LVC1G17 inputs at 5 V with VCC = 0 are within
+  ratings: VI to 6.5 V, 5.5 V recommended, at any VCC, and Ioff limits
+  the current to 10 µA (SCES351Y, 5.1, 5.3, 5.5).
 
 **Gotcha:** pin 8 is IFETCH (an output) when the CPU is not in BDM. Keep the DSI driver tristated until FREEZE is asserted.
 
@@ -274,8 +272,8 @@ the pod has its own.  Requests:
 - Pins: FREEZE, RESET, DS levels, VDD in millivolts, and ATEMP for
   the current stay in background mode (below).  DSO is a PIO
   pin, which embassy-rp gives no way to read, so it is not reported.
-  BERR is driven but not sensed.  The 74LVC125's channel B is a spare
-  that could sense it (TODO.md).
+  BERR is sensed on GP12 (U8); the firmware does not read it yet
+  (TODO.md).
 - ResetHalt, Halt: the sequences in Protocol summary; refused without
   VDD, and NoFreeze if FREEZE does not assert in 100 ms.  Each returns
   ATEMP.  Halt on a CPU already in background mode only returns it.
@@ -404,8 +402,8 @@ code and no `unsafe`; no USB request, so the protocol is unchanged.
 
 How to run each item and what to expect: `docs/bring-up.md`.
 
-- [ ] Schematic, breadboard first (Pico + 74AHCT125 + 74LVC125 +
-      74LVC1G17 + BSS138BKs), then the carrier
+- [ ] Schematic, breadboard first (Pico + 74AHCT1G125s + 74LVC1G17s +
+      BSS138BKs), then the carrier
 - [ ] PIO loopback (`bdm loopback`, GP3 to GP6): scope DSCLK/DSI,
       verify 17-bit framing and idle-high.  Data checked on an
       RP2040-Zero, unscoped: 36000 words ok at 1 MHz (1.745 s) and

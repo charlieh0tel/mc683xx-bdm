@@ -92,7 +92,7 @@ The Pico on the carrier, the BDM cable unplugged.
 bdm pins
 ```
 
-Expect FREEZE, RESET and DS low (the 100 kOhm pull-downs on U2's inputs)
+Expect FREEZE, RESET and DS low (the 100 kOhm pull-downs on the U4-U8 inputs)
 and VDD near 0 V.  With a 5 V bench supply on J1 pin 9 (VDD) and pin 3
 (GND), VDD should read 5.0 V within a few percent (the 100k/100k
 divider and the Pico's 3.3 V reference).  Record the error.
@@ -101,8 +101,8 @@ divider and the Pico's 3.3 V reference).  Record the error.
 
 Plug the cable into a running target with the pod's USB unplugged.
 
-- The target runs normally: R3 holds BKPT high, and U1's outputs are
-  off (PLAN.md, Hardware).
+- The target runs normally: R3 holds BKPT high, and U1's and U2's
+  outputs are off (PLAN.md, Hardware).
 - Scope BKPT and DSI at the header: no glitches as the cable goes in.
 
 ## 5. Reset into background mode
@@ -140,7 +140,7 @@ bdm go
 ```
 
 - DSI's driver turns off within 20 ns of FREEZE falling (PLAN.md,
-  Hardware: 74AHCT1G00 then 74AHCT125).
+  Hardware: 74AHCT1G00 then 74AHCT1G125).
 - IFETCH starts toggling only after that; any overlap shows as a step
   across R2 (100 Ohm).
 

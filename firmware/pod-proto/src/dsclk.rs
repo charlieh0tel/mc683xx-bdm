@@ -11,7 +11,8 @@ pub const DEFAULT_HZ: u32 = 1_000_000;
 /// after a rise, 234 ns at 4 MHz, against at most about 160 ns: up to 2
 /// CLKOUT (119 ns at 16.78 MHz) for the CPU to synchronize the rise and
 /// shift DSO (CPU32RM 7.2.7.1), 25 ns DSO delay (MC68331UM Table A-7),
-/// and 15 ns through both translators (SCLS264R 5.5, SCAS290T 5.6).
+/// and 15 ns through both translators: 8.5 ns into 50 pF for U1 and
+/// 4.6 ns for U5 (SCLS378P 5.6, SCES351Y 5.6).
 pub const MAX_HZ: u32 = 4_000_000;
 
 /// Fraction bits in the PIO clock divider (8.8 in hardware's 16.8).
