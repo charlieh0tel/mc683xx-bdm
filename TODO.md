@@ -6,8 +6,7 @@
 - USB PID from Raspberry Pi (PLAN.md, Open questions); then
   `pod-proto`'s VID and PID, and the README's udev rule.
 - Breadboard first: Pico + 74AHCT125 + 74LVC125 + 2N7002s.
-- Board stackup (JLC 2-layer 1.6 mm) and its table on User.Drawings,
-  by the owner in KiCad; then a release (`jlcpcb-release` skill).
+- Carrier release (`jlcpcb-release` skill).
 
 ## Firmware
 
