@@ -3748,36 +3748,25 @@
 	)
 	(wire
 		(pts
-			(xy 104.14 259.08)
-			(xy 104.14 261.62)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "5a30da52-c02b-547e-a044-ad891b88a7b1")
-	)
-	(wire
-		(pts
+			(xy 114.3 254)
 			(xy 111.76 254)
-			(xy 114.3 254)
 		)
 		(stroke
 			(width 0)
 			(type default)
 		)
-		(uuid "d352c8aa-0c21-500b-9a0e-7e54c5566209")
+		(uuid "2a1461d0-ea2e-583d-bc3f-0a8a38091852")
 	)
 	(wire
 		(pts
-			(xy 114.3 254)
-			(xy 114.3 256.54)
+			(xy 119.38 261.62)
+			(xy 119.38 264.16)
 		)
 		(stroke
 			(width 0)
 			(type default)
 		)
-		(uuid "aeb62511-c6c7-5192-ba1a-e3374e8e8452")
+		(uuid "d783c5d8-d805-53f3-821a-feef3bde8bd7")
 	)
 	(wire
 		(pts
@@ -4650,14 +4639,14 @@
 	)
 	(wire
 		(pts
-			(xy 101.6 259.08)
-			(xy 101.6 276.86)
+			(xy 114.3 251.46)
+			(xy 96.52 251.46)
 		)
 		(stroke
 			(width 0)
 			(type default)
 		)
-		(uuid "162fef1f-6f80-5927-b89f-7c795bce0bae")
+		(uuid "4f2bfc0a-bfc3-58aa-8244-a1b558da19a3")
 	)
 	(wire
 		(pts
@@ -4672,14 +4661,14 @@
 	)
 	(wire
 		(pts
-			(xy 106.68 259.08)
-			(xy 106.68 276.86)
+			(xy 114.3 256.54)
+			(xy 96.52 256.54)
 		)
 		(stroke
 			(width 0)
 			(type default)
 		)
-		(uuid "69165f9f-4c45-5bfe-8f44-f21be499cb29")
+		(uuid "25ac3e8f-3600-5d59-a06e-8241347f8793")
 	)
 	(wire
 		(pts
@@ -5671,14 +5660,14 @@
 		(uuid "72a03bdc-a135-5211-93bd-1f4d6fd97e97")
 	)
 	(label "SWCLK"
-		(at 101.6 276.86 90)
+		(at 96.52 251.46 0)
 		(effects
 			(font
 				(size 1.27 1.27)
 			)
 			(justify left bottom)
 		)
-		(uuid "bae07332-82b4-52f3-ac19-12a473957673")
+		(uuid "9c23620d-674c-54ea-849b-23fc9d98c577")
 	)
 	(label "SWDIO"
 		(at 144.78 175.26 180)
@@ -5691,14 +5680,14 @@
 		(uuid "46b93d14-338e-5929-8521-3e70000e3acd")
 	)
 	(label "SWDIO"
-		(at 106.68 276.86 90)
+		(at 96.52 256.54 0)
 		(effects
 			(font
 				(size 1.27 1.27)
 			)
 			(justify left bottom)
 		)
-		(uuid "89b587f0-71d2-5051-a4b0-cff18e68063f")
+		(uuid "0aac5fc6-622a-55fa-98fa-13d509557eb3")
 	)
 	(label "DSCLK_DRV"
 		(at 254 91.44 0)
@@ -6071,7 +6060,7 @@
 	)
 	(symbol
 		(lib_id "Connector_Generic_MountingPin:Conn_01x03_MountingPin")
-		(at 104.14 254 90)
+		(at 119.38 254 0)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -6081,29 +6070,29 @@
 		(dnp no)
 		(uuid "e58c3da4-671e-5f26-bd3a-0516cff50f70")
 		(property "Reference" "J2"
-			(at 96.52 252.476 270)
+			(at 124.46 252.476 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
-				(justify right)
+				(justify left)
 			)
 		)
 		(property "Value" "SWD"
-			(at 96.52 255.524 270)
+			(at 124.46 255.524 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
-				(justify right)
+				(justify left)
 			)
 		)
 		(property "Footprint" "Connector_JST:JST_SH_SM03B-SRSS-TB_1x03-1MP_P1.00mm_Horizontal"
-			(at 104.14 254 0)
+			(at 119.38 254 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -6114,7 +6103,7 @@
 			)
 		)
 		(property "Datasheet" "https://datasheets.raspberrypi.com/debug/debug-connector-specification.pdf"
-			(at 104.14 254 0)
+			(at 119.38 254 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -6125,7 +6114,7 @@
 			)
 		)
 		(property "Description" "Generic connectable mounting pin connector, single row, 01x03, script generated (kicad-library-utils/schlib/autogen/connector/)"
-			(at 104.14 254 0)
+			(at 119.38 254 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -6136,7 +6125,7 @@
 			)
 		)
 		(property "Manufacturer" "JST"
-			(at 104.14 254 0)
+			(at 119.38 254 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -6147,7 +6136,7 @@
 			)
 		)
 		(property "MPN" "SM03B-SRSS-TB(LF)(SN)"
-			(at 104.14 254 0)
+			(at 119.38 254 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -6158,7 +6147,7 @@
 			)
 		)
 		(property "LCSC" "C160403"
-			(at 104.14 254 0)
+			(at 119.38 254 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -6191,7 +6180,7 @@
 	)
 	(symbol
 		(lib_id "power:GND")
-		(at 104.14 261.62 0)
+		(at 111.76 254 270)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -6201,7 +6190,7 @@
 		(dnp no)
 		(uuid "54eb6df9-0439-582d-99c8-5a45ec6fcd47")
 		(property "Reference" "#PWR01"
-			(at 104.14 261.62 0)
+			(at 111.76 254 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -6212,7 +6201,7 @@
 			)
 		)
 		(property "Value" "GND"
-			(at 104.14 265.43 0)
+			(at 105.664 254 90)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -6222,7 +6211,7 @@
 			)
 		)
 		(property "Footprint" ""
-			(at 104.14 261.62 0)
+			(at 111.76 254 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -6233,7 +6222,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 104.14 261.62 0)
+			(at 111.76 254 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -6244,7 +6233,7 @@
 			)
 		)
 		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
-			(at 104.14 261.62 0)
+			(at 111.76 254 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -6268,7 +6257,7 @@
 	)
 	(symbol
 		(lib_id "power:GND")
-		(at 114.3 256.54 0)
+		(at 119.38 264.16 0)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -6278,7 +6267,7 @@
 		(dnp no)
 		(uuid "37a6cbe4-0893-52b6-8d35-ec0169aefaf3")
 		(property "Reference" "#PWR02"
-			(at 114.3 256.54 0)
+			(at 119.38 264.16 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -6289,7 +6278,7 @@
 			)
 		)
 		(property "Value" "GND"
-			(at 114.3 260.35 0)
+			(at 119.38 267.97 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -6299,7 +6288,7 @@
 			)
 		)
 		(property "Footprint" ""
-			(at 114.3 256.54 0)
+			(at 119.38 264.16 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -6310,7 +6299,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 114.3 256.54 0)
+			(at 119.38 264.16 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -6321,7 +6310,7 @@
 			)
 		)
 		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
-			(at 114.3 256.54 0)
+			(at 119.38 264.16 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
