@@ -50,14 +50,15 @@ for the log line.
 bdm pins
 ```
 
-Expect FREEZE, RESET and DS low (no carrier: GP5 is pulled down, GP4 and
+Expect FREEZE, RESET and DS low (no carrier: GP5 is pulled down, GP6 and
 GP7 float and may read either way).  VDD reads wherever GP26 floats
 without the carrier's divider: 1.06-1.14 V on an RP2040-Zero.  `bdm halt`
 fails with "no target power" (NoTarget): VDD is under 4.5 V.
 
 ## 2. Bare Pico: PIO loopback
 
-Jumper GP3 (DSI) to GP6 (DSO).  No carrier, no target.
+Jumper GP3 (DSI) to GP2 (DSO).  No carrier, no target.  On an
+RP2040-Zero they are pads 4 and 3, side by side.
 
 ```
 bdm loopback --rounds 100
@@ -67,7 +68,7 @@ Expect `loopback: 3600 words ok`.  Each word comes back as sent: DSO is
 sampled at the end of DSCLK's low phase, after DSI changed at the fall
 (PLAN.md, PIO program).
 
-Scope GP2 (DSCLK) and GP3 (DSI) during `bdm loopback`:
+Scope GP4 (DSCLK) and GP3 (DSI) during `bdm loopback`:
 
 - DSCLK idles high, and each word is 17 clocks.
 - The rate is 1 MHz (the default): low and high about 500 ns each.

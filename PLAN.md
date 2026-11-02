@@ -45,7 +45,7 @@ firmware and documentation are GPL-3.0-only (`LICENSE`).
 |---|---|---|
 | MCU | Pico (RP2040) or Pico 2 (RP2350), soldered flat by its castellated edge | USB to host; same footprint and pinout; hand-soldered, not in the assembly BOM |
 | 3.3 V → 5 V outputs | 74AHCT1G125 ×2 (U1 BKPT/DSCLK, U2 DSI), VCC = target VDD | 220 Ω series (R1, R2): about 20 mA if DSI and IFETCH overlap (MC68331UM Table A-1: 25 mA per pin), or into an unpowered 74AHCT1G125's output clamp if the cable's signals meet before its VDD (SCLS378P 5.1: ±20 mA); each its own OE |
-| 74AHCT1G125 input pull-downs | 100 kΩ to GND on GP2 and GP3 (R15, R16) | The inputs must not float (SCLS378P 5.3, note 1); the Pico's own pull-downs need it powered |
+| 74AHCT1G125 input pull-downs | 100 kΩ to GND on GP4 and GP3 (R15, R16) | The inputs must not float (SCLS378P 5.3, note 1); the Pico's own pull-downs need it powered |
 | U1 OE pull-up, BKPT/DSCLK | 1 kΩ to target VDD (R4), pulled low by Q3 (BSS138BK, gate on GP11, 100 kΩ gate pull-down) | The OE edge within the 74AHCT1G125's 20 ns/V (SCLS378P 5.3): about 8 ns/V into its 10 pF (5.5) and Q3's 7 pF; 5 mA from VDD while Q3 is on.  Output tristated while the pod is unpowered or booting.  Q3 keeps the target's 5 V off every Pico pin: a GPIO on this pull-up would see 5 V, over the RP2040's and RP2350's 3.63 V limit unpowered (RP2040 datasheet 5.5.2.1, RP2350 14.9.1) |
 | DSI enable gate | 74AHCT1G00 (U3), VCC = target VDD | Drives U2's OE: NAND(FREEZE, DSI_EN), so DSI is driven only while FREEZE is high and the Pico enables it |
 | DSI_EN pull-down | 100 kΩ to GND | DSI off while the pod is unpowered or booting |
@@ -80,11 +80,11 @@ Pico pins (GPn):
 
 | GP | Signal | Direction |
 |---|---|---|
-| 2 | BKPT/DSCLK | PIO side-set and set |
+| 2 | IPIPE/DSO | PIO in |
 | 3 | DSI | PIO out |
-| 4 | DS | in |
+| 4 | BKPT/DSCLK | PIO side-set and set |
 | 5 | FREEZE | in, pull-down |
-| 6 | IPIPE/DSO | PIO in |
+| 6 | DS | in |
 | 7 | RESET sense | in |
 | 8 | DSI_EN, to the 74AHCT1G00 | PIO set, high enables |
 | 9 | RESET drive (Q1 gate) | out, high asserts RESET |
@@ -404,7 +404,7 @@ How to run each item and what to expect: `docs/bring-up.md`.
 
 - [ ] Schematic, breadboard first (Pico + 74AHCT1G125s + 74LVC1G17s +
       BSS138BKs), then the carrier
-- [ ] PIO loopback (`bdm loopback`, GP3 to GP6): scope DSCLK/DSI,
+- [ ] PIO loopback (`bdm loopback`, GP3 to GP2): scope DSCLK/DSI,
       verify 17-bit framing and idle-high.  Data checked on an
       RP2040-Zero, unscoped: 36000 words ok at 1 MHz (1.745 s) and
       4 MHz (1.297 s), 36 words a USB round trip: 1.3 ms a round trip

@@ -119,7 +119,7 @@ enum Command {
         #[arg(long, value_parser = function_code, default_value = "5")]
         fc: FunctionCode,
     },
-    /// With DSI jumpered to DSO (GP3 to GP6) on a bare Pico, no
+    /// With DSI jumpered to DSO (GP3 to GP2) on a bare Pico, no
     /// target: each word should come back as sent.  Checks the PIO,
     /// framing and USB (docs/bring-up.md).
     Loopback {
