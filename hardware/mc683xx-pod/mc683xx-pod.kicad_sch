@@ -4492,337 +4492,238 @@
 			(width 0)
 			(type default)
 		)
-		(uuid "ee3d17ac-1005-5dbd-a8bd-be9050e04bf6")
+		(uuid "ba9e9de8-4440-5ee4-ab78-cce6d206d077")
 	)
 	(wire
 		(pts
-			(xy 144.78 193.04)
-			(xy 144.78 236.22)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "5c071c9d-4a7d-54aa-bb74-99ca662931c3")
-	)
-	(wire
-		(pts
-			(xy 144.78 236.22)
+			(xy 210.82 236.22)
 			(xy 228.6 236.22)
 		)
 		(stroke
 			(width 0)
 			(type default)
 		)
-		(uuid "8495bada-c63b-5d52-a381-137fc1ea709f")
+		(uuid "50cfc5c9-ad80-5670-9ae9-942f2b27247e")
 	)
 	(wire
 		(pts
 			(xy 127 195.58)
-			(xy 147.32 195.58)
+			(xy 144.78 195.58)
 		)
 		(stroke
 			(width 0)
 			(type default)
 		)
-		(uuid "ff9e0673-b4db-5c73-9c7c-457ef136302c")
+		(uuid "0859f066-858f-5cd6-9c2c-bb34d7424015")
 	)
 	(wire
 		(pts
-			(xy 147.32 195.58)
-			(xy 147.32 132.08)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "6c1fd429-e53d-5e66-9ef2-5abd9ea41491")
-	)
-	(wire
-		(pts
-			(xy 147.32 132.08)
+			(xy 160.02 132.08)
 			(xy 223.52 132.08)
 		)
 		(stroke
 			(width 0)
 			(type default)
 		)
-		(uuid "d71659ba-510c-5fc3-bc61-80c38ada242b")
-	)
-	(wire
-		(pts
-			(xy 127 200.66)
-			(xy 228.6 200.66)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "0f65d8a3-c9b7-5862-b787-65ed8ceba724")
-	)
-	(wire
-		(pts
-			(xy 127 213.36)
-			(xy 152.4 213.36)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "31ef7ffa-23f3-5cef-96f7-839580c43741")
-	)
-	(wire
-		(pts
-			(xy 152.4 213.36)
-			(xy 152.4 378.46)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "0f80b862-bd5c-5174-907b-73437a28be27")
-	)
-	(wire
-		(pts
-			(xy 152.4 378.46)
-			(xy 271.78 378.46)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "ba6ede12-0e1d-5f91-ac9c-07ffa094fc41")
-	)
-	(wire
-		(pts
-			(xy 127 210.82)
-			(xy 154.94 210.82)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "0f89ef9e-ed13-5c33-bb4c-cbf2fdcdd09d")
-	)
-	(wire
-		(pts
-			(xy 154.94 210.82)
-			(xy 154.94 292.1)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "bfc035d0-68d6-50d2-b96a-f9fb03d2e58b")
-	)
-	(wire
-		(pts
-			(xy 154.94 292.1)
-			(xy 271.78 292.1)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "0d59cccf-a157-5dd4-838e-17215686f7eb")
+		(uuid "76a9543a-d6ef-5ad9-9137-756b791bb8f5")
 	)
 	(wire
 		(pts
 			(xy 127 198.12)
-			(xy 157.48 198.12)
+			(xy 144.78 198.12)
 		)
 		(stroke
 			(width 0)
 			(type default)
 		)
-		(uuid "cf8a2f22-4e84-50b5-abe0-b7d5e163131b")
+		(uuid "2a074046-1058-5c3c-a70a-fd404001f653")
 	)
 	(wire
 		(pts
-			(xy 157.48 198.12)
-			(xy 157.48 91.44)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "49f808fa-0ab9-5630-a46e-de851216f7fa")
-	)
-	(wire
-		(pts
-			(xy 157.48 91.44)
+			(xy 160.02 91.44)
 			(xy 223.52 91.44)
 		)
 		(stroke
 			(width 0)
 			(type default)
 		)
-		(uuid "312d3928-6d00-5d2f-85d7-8f620d6c26f1")
+		(uuid "69787402-b6eb-5768-a78f-37ea74eb85ca")
 	)
 	(wire
 		(pts
-			(xy 127 205.74)
-			(xy 160.02 205.74)
+			(xy 127 200.66)
+			(xy 144.78 200.66)
 		)
 		(stroke
 			(width 0)
 			(type default)
 		)
-		(uuid "2563170b-2657-54e0-b0fd-ea4d26837803")
+		(uuid "b9804aaa-bd4e-599b-bad1-53bea195df4f")
 	)
 	(wire
 		(pts
-			(xy 160.02 205.74)
-			(xy 160.02 271.78)
+			(xy 210.82 200.66)
+			(xy 228.6 200.66)
 		)
 		(stroke
 			(width 0)
 			(type default)
 		)
-		(uuid "66c74bda-8895-5cef-946e-c166be420367")
-	)
-	(wire
-		(pts
-			(xy 160.02 271.78)
-			(xy 228.6 271.78)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "3c33baff-344e-5bfe-98ca-d691018682d4")
+		(uuid "55dca5eb-1cf4-53d8-b1e5-5782bb9ad471")
 	)
 	(wire
 		(pts
 			(xy 127 203.2)
-			(xy 165.1 203.2)
+			(xy 144.78 203.2)
 		)
 		(stroke
 			(width 0)
 			(type default)
 		)
-		(uuid "a8fa577b-fd25-5893-8a9a-9e4a773beddd")
+		(uuid "075b33d3-fb6d-51bc-8e29-5e7314fc1550")
 	)
 	(wire
 		(pts
-			(xy 165.1 203.2)
-			(xy 165.1 322.58)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "a5c59be1-d7f5-5afd-8acd-c0b2ecbfad9a")
-	)
-	(wire
-		(pts
-			(xy 165.1 322.58)
+			(xy 210.82 322.58)
 			(xy 228.6 322.58)
 		)
 		(stroke
 			(width 0)
 			(type default)
 		)
-		(uuid "bfc8faa9-cea5-5f18-b714-88449f6c5c09")
+		(uuid "b5e3a630-32d3-54a5-9bdc-3a74a6aac509")
 	)
 	(wire
 		(pts
-			(xy 127 215.9)
-			(xy 167.64 215.9)
+			(xy 127 205.74)
+			(xy 144.78 205.74)
 		)
 		(stroke
 			(width 0)
 			(type default)
 		)
-		(uuid "46d0b26d-dfd8-5ef6-a710-e12dcd6fe173")
+		(uuid "7bfe0f58-c955-50d3-ae3b-710667da3929")
 	)
 	(wire
 		(pts
-			(xy 167.64 215.9)
-			(xy 167.64 55.88)
+			(xy 210.82 271.78)
+			(xy 228.6 271.78)
 		)
 		(stroke
 			(width 0)
 			(type default)
 		)
-		(uuid "8db41ac2-5e34-5913-96fd-512ae771aa0b")
-	)
-	(wire
-		(pts
-			(xy 167.64 55.88)
-			(xy 215.9 55.88)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "a8598f08-ac62-5d18-a3a2-40302ae98bfd")
+		(uuid "2b076b3f-1f32-5e51-a9f2-033515f7538d")
 	)
 	(wire
 		(pts
 			(xy 127 208.28)
-			(xy 162.56 208.28)
+			(xy 144.78 208.28)
 		)
 		(stroke
 			(width 0)
 			(type default)
 		)
-		(uuid "8e2d169d-e37e-58da-ba4a-9166e93dfd26")
+		(uuid "66073975-1049-5fe0-8fdf-8038f70037a3")
 	)
 	(wire
 		(pts
-			(xy 162.56 208.28)
-			(xy 162.56 157.48)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "acee1382-cbbd-5b6b-a66e-d90d02bcd3b0")
-	)
-	(wire
-		(pts
-			(xy 162.56 157.48)
+			(xy 170.18 157.48)
 			(xy 187.96 157.48)
 		)
 		(stroke
 			(width 0)
 			(type default)
 		)
-		(uuid "ca07c470-fde2-5314-a34c-f02ddb947653")
+		(uuid "83cd5249-60af-595b-a870-57d8e572faa0")
+	)
+	(wire
+		(pts
+			(xy 127 210.82)
+			(xy 144.78 210.82)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "24b3d831-a2f1-5bbb-8b03-0a81aa2cd41a")
+	)
+	(wire
+		(pts
+			(xy 254 292.1)
+			(xy 271.78 292.1)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "1fa9982c-2bbb-532a-bd14-4713dbcbb9a3")
+	)
+	(wire
+		(pts
+			(xy 127 213.36)
+			(xy 144.78 213.36)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "242e4ed4-8a6c-5c1d-a6ed-29ab00364e72")
+	)
+	(wire
+		(pts
+			(xy 254 378.46)
+			(xy 271.78 378.46)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "19bc76d4-c472-5a20-8f16-55aa76b02014")
+	)
+	(wire
+		(pts
+			(xy 127 215.9)
+			(xy 144.78 215.9)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "395daa0e-a39a-5960-8814-fb0cadd2a8a3")
+	)
+	(wire
+		(pts
+			(xy 170.18 55.88)
+			(xy 215.9 55.88)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "f75e67d8-1836-5b84-b170-ff47b04f97bb")
 	)
 	(wire
 		(pts
 			(xy 127 218.44)
-			(xy 170.18 218.44)
+			(xy 144.78 218.44)
 		)
 		(stroke
 			(width 0)
 			(type default)
 		)
-		(uuid "86372e32-0a8a-59b3-a4ce-ed72c6a92d74")
+		(uuid "38e1032e-7fe2-5026-bd6a-580a75c50487")
 	)
 	(wire
 		(pts
-			(xy 170.18 218.44)
-			(xy 170.18 358.14)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "eb05dd54-00ce-5f2e-bc9c-519bbc3c7b44")
-	)
-	(wire
-		(pts
-			(xy 170.18 358.14)
+			(xy 210.82 358.14)
 			(xy 228.6 358.14)
 		)
 		(stroke
 			(width 0)
 			(type default)
 		)
-		(uuid "fe1fd3b8-0b48-57d5-9ee9-cb5ce6da036b")
+		(uuid "3c6008b6-d101-53b2-9258-f8c72543cedf")
 	)
 	(wire
 		(pts
@@ -5583,15 +5484,225 @@
 		)
 		(uuid "9c52fcb4-8dd6-573e-a824-cdb34be9877b")
 	)
-	(label "DSCLK_OUT"
-		(at 129.54 198.12 0)
+	(label "DSO_IN"
+		(at 144.78 193.04 180)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right bottom)
+		)
+		(uuid "16980ef1-c58e-5ede-a6c8-3e3a7b09767f")
+	)
+	(label "DSO_IN"
+		(at 210.82 236.22 0)
 		(effects
 			(font
 				(size 1.27 1.27)
 			)
 			(justify left bottom)
 		)
-		(uuid "11a1f618-e6f8-554f-acbf-5ef1831c02d5")
+		(uuid "b3d62dbf-911c-5d46-9e9f-f85f86162770")
+	)
+	(label "DSI_OUT"
+		(at 144.78 195.58 180)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right bottom)
+		)
+		(uuid "0d77957b-e0c5-5610-be09-2c9774b8678b")
+	)
+	(label "DSI_OUT"
+		(at 160.02 132.08 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "8ec8a5a8-8050-50e9-9a27-48d887d893ff")
+	)
+	(label "DSCLK_OUT"
+		(at 144.78 198.12 180)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right bottom)
+		)
+		(uuid "1ab6118a-3f2e-540b-b90b-b0049698a0bb")
+	)
+	(label "DSCLK_OUT"
+		(at 160.02 91.44 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "37966ca7-323d-5c54-9349-88dfda082b68")
+	)
+	(label "FREEZE_IN"
+		(at 144.78 200.66 180)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right bottom)
+		)
+		(uuid "c4a1f5ee-39cb-5e41-b532-3f88758df577")
+	)
+	(label "FREEZE_IN"
+		(at 210.82 200.66 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "3c8cb73a-fcaf-5d9f-9e33-846cd046b29c")
+	)
+	(label "DS_IN"
+		(at 144.78 203.2 180)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right bottom)
+		)
+		(uuid "031bc7dd-81ee-5bbe-9a03-e541059174f4")
+	)
+	(label "DS_IN"
+		(at 210.82 322.58 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "6fcf05c3-9c81-5018-af88-f37a2b59f8f8")
+	)
+	(label "RESET_IN"
+		(at 144.78 205.74 180)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right bottom)
+		)
+		(uuid "e5f2bfe0-c9c2-5319-94ff-d5a666349943")
+	)
+	(label "RESET_IN"
+		(at 210.82 271.78 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "40e18bfa-bc41-56d1-8d50-2ca4ef44ac11")
+	)
+	(label "DSI_EN"
+		(at 144.78 208.28 180)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right bottom)
+		)
+		(uuid "c8b54501-2f4f-5d0a-9427-c7b7365b2e8a")
+	)
+	(label "DSI_EN"
+		(at 170.18 157.48 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "46d3b76e-4890-5a42-8bde-57a96b970a14")
+	)
+	(label "RESET_DRV"
+		(at 144.78 210.82 180)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right bottom)
+		)
+		(uuid "1cfee14d-88de-5666-a25d-52b2cd35c1ca")
+	)
+	(label "RESET_DRV"
+		(at 254 292.1 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "453a0c68-3d43-5c9a-964a-612ff017a8df")
+	)
+	(label "BERR_DRV"
+		(at 144.78 213.36 180)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right bottom)
+		)
+		(uuid "12d165bf-124a-508e-ace8-3a998d72170b")
+	)
+	(label "BERR_DRV"
+		(at 254 378.46 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "7b4b779c-36fb-58e7-9c4f-502f81aca1fb")
+	)
+	(label "DSCLK_EN"
+		(at 144.78 215.9 180)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right bottom)
+		)
+		(uuid "0e25d796-82f2-5afd-8cf5-7e832e7f5045")
+	)
+	(label "DSCLK_EN"
+		(at 170.18 55.88 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "a8ed1a9f-1480-5d1a-95b9-9e53a9039a51")
+	)
+	(label "BERR_IN"
+		(at 144.78 218.44 180)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right bottom)
+		)
+		(uuid "61d33564-7f5e-5bf6-b090-845c896f5c9b")
+	)
+	(label "BERR_IN"
+		(at 210.82 358.14 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "8ec321bb-4504-5f1a-aff0-53b1394642cd")
 	)
 	(label "DSCLK_DRV"
 		(at 254 91.44 0)
@@ -5612,16 +5723,6 @@
 			(justify left bottom)
 		)
 		(uuid "0806312e-e0da-503d-8bb1-b767962cdc9c")
-	)
-	(label "DSI_OUT"
-		(at 129.54 195.58 0)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left bottom)
-		)
-		(uuid "a0124fd2-3660-58bd-979c-f9006eb06047")
 	)
 	(label "DSI_DRV"
 		(at 259.08 132.08 0)
@@ -5653,16 +5754,6 @@
 		)
 		(uuid "e22e1c66-54a6-55a1-bc8d-0cece84a83fb")
 	)
-	(label "DSO_IN"
-		(at 129.54 193.04 0)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left bottom)
-		)
-		(uuid "88c137c6-49b2-5847-9917-2e3ee91533a8")
-	)
 	(label "FREEZE"
 		(at 254 200.66 0)
 		(effects
@@ -5672,16 +5763,6 @@
 			(justify left bottom)
 		)
 		(uuid "d3e7ad30-0730-5374-be78-56b5a3c3c29e")
-	)
-	(label "FREEZE_IN"
-		(at 129.54 200.66 0)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left bottom)
-		)
-		(uuid "64cf8ac2-5fd9-51ad-941f-9f2da1508799")
 	)
 	(label "RESET"
 		(at 254 271.78 0)
@@ -5693,16 +5774,6 @@
 		)
 		(uuid "bf2784f0-26f1-50e1-949d-020c16000310")
 	)
-	(label "RESET_IN"
-		(at 129.54 205.74 0)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left bottom)
-		)
-		(uuid "8f835e75-c0cc-5a9c-837c-b5984f0ff4c4")
-	)
 	(label "DS"
 		(at 254 322.58 0)
 		(effects
@@ -5712,16 +5783,6 @@
 			(justify left bottom)
 		)
 		(uuid "8c6b8be7-eaea-56d5-b047-90a70a5c348d")
-	)
-	(label "DS_IN"
-		(at 129.54 203.2 0)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left bottom)
-		)
-		(uuid "6fe71b92-2f75-540e-a73d-49e284c2e1a3")
 	)
 	(label "BERR"
 		(at 254 358.14 0)
@@ -5733,46 +5794,6 @@
 		)
 		(uuid "f32e36b4-c403-5888-9eca-bae2c0db2e25")
 	)
-	(label "BERR_IN"
-		(at 129.54 218.44 0)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left bottom)
-		)
-		(uuid "9d8e6096-4362-5cd3-ad0e-4c01911f2afd")
-	)
-	(label "RESET_DRV"
-		(at 129.54 210.82 0)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left bottom)
-		)
-		(uuid "dc728fd9-1109-5d7c-9ef5-7e9da9bb02fe")
-	)
-	(label "BERR_DRV"
-		(at 129.54 213.36 0)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left bottom)
-		)
-		(uuid "6b6e104d-07a1-5b10-a465-8fb7e391cc60")
-	)
-	(label "DSCLK_EN"
-		(at 129.54 215.9 0)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left bottom)
-		)
-		(uuid "f72f03a7-5ee6-5c1c-86cc-55fa3448a622")
-	)
 	(label "DSCLK_OE_N"
 		(at 223.52 66.04 0)
 		(effects
@@ -5782,16 +5803,6 @@
 			(justify left bottom)
 		)
 		(uuid "e1ff8bc6-8423-5655-a7b2-947123f87eee")
-	)
-	(label "DSI_EN"
-		(at 129.54 208.28 0)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left bottom)
-		)
-		(uuid "84e09359-dada-5da9-9ba6-c100bb97ac4a")
 	)
 	(label "DSI_OE_N"
 		(at 228.6 154.94 0)
@@ -5833,7 +5844,7 @@
 		)
 		(uuid "42914e9a-1a31-5cf8-ad0b-c5d580b7a75c")
 	)
-	(text "NOTES (PLAN.md, Hardware and Target connector)\n\n1. A1 is a Raspberry Pi Pico or Pico 2, soldered flat by its castellated\n   edge (Module:RaspberryPi_Pico_SMD_HandSolder; same for both), by hand:\n   JLCPCB does not place it, so it is excluded from the BOM.  USB to the\n   host; 3V3 is its regulator's output.  GP25 is the Pico's own LED.\n2. J1 is the CPU32 BDM header, drawn by function: 1 DS, 2 BERR, 3 GND,\n   4 BKPT/DSCLK, 5 GND, 6 FREEZE, 7 RESET, 8 IFETCH/DSI, 9 VDD, 10 IPIPE/DSO.\n   VDD is the target's supply (about 5 V); it powers U1, U2 and U3 only.\n3. 3.3 V to 5 V: U1, U2 (74AHCT1G125, VCC = VDD) drive BKPT/DSCLK and DSI\n   through R1, R2 (220 ohm), which limit the current to about 20 mA if\n   DSI overlaps IFETCH or the cable's signals meet before its VDD, and\n   source-terminate the cable.  R4 (1k) pulls U1's output enable up to\n   VDD, an edge within the 74AHCT1G125's 20 ns/V; Q3 pulls it low when\n   GP11 is high, so no Pico pin is ever tied to the target's 5 V.  R15,\n   R16 (100k) hold U1's and U2's inputs low while the Pico is unpowered.\n4. U3 enables DSI only for NAND(FREEZE, DSI_EN), so DSI turns off within\n   20 ns of FREEZE falling, whatever ends background mode.  Pin 8 is\n   IFETCH, a CPU output, whenever FREEZE is negated.  U3 takes FREEZE\n   from J1, the 5 V side.\n5. 5 V to 3.3 V: U4-U8 (74LVC1G17, Schmitt trigger, VCC = 3V3) buffer\n   RESET, IPIPE/DSO, FREEZE, DS and BERR to GP7, GP2, GP5, GP6 and GP12.\n   RESET and BERR are open drain on the target and rise as its pull-ups\n   let them.  Inputs take 5.5 V at any VCC.  R10-R13, R17 (100k) hold the\n   inputs low with the cable unplugged, against at most 5 uA of input\n   leakage; 50 uA at 5 V is negligible load on the target.\n6. Q1, Q2 (BSS138BK, RDS(on) specified at VGS = 2.5 V) pull RESET and BERR\n   low, open drain, from GP9 and GP10.\n7. Unpowered pod, target running: R3 holds BKPT/DSCLK high so the target\n   runs; R4 holds U1 disabled, with Q3 off (R14); R5 holds DSI_EN low, so\n   U2 is disabled; R6, R7 hold Q1, Q2 off.  The same holds while the Pico\n   boots.\n8. Unpowered target, pod running: U1, U2 and U3 inputs at 3.3 V with\n   VCC = 0 are within ratings (to 7 V at any VCC).\n9. VDD sense: R8 / R9 halve VDD into GP26 (ADC0), 2.75 V at 5.5 V; 100k\n   limits current into an unpowered Pico.  Firmware refuses halt and reset\n   below 4.5 V.  The divider returns to AGND, which is tied to GND.\n   C4 (100 nF) holds GP26 against the RP2040 ADC's sampling, which the\n   divider's 50k source impedance could not recharge in time.\n10. Net labels name the nets for routing.  DSCLK_OUT, DSCLK_DRV,\n   BKPT_DSCLK, DSI_OUT, DSI_DRV, IFETCH_DSI, IPIPE_DSO and DSO_IN are the\n   Fast net class.\n11. C1-C3 decouple U1-U3 on VDD, C5-C9 U4-U8 on 3V3, each at its VCC pin.\n   No bulk capacitor on VDD: the pod draws a few mA from the target, and\n   a bulk capacitor would load the target's supply when the pod is\n   plugged in.\n12. Pico GND, AGND and J1 pins 3 and 5 are one net.\n13. SWD: the Pico's debug pads (D1 SWCLK, D2 GND, D3 SWDIO) to J2, the\n   Raspberry Pi 3-pin debug connector (JST SH: 1 SWCLK, 2 GND, 3 SWDIO), for\n   the Debug Probe's cable.  The RP2040 pulls SWDIO and SWCLK up internally,\n   about 60k (Pico datasheet 4.8), so there are no external pull-ups.\n14. Layout: the Pico's USB connector end and J2 at the carrier's edge, both\n   reachable with the Pico soldered flat.\n15. H1-H4: M3 mounting holes in the corners, plated, each ringed with\n   vias, on GND."
+	(text "NOTES (PLAN.md, Hardware and Target connector)\n\n1. A1 is a Raspberry Pi Pico or Pico 2, soldered flat by its castellated\n   edge (Module:RaspberryPi_Pico_SMD_HandSolder; same for both), by hand:\n   JLCPCB does not place it, so it is excluded from the BOM.  USB to the\n   host; 3V3 is its regulator's output.  GP25 is the Pico's own LED.\n2. J1 is the CPU32 BDM header, drawn by function: 1 DS, 2 BERR, 3 GND,\n   4 BKPT/DSCLK, 5 GND, 6 FREEZE, 7 RESET, 8 IFETCH/DSI, 9 VDD, 10 IPIPE/DSO.\n   VDD is the target's supply (about 5 V); it powers U1, U2 and U3 only.\n3. 3.3 V to 5 V: U1, U2 (74AHCT1G125, VCC = VDD) drive BKPT/DSCLK and DSI\n   through R1, R2 (220 ohm), which limit the current to about 20 mA if\n   DSI overlaps IFETCH or the cable's signals meet before its VDD, and\n   source-terminate the cable.  R4 (1k) pulls U1's output enable up to\n   VDD, an edge within the 74AHCT1G125's 20 ns/V; Q3 pulls it low when\n   GP11 is high, so no Pico pin is ever tied to the target's 5 V.  R15,\n   R16 (100k) hold U1's and U2's inputs low while the Pico is unpowered.\n4. U3 enables DSI only for NAND(FREEZE, DSI_EN), so DSI turns off within\n   20 ns of FREEZE falling, whatever ends background mode.  Pin 8 is\n   IFETCH, a CPU output, whenever FREEZE is negated.  U3 takes FREEZE\n   from J1, the 5 V side.\n5. 5 V to 3.3 V: U4-U8 (74LVC1G17, Schmitt trigger, VCC = 3V3) buffer\n   RESET, IPIPE/DSO, FREEZE, DS and BERR to GP7, GP2, GP5, GP6 and GP12.\n   RESET and BERR are open drain on the target and rise as its pull-ups\n   let them.  Inputs take 5.5 V at any VCC.  R10-R13, R17 (100k) hold the\n   inputs low with the cable unplugged, against at most 5 uA of input\n   leakage; 50 uA at 5 V is negligible load on the target.\n6. Q1, Q2 (BSS138BK, RDS(on) specified at VGS = 2.5 V) pull RESET and BERR\n   low, open drain, from GP9 and GP10.\n7. Unpowered pod, target running: R3 holds BKPT/DSCLK high so the target\n   runs; R4 holds U1 disabled, with Q3 off (R14); R5 holds DSI_EN low, so\n   U2 is disabled; R6, R7 hold Q1, Q2 off.  The same holds while the Pico\n   boots.\n8. Unpowered target, pod running: U1, U2 and U3 inputs at 3.3 V with\n   VCC = 0 are within ratings (to 7 V at any VCC).\n9. VDD sense: R8 / R9 halve VDD into GP26 (ADC0), 2.75 V at 5.5 V; 100k\n   limits current into an unpowered Pico.  Firmware refuses halt and reset\n   below 4.5 V.  The divider returns to AGND, which is tied to GND.\n   C4 (100 nF) holds GP26 against the RP2040 ADC's sampling, which the\n   divider's 50k source impedance could not recharge in time.\n10. Net labels name the nets for routing.  Each GPIO joins its circuit\n   by label alone: to move a signal to another GPIO, move its label on\n   A1's side, and its pin in the firmware.  DSCLK_OUT, DSCLK_DRV,\n   BKPT_DSCLK, DSI_OUT, DSI_DRV, IFETCH_DSI, IPIPE_DSO and DSO_IN are the\n   Fast net class.\n11. C1-C3 decouple U1-U3 on VDD, C5-C9 U4-U8 on 3V3, each at its VCC pin.\n   No bulk capacitor on VDD: the pod draws a few mA from the target, and\n   a bulk capacitor would load the target's supply when the pod is\n   plugged in.\n12. Pico GND, AGND and J1 pins 3 and 5 are one net.\n13. SWD: the Pico's debug pads (D1 SWCLK, D2 GND, D3 SWDIO) to J2, the\n   Raspberry Pi 3-pin debug connector (JST SH: 1 SWCLK, 2 GND, 3 SWDIO), for\n   the Debug Probe's cable.  The RP2040 pulls SWDIO and SWCLK up internally,\n   about 60k (Pico datasheet 4.8), so there are no external pull-ups.\n14. Layout: the Pico's USB connector end and J2 at the carrier's edge, both\n   reachable with the Pico soldered flat.\n15. H1-H4: M3 mounting holes in the corners, plated, each ringed with\n   vias, on GND."
 		(exclude_from_sim no)
 		(at 370.84 116.84 0)
 		(effects
