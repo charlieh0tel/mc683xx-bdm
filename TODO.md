@@ -2,7 +2,7 @@
 
 ## Hardware
 
-- Schematic: owner's KiCad pass on the draft (`hardware/m683xx-pod/`).
+- Schematic: owner's KiCad pass on the draft (`hardware/mc683xx-pod/`).
 - USB PID from Raspberry Pi (PLAN.md, Open questions); then
   `pod-proto`'s VID and PID, and the README's udev rule.
 - Breadboard first: Pico + 74AHCT125 + 74LVC125 + 2N7002s.

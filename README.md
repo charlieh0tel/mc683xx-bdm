@@ -1,4 +1,4 @@
-# m683xx-pod
+# mc683xx-pod
 
 A USB background debug mode (BDM) pod for Motorola/Freescale CPU32
 (683xx) microcontrollers, primarily the MC68331: a Raspberry Pi Pico or
@@ -8,7 +8,7 @@ are Rust.
 
 Status: firmware and host CLI pass a PIO loopback on a bare RP2040, no
 target yet (`docs/bring-up.md`, steps 1-2); the carrier
-(`hardware/m683xx-pod/`) is routed, 68 x 59 mm on 2 layers, DRC clean,
+(`hardware/mc683xx-pod/`) is routed, 68 x 59 mm on 2 layers, DRC clean,
 not yet ordered.
 
 ## Layout
@@ -18,7 +18,7 @@ not yet ordered.
 | `PLAN.md` | the design and why it is the way it is |
 | `TODO.md` | the work list |
 | `docs/` | the host-pod protocol (`usb-protocol.md`), bring-up steps (`bring-up.md`) |
-| `hardware/` | the KiCad carrier board; `ee_tooling/`, the shared tooling (a submodule following its `main`), whose `jlcpcb-release` builds a JLCPCB order; `fastcheck.py`, a report on the BDM link's fast nets (`uv run python fastcheck.py m683xx-pod/m683xx-pod.kicad_pcb`) |
+| `hardware/` | the KiCad carrier board; `ee_tooling/`, the shared tooling (a submodule following its `main`), whose `jlcpcb-release` builds a JLCPCB order; `fastcheck.py`, a report on the BDM link's fast nets (`uv run python fastcheck.py mc683xx-pod/mc683xx-pod.kicad_pcb`) |
 | `production/` | each release as ordered |
 | `firmware/` | the Rust workspace: firmware, host CLI, shared crates |
 | `third_party/` | vendor documents and their provenance (`NOTICE`) |
@@ -51,7 +51,7 @@ cargo run -p pod-host --bin bdm -- --pod unix:/tmp/pod.sock reset
 ```
 
 Without root on Linux, the pod needs a udev rule, e.g.
-`/etc/udev/rules.d/70-m683xx-pod.rules`:
+`/etc/udev/rules.d/70-mc683xx-pod.rules`:
 
 ```
 SUBSYSTEM=="usb", ATTRS{idVendor}=="1209", ATTRS{idProduct}=="0001", TAG+="uaccess"

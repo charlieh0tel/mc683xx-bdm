@@ -8,7 +8,7 @@
 	)
 	(paper "A4")
 	(title_block
-		(title "m683xx-pod")
+		(title "mc683xx-pod")
 		(date "2026-10-31")
 		(rev "0.1")
 		(comment 1 "USB BDM pod for CPU32 (683xx): Pico carrier with 5 V level translators")
@@ -233,7 +233,7 @@
 		)
 		(path "/cef52d58-0ca1-5436-ac51-2c6d11159177")
 		(sheetname "/")
-		(sheetfile "m683xx-pod.kicad_sch")
+		(sheetfile "mc683xx-pod.kicad_sch")
 		(attr smd)
 		(duplicate_pad_numbers_are_jumpers no)
 		(fp_line
@@ -420,7 +420,7 @@
 		)
 		(path "/50d52c23-836e-5065-8083-a1ee1fe0d8c8")
 		(sheetname "/")
-		(sheetfile "m683xx-pod.kicad_sch")
+		(sheetfile "mc683xx-pod.kicad_sch")
 		(attr exclude_from_pos_files exclude_from_bom)
 		(duplicate_pad_numbers_are_jumpers no)
 		(fp_circle
@@ -649,7 +649,7 @@
 		)
 		(path "/cfda8dd0-54ac-5c5e-bca8-701b0b3f5baf")
 		(sheetname "/")
-		(sheetfile "m683xx-pod.kicad_sch")
+		(sheetfile "mc683xx-pod.kicad_sch")
 		(attr smd)
 		(duplicate_pad_numbers_are_jumpers no)
 		(fp_line
@@ -1055,7 +1055,7 @@
 		)
 		(path "/0b03f172-7dda-44c3-986f-f1d6f0404075")
 		(sheetname "/")
-		(sheetfile "m683xx-pod.kicad_sch")
+		(sheetfile "mc683xx-pod.kicad_sch")
 		(attr smd)
 		(duplicate_pad_numbers_are_jumpers no)
 		(fp_line
@@ -1500,7 +1500,7 @@
 		)
 		(path "/e58c3da4-671e-5f26-bd3a-0516cff50f70")
 		(sheetname "/")
-		(sheetfile "m683xx-pod.kicad_sch")
+		(sheetfile "mc683xx-pod.kicad_sch")
 		(attr smd)
 		(duplicate_pad_numbers_are_jumpers no)
 		(fp_line
@@ -1949,7 +1949,7 @@
 		)
 		(path "/808c3a4c-f33f-5298-afda-bbb0ffa0e576")
 		(sheetname "/")
-		(sheetfile "m683xx-pod.kicad_sch")
+		(sheetfile "mc683xx-pod.kicad_sch")
 		(attr exclude_from_pos_files exclude_from_bom)
 		(duplicate_pad_numbers_are_jumpers no)
 		(fp_circle
@@ -2178,7 +2178,7 @@
 		)
 		(path "/edc36d58-24fb-5f76-8b62-cd0d794e9f14")
 		(sheetname "/")
-		(sheetfile "m683xx-pod.kicad_sch")
+		(sheetfile "mc683xx-pod.kicad_sch")
 		(attr smd)
 		(duplicate_pad_numbers_are_jumpers no)
 		(fp_line
@@ -2584,7 +2584,7 @@
 		)
 		(path "/919b627d-fa93-449a-96f4-d4a0df475e98")
 		(sheetname "/")
-		(sheetfile "m683xx-pod.kicad_sch")
+		(sheetfile "mc683xx-pod.kicad_sch")
 		(attr smd)
 		(duplicate_pad_numbers_are_jumpers no)
 		(fp_line
@@ -3028,7 +3028,7 @@
 		)
 		(path "/69d1eca4-92ff-51bb-bb8e-b938c8abed71")
 		(sheetname "/")
-		(sheetfile "m683xx-pod.kicad_sch")
+		(sheetfile "mc683xx-pod.kicad_sch")
 		(attr smd)
 		(duplicate_pad_numbers_are_jumpers no)
 		(fp_line
@@ -3214,7 +3214,7 @@
 		)
 		(path "/2eb7adc7-ca87-5f4b-afa2-9b3b32acf4bd")
 		(sheetname "/")
-		(sheetfile "m683xx-pod.kicad_sch")
+		(sheetfile "mc683xx-pod.kicad_sch")
 		(attr smd)
 		(duplicate_pad_numbers_are_jumpers no)
 		(fp_line
@@ -3400,7 +3400,7 @@
 		)
 		(path "/8b9d7059-f5e7-53dd-bf7d-12fb6d4dcdf1")
 		(sheetname "/")
-		(sheetfile "m683xx-pod.kicad_sch")
+		(sheetfile "mc683xx-pod.kicad_sch")
 		(attr smd)
 		(duplicate_pad_numbers_are_jumpers no)
 		(fp_line
@@ -3586,7 +3586,7 @@
 		)
 		(path "/055b7519-ecc6-53dc-bb66-cc4a31640534")
 		(sheetname "/")
-		(sheetfile "m683xx-pod.kicad_sch")
+		(sheetfile "mc683xx-pod.kicad_sch")
 		(attr smd)
 		(duplicate_pad_numbers_are_jumpers no)
 		(fp_line
@@ -3772,7 +3772,7 @@
 		)
 		(path "/585d949e-e368-56bb-97bd-13102b373920")
 		(sheetname "/")
-		(sheetfile "m683xx-pod.kicad_sch")
+		(sheetfile "mc683xx-pod.kicad_sch")
 		(attr smd)
 		(duplicate_pad_numbers_are_jumpers no)
 		(fp_line
@@ -3958,7 +3958,7 @@
 		)
 		(path "/d6ac47c0-fc58-5b49-90fa-5b3f21834cb2")
 		(sheetname "/")
-		(sheetfile "m683xx-pod.kicad_sch")
+		(sheetfile "mc683xx-pod.kicad_sch")
 		(attr smd)
 		(duplicate_pad_numbers_are_jumpers no)
 		(fp_line
@@ -4144,7 +4144,7 @@
 		)
 		(path "/e7ed178e-6626-53e3-a286-a14e972c9e55")
 		(sheetname "/")
-		(sheetfile "m683xx-pod.kicad_sch")
+		(sheetfile "mc683xx-pod.kicad_sch")
 		(attr smd)
 		(duplicate_pad_numbers_are_jumpers no)
 		(fp_line
@@ -4330,7 +4330,7 @@
 		)
 		(path "/e1ac1545-0f00-5184-83a0-1a2fa7e0c9cc")
 		(sheetname "/")
-		(sheetfile "m683xx-pod.kicad_sch")
+		(sheetfile "mc683xx-pod.kicad_sch")
 		(attr smd)
 		(duplicate_pad_numbers_are_jumpers no)
 		(fp_line
@@ -4517,7 +4517,7 @@
 		)
 		(path "/8b922e2a-e240-5afa-bf35-76fcc05bd4fc")
 		(sheetname "/")
-		(sheetfile "m683xx-pod.kicad_sch")
+		(sheetfile "mc683xx-pod.kicad_sch")
 		(attr through_hole)
 		(duplicate_pad_numbers_are_jumpers no)
 		(fp_line
@@ -5007,7 +5007,7 @@
 		)
 		(path "/563d82a9-fcbc-5766-b879-326999b41e27")
 		(sheetname "/")
-		(sheetfile "m683xx-pod.kicad_sch")
+		(sheetfile "mc683xx-pod.kicad_sch")
 		(attr smd)
 		(duplicate_pad_numbers_are_jumpers no)
 		(fp_line
@@ -5193,7 +5193,7 @@
 		)
 		(path "/8f356994-9037-5879-b8ef-5d5cc9d559e5")
 		(sheetname "/")
-		(sheetfile "m683xx-pod.kicad_sch")
+		(sheetfile "mc683xx-pod.kicad_sch")
 		(attr smd)
 		(duplicate_pad_numbers_are_jumpers no)
 		(fp_line
@@ -5615,7 +5615,7 @@
 		)
 		(path "/00bf1bda-9345-5cb9-9dfb-bb81954bbca8")
 		(sheetname "/")
-		(sheetfile "m683xx-pod.kicad_sch")
+		(sheetfile "mc683xx-pod.kicad_sch")
 		(attr smd)
 		(duplicate_pad_numbers_are_jumpers no)
 		(fp_line
@@ -6021,7 +6021,7 @@
 		)
 		(path "/debc4ea8-9b0c-5f25-aa92-21b3e35ea7bf")
 		(sheetname "/")
-		(sheetfile "m683xx-pod.kicad_sch")
+		(sheetfile "mc683xx-pod.kicad_sch")
 		(attr smd)
 		(duplicate_pad_numbers_are_jumpers no)
 		(fp_line
@@ -6207,7 +6207,7 @@
 		)
 		(path "/3ce65b0b-e915-598d-9c0f-509a2506717a")
 		(sheetname "/")
-		(sheetfile "m683xx-pod.kicad_sch")
+		(sheetfile "mc683xx-pod.kicad_sch")
 		(attr smd)
 		(duplicate_pad_numbers_are_jumpers no)
 		(fp_line
@@ -6392,7 +6392,7 @@
 		)
 		(path "/a362f6d3-c939-5320-923e-237363af724f")
 		(sheetname "/")
-		(sheetfile "m683xx-pod.kicad_sch")
+		(sheetfile "mc683xx-pod.kicad_sch")
 		(attr smd)
 		(duplicate_pad_numbers_are_jumpers no)
 		(fp_line
@@ -6578,7 +6578,7 @@
 		)
 		(path "/5971e0d3-24db-51f4-8ad5-e022d2ac5287")
 		(sheetname "/")
-		(sheetfile "m683xx-pod.kicad_sch")
+		(sheetfile "mc683xx-pod.kicad_sch")
 		(attr smd)
 		(duplicate_pad_numbers_are_jumpers no)
 		(fp_line
@@ -6764,7 +6764,7 @@
 		)
 		(path "/5ab97b17-3736-5781-ae79-401be6cc1ce1")
 		(sheetname "/")
-		(sheetfile "m683xx-pod.kicad_sch")
+		(sheetfile "mc683xx-pod.kicad_sch")
 		(attr smd)
 		(duplicate_pad_numbers_are_jumpers no)
 		(fp_line
@@ -6940,7 +6940,7 @@
 		)
 		(path "/0324c454-db04-5f47-bcc1-9df4cae0448c")
 		(sheetname "/")
-		(sheetfile "m683xx-pod.kicad_sch")
+		(sheetfile "mc683xx-pod.kicad_sch")
 		(attr smd exclude_from_bom)
 		(duplicate_pad_numbers_are_jumpers no)
 		(fp_line
@@ -9680,7 +9680,7 @@
 		)
 		(path "/17b350cd-a3f2-5942-8023-9f91f1cf00da")
 		(sheetname "/")
-		(sheetfile "m683xx-pod.kicad_sch")
+		(sheetfile "mc683xx-pod.kicad_sch")
 		(attr smd)
 		(duplicate_pad_numbers_are_jumpers no)
 		(fp_line
@@ -9866,7 +9866,7 @@
 		)
 		(path "/6e3a695a-53bf-555c-a9d6-bd15ffb62efc")
 		(sheetname "/")
-		(sheetfile "m683xx-pod.kicad_sch")
+		(sheetfile "mc683xx-pod.kicad_sch")
 		(attr smd)
 		(duplicate_pad_numbers_are_jumpers no)
 		(fp_line
@@ -10053,7 +10053,7 @@
 		)
 		(path "/01c5adca-d76d-5ed2-9c9c-c1f48a1a418d")
 		(sheetname "/")
-		(sheetfile "m683xx-pod.kicad_sch")
+		(sheetfile "mc683xx-pod.kicad_sch")
 		(attr exclude_from_pos_files exclude_from_bom)
 		(duplicate_pad_numbers_are_jumpers no)
 		(fp_circle
@@ -10282,7 +10282,7 @@
 		)
 		(path "/63fcefb7-d4c4-57e5-929e-208bd750f907")
 		(sheetname "/")
-		(sheetfile "m683xx-pod.kicad_sch")
+		(sheetfile "mc683xx-pod.kicad_sch")
 		(attr smd)
 		(duplicate_pad_numbers_are_jumpers no)
 		(fp_line
@@ -10469,7 +10469,7 @@
 		)
 		(path "/f65d0615-add8-5365-accc-de21daac7648")
 		(sheetname "/")
-		(sheetfile "m683xx-pod.kicad_sch")
+		(sheetfile "mc683xx-pod.kicad_sch")
 		(attr exclude_from_pos_files exclude_from_bom)
 		(duplicate_pad_numbers_are_jumpers no)
 		(fp_circle
@@ -10701,7 +10701,7 @@
 			(justify left bottom)
 		)
 	)
-	(gr_text "m683xx-pod rev 0.1"
+	(gr_text "mc683xx-pod rev 0.1"
 		(at 69.75 103.75 0)
 		(layer "F.SilkS" knockout)
 		(uuid "ce5e92b8-fd22-48d3-a9d0-ded521c750ba")

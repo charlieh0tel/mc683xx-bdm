@@ -43,7 +43,7 @@ wheels = [
 ]
 
 [[package]]
-name = "m683xx-pod-hardware"
+name = "mc683xx-pod-hardware"
 version = "0.1.0"
 source = { virtual = "." }
 

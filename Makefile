@@ -28,5 +28,5 @@ lint:
 				-F $$chip$$extra --target $$target --bins -- -D warnings) || exit 1; \
 		done; \
 	done
-	cd hardware && uv run kicad-style-check m683xx-pod/m683xx-pod.kicad_sch
+	cd hardware && uv run kicad-style-check mc683xx-pod/mc683xx-pod.kicad_sch
 	cd hardware && uv run ruff format --check && uv run ruff check && uv run pytest -q

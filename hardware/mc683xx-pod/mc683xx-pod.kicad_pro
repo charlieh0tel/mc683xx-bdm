@@ -509,7 +509,7 @@
     "pinned_symbol_libs": []
   },
   "meta": {
-    "filename": "m683xx-pod.kicad_pro",
+    "filename": "mc683xx-pod.kicad_pro",
     "version": 3
   },
   "net_settings": {
@@ -709,8 +709,8 @@
     "subpart_id_separator": 0,
     "top_level_sheets": [
       {
-        "filename": "m683xx-pod.kicad_sch",
-        "name": "m683xx-pod",
+        "filename": "mc683xx-pod.kicad_sch",
+        "name": "mc683xx-pod",
         "uuid": "43dfa0e1-4383-5816-a4a9-da949b3d8bea"
       }
     ],
@@ -720,7 +720,7 @@
   "sheets": [
     [
       "9348ad45-f2c4-5238-9d8e-0923825fb3e5",
-      "m683xx-pod"
+      "mc683xx-pod"
     ]
   ],
   "text_variables": {},

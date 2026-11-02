@@ -1,6 +1,6 @@
 ---
 name: jlcpcb-release
-description: Build the JLCPCB release package for the m683xx-pod carrier board (Gerber/drill zip, BOM, placement, source tgz) under production/YYYYMMDD-REV/, and walk the order checklist. Use when the user asks to release, package, or order the board from JLCPCB.
+description: Build the JLCPCB release package for the mc683xx-pod carrier board (Gerber/drill zip, BOM, placement, source tgz) under production/YYYYMMDD-REV/, and walk the order checklist. Use when the user asks to release, package, or order the board from JLCPCB.
 ---
 
 # JLCPCB release

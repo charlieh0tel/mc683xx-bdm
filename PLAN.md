@@ -1,4 +1,4 @@
-# m683xx-pod
+# mc683xx-pod
 
 USB background debug mode (BDM) pod for Motorola/Freescale CPU32
 (683xx) parts, primarily the MC68331. Raspberry Pi Pico (RP2040) or
@@ -231,9 +231,9 @@ pinned toolchain (`firmware/rust-toolchain.toml`).  `pod-fw` builds
 only for the Pico targets, so it has its own `Cargo.lock`.
 
 ```
-m683xx-pod/
+mc683xx-pod/
 ├── hardware/
-│   ├── m683xx-pod/      # KiCad schematic + board
+│   ├── mc683xx-pod/      # KiCad schematic + board
 │   └── ee_tooling/      # shared KiCad tooling and house style (submodule, follows main)
 ├── production/          # each release as ordered
 ├── firmware/

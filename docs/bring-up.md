@@ -32,7 +32,7 @@ cd firmware/pod-fw
 cargo run --release              # flashes over SWD, then shows defmt logs
 ```
 
-Expect `m683xx-pod up` in the log, and the Pico's LED (GP25) on; an
+Expect `mc683xx-pod up` in the log, and the Pico's LED (GP25) on; an
 RP2040-Zero has none there (its RGB LED on GP16 stays dark).
 
 Without a probe, flash a build without RTT over USB (`-f` reboots a

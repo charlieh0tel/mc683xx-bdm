@@ -2,8 +2,8 @@
 # default.  Paths are from the repository root.
 
 [[board]]
-name = "m683xx-pod"
-directory = "hardware/m683xx-pod"
+name = "mc683xx-pod"
+directory = "hardware/mc683xx-pod"
 copper = ["F.Cu", "B.Cu"]
 production = "production"
-sources = ["hardware/m683xx-pod/m683xx-pod.kicad_sym", "PLAN.md", "docs"]
+sources = ["hardware/mc683xx-pod/mc683xx-pod.kicad_sym", "PLAN.md", "docs"]

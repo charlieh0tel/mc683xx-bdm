@@ -103,7 +103,7 @@ async fn main(_spawner: Spawner) {
     let mut pod = Pod::new(PicoBoard::new(link, lines, adc, vdd));
 
     let mut config = embassy_usb::Config::new(VID, PID);
-    config.manufacturer = Some("m683xx-pod");
+    config.manufacturer = Some("mc683xx-pod");
     config.product = Some("CPU32 BDM pod");
     config.max_power = MAX_POWER_MA;
     config.max_packet_size_0 = 64;
@@ -125,7 +125,7 @@ async fn main(_spawner: Spawner) {
     let mut usb = builder.build();
 
     #[cfg(feature = "rtt")]
-    defmt::info!("m683xx-pod up");
+    defmt::info!("mc683xx-pod up");
     // The watcher first, so FREEZE's level is in before a request.
     join3(freeze::watch(freeze), usb.run(), serve(&mut pod, &mut from_host, &mut to_host)).await;
 }

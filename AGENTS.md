@@ -1,4 +1,4 @@
-# Claude Instructions for m683xx-pod
+# Claude Instructions for mc683xx-pod
 
 ## Project
 
@@ -82,7 +82,7 @@
 ## Schematics and PCB
 
 - Each KiCad project has its own directory under `hardware/`, named as
-  the project: `hardware/m683xx-pod/`.  The house style, tools and
+  the project: `hardware/mc683xx-pod/`.  The house style, tools and
   skills are ee_tooling's (the ee_tooling section).
 - The schematic's notes and title block are documentation: keep them
   current in the same commit as the change.

@@ -2,7 +2,7 @@
 # stitch from the ee_tooling submodule, and fastcheck.py, this board's
 # fast-net report.
 [project]
-name = "m683xx-pod-hardware"
+name = "mc683xx-pod-hardware"
 version = "0.1.0"
 requires-python = ">=3.12"
 dependencies = []
