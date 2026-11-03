@@ -1,0 +1,21 @@
+mc683xx-pod 0.2: the files in mc683xx-pod-0.2-jlcpcb.zip
+
+Gerber RS-274X, mm, 4.6 format; Excellon drill, mm, decimal; finished hole sizes.
+Copper layers L1 (top) to Ln (bottom).
+
+File                          Layer         Function                            Side    Polarity
+----------------------------  ------------  ----------------------------------  ------  --------
+mc683xx-pod-F_Cu.gtl          F.Cu          copper L1                           top     positive
+mc683xx-pod-In1_Cu.g1         In1.Cu        copper L2                           inner   positive
+mc683xx-pod-In2_Cu.g2         In2.Cu        copper L3                           inner   positive
+mc683xx-pod-B_Cu.gbl          B.Cu          copper L4                           bottom  positive
+mc683xx-pod-F_Paste.gtp       F.Paste       solder paste                        top     positive
+mc683xx-pod-B_Paste.gbp       B.Paste       solder paste                        bottom  positive
+mc683xx-pod-F_Silkscreen.gto  F.Silkscreen  silkscreen                          top     positive
+mc683xx-pod-B_Silkscreen.gbo  B.Silkscreen  silkscreen                          bottom  positive
+mc683xx-pod-F_Mask.gts        F.Mask        solder mask                         top     negative
+mc683xx-pod-B_Mask.gbs        B.Mask        solder mask                         bottom  negative
+mc683xx-pod-Edge_Cuts.gm1     Edge.Cuts     board outline                       -       positive
+mc683xx-pod-NPTH.drl          -             drill, non-plated (NPTH), L1 to L4  -       -
+mc683xx-pod-PTH.drl           -             drill, plated (PTH), L1 to L4       -       -
+mc683xx-pod-job.gbrjob        -             Gerber job file (JSON)              -       -
