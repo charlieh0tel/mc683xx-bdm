@@ -4452,14 +4452,14 @@
 	)
 	(wire
 		(pts
-			(xy 210.82 200.66)
-			(xy 228.6 200.66)
+			(xy 170.18 157.48)
+			(xy 187.96 157.48)
 		)
 		(stroke
 			(width 0)
 			(type default)
 		)
-		(uuid "55dca5eb-1cf4-53d8-b1e5-5782bb9ad471")
+		(uuid "83cd5249-60af-595b-a870-57d8e572faa0")
 	)
 	(wire
 		(pts
@@ -4474,14 +4474,14 @@
 	)
 	(wire
 		(pts
-			(xy 170.18 157.48)
-			(xy 187.96 157.48)
+			(xy 210.82 200.66)
+			(xy 228.6 200.66)
 		)
 		(stroke
 			(width 0)
 			(type default)
 		)
-		(uuid "83cd5249-60af-595b-a870-57d8e572faa0")
+		(uuid "55dca5eb-1cf4-53d8-b1e5-5782bb9ad471")
 	)
 	(wire
 		(pts
@@ -5502,28 +5502,8 @@
 		)
 		(uuid "8ec8a5a8-8050-50e9-9a27-48d887d893ff")
 	)
-	(label "FREEZE_IN"
-		(at 144.78 198.12 180)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify right bottom)
-		)
-		(uuid "c4a1f5ee-39cb-5e41-b532-3f88758df577")
-	)
-	(label "FREEZE_IN"
-		(at 210.82 200.66 0)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left bottom)
-		)
-		(uuid "3c8cb73a-fcaf-5d9f-9e33-846cd046b29c")
-	)
 	(label "DSI_EN"
-		(at 144.78 200.66 180)
+		(at 144.78 198.12 180)
 		(effects
 			(font
 				(size 1.27 1.27)
@@ -5541,6 +5521,26 @@
 			(justify left bottom)
 		)
 		(uuid "46d3b76e-4890-5a42-8bde-57a96b970a14")
+	)
+	(label "FREEZE_IN"
+		(at 144.78 200.66 180)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right bottom)
+		)
+		(uuid "c4a1f5ee-39cb-5e41-b532-3f88758df577")
+	)
+	(label "FREEZE_IN"
+		(at 210.82 200.66 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "3c8cb73a-fcaf-5d9f-9e33-846cd046b29c")
 	)
 	(label "DS_IN"
 		(at 144.78 203.2 180)
@@ -5842,7 +5842,7 @@
 		)
 		(uuid "70ad9fc1-6131-59d1-b5f5-9c3b2e7d899b")
 	)
-	(text "NOTES (PLAN.md, Hardware and Target connector)\n\n1. A1 is a Raspberry Pi Pico or Pico 2, soldered flat by its castellated\n   edge (Module:RaspberryPi_Pico_SMD_HandSolder; same for both), by hand:\n   JLCPCB does not place it, so it is excluded from the BOM.  USB to the\n   host; 3V3 is its regulator's output.  GP25 is the Pico's own LED.\n2. J1 is the CPU32 BDM header, drawn by function: 1 DS, 2 BERR, 3 GND,\n   4 BKPT/DSCLK, 5 GND, 6 FREEZE, 7 RESET, 8 IFETCH/DSI, 9 VDD, 10 IPIPE/DSO.\n   VDD is the target's supply (about 5 V); it powers U1, U2 and U3 only.\n3. 3.3 V to 5 V: U1, U2 (74AHCT1G125, VCC = VDD) drive BKPT/DSCLK and DSI\n   through R1, R2 (220 ohm), which limit the current to about 20 mA if\n   DSI overlaps IFETCH or the cable's signals meet before its VDD, and\n   source-terminate the cable.  R4 (1k) pulls U1's output enable up to\n   VDD, an edge within the 74AHCT1G125's 20 ns/V; Q3 pulls it low when\n   GP12 is high, so no Pico pin is ever tied to the target's 5 V.  R15,\n   R16 (100k) hold U1's and U2's inputs low while the Pico is unpowered.\n4. U3 enables DSI only for NAND(FREEZE, DSI_EN), so DSI turns off within\n   20 ns of FREEZE falling, whatever ends background mode.  Pin 8 is\n   IFETCH, a CPU output, whenever FREEZE is negated.  U3 takes FREEZE\n   from J1, the 5 V side.\n5. 5 V to 3.3 V: U4-U8 (74LVC1G17, Schmitt trigger, VCC = 3V3) buffer\n   RESET, IPIPE/DSO, FREEZE, DS and BERR to GP10, GP2, GP4, GP6 and GP7.\n   RESET and BERR are open drain on the target and rise as its pull-ups\n   let them.  Inputs take 5.5 V at any VCC.  R10-R13, R17 (100k) hold the\n   inputs low with the cable unplugged, against at most 5 uA of input\n   leakage; 50 uA at 5 V is negligible load on the target.\n6. Q1, Q2 (BSS138BK, RDS(on) specified at VGS = 2.5 V) pull RESET and BERR\n   low, open drain, from GP11 and GP9.\n7. Unpowered pod, target running: R3 holds BKPT/DSCLK high so the target\n   runs; R4 holds U1 disabled, with Q3 off (R14); R5 holds DSI_EN low, so\n   U2 is disabled; R6, R7 hold Q1, Q2 off.  The same holds while the Pico\n   boots.\n8. Unpowered target, pod running: U1, U2 and U3 inputs at 3.3 V with\n   VCC = 0 are within ratings (to 7 V at any VCC).\n9. VDD sense: R8 / R9 halve VDD into GP26 (ADC0), 2.75 V at 5.5 V; 100k\n   limits current into an unpowered Pico.  Firmware refuses halt and reset\n   below 4.5 V.  The divider returns to AGND, which is tied to GND.\n   C4 (100 nF) holds GP26 against the RP2040 ADC's sampling, which the\n   divider's 50k source impedance could not recharge in time.\n10. Net labels name the nets for routing.  Each GPIO joins its circuit\n   by label alone: to move a signal to another GPIO, move its label on\n   A1's side, and its pin in the firmware.  DSCLK_OUT, DSCLK_DRV,\n   BKPT_DSCLK, DSI_OUT, DSI_DRV, IFETCH_DSI, IPIPE_DSO and DSO_IN are the\n   Fast net class.\n11. C1-C3 decouple U1-U3 on VDD, C5-C9 U4-U8 on 3V3, each at its VCC pin.\n   No bulk capacitor on VDD: the pod draws a few mA from the target, and\n   a bulk capacitor would load the target's supply when the pod is\n   plugged in.\n12. Pico GND, AGND and J1 pins 3 and 5 are one net.\n13. SWD: the Pico's debug pads (D1 SWCLK, D2 GND, D3 SWDIO) to J2, the\n   Raspberry Pi 3-pin debug connector (JST SH: 1 SWCLK, 2 GND, 3 SWDIO), for\n   the Debug Probe's cable.  The RP2040 pulls SWDIO and SWCLK up internally,\n   about 60k (Pico datasheet 4.8), so there are no external pull-ups.\n14. Layout: the Pico's USB connector end and J2 at the carrier's edge, both\n   reachable with the Pico soldered flat.\n15. H1-H4: M3 mounting holes in the corners, plated, each ringed with\n   vias, on GND."
+	(text "NOTES (PLAN.md, Hardware and Target connector)\n\n1. A1 is a Raspberry Pi Pico or Pico 2, soldered flat by its castellated\n   edge (Module:RaspberryPi_Pico_SMD_HandSolder; same for both), by hand:\n   JLCPCB does not place it, so it is excluded from the BOM.  USB to the\n   host; 3V3 is its regulator's output.  GP25 is the Pico's own LED.\n2. J1 is the CPU32 BDM header, drawn by function: 1 DS, 2 BERR, 3 GND,\n   4 BKPT/DSCLK, 5 GND, 6 FREEZE, 7 RESET, 8 IFETCH/DSI, 9 VDD, 10 IPIPE/DSO.\n   VDD is the target's supply (about 5 V); it powers U1, U2 and U3 only.\n3. 3.3 V to 5 V: U1, U2 (74AHCT1G125, VCC = VDD) drive BKPT/DSCLK and DSI\n   through R1, R2 (220 ohm), which limit the current to about 20 mA if\n   DSI overlaps IFETCH or the cable's signals meet before its VDD, and\n   source-terminate the cable.  R4 (1k) pulls U1's output enable up to\n   VDD, an edge within the 74AHCT1G125's 20 ns/V; Q3 pulls it low when\n   GP12 is high, so no Pico pin is ever tied to the target's 5 V.  R15,\n   R16 (100k) hold U1's and U2's inputs low while the Pico is unpowered.\n4. U3 enables DSI only for NAND(FREEZE, DSI_EN), so DSI turns off within\n   20 ns of FREEZE falling, whatever ends background mode.  Pin 8 is\n   IFETCH, a CPU output, whenever FREEZE is negated.  U3 takes FREEZE\n   from J1, the 5 V side.\n5. 5 V to 3.3 V: U4-U8 (74LVC1G17, Schmitt trigger, VCC = 3V3) buffer\n   RESET, IPIPE/DSO, FREEZE, DS and BERR to GP10, GP2, GP5, GP6 and GP7.\n   RESET and BERR are open drain on the target and rise as its pull-ups\n   let them.  Inputs take 5.5 V at any VCC.  R10-R13, R17 (100k) hold the\n   inputs low with the cable unplugged, against at most 5 uA of input\n   leakage; 50 uA at 5 V is negligible load on the target.\n6. Q1, Q2 (BSS138BK, RDS(on) specified at VGS = 2.5 V) pull RESET and BERR\n   low, open drain, from GP11 and GP9.\n7. Unpowered pod, target running: R3 holds BKPT/DSCLK high so the target\n   runs; R4 holds U1 disabled, with Q3 off (R14); R5 holds DSI_EN low, so\n   U2 is disabled; R6, R7 hold Q1, Q2 off.  The same holds while the Pico\n   boots.\n8. Unpowered target, pod running: U1, U2 and U3 inputs at 3.3 V with\n   VCC = 0 are within ratings (to 7 V at any VCC).\n9. VDD sense: R8 / R9 halve VDD into GP26 (ADC0), 2.75 V at 5.5 V; 100k\n   limits current into an unpowered Pico.  Firmware refuses halt and reset\n   below 4.5 V.  The divider returns to AGND, which is tied to GND.\n   C4 (100 nF) holds GP26 against the RP2040 ADC's sampling, which the\n   divider's 50k source impedance could not recharge in time.\n10. Net labels name the nets for routing.  Each GPIO joins its circuit\n   by label alone: to move a signal to another GPIO, move its label on\n   A1's side, and its pin in the firmware.  DSCLK_OUT, DSCLK_DRV,\n   BKPT_DSCLK, DSI_OUT, DSI_DRV, IFETCH_DSI, IPIPE_DSO and DSO_IN are the\n   Fast net class.\n11. C1-C3 decouple U1-U3 on VDD, C5-C9 U4-U8 on 3V3, each at its VCC pin.\n   No bulk capacitor on VDD: the pod draws a few mA from the target, and\n   a bulk capacitor would load the target's supply when the pod is\n   plugged in.\n12. Pico GND, AGND and J1 pins 3 and 5 are one net.\n13. SWD: the Pico's debug pads (D1 SWCLK, D2 GND, D3 SWDIO) to J2, the\n   Raspberry Pi 3-pin debug connector (JST SH: 1 SWCLK, 2 GND, 3 SWDIO), for\n   the Debug Probe's cable.  The RP2040 pulls SWDIO and SWCLK up internally,\n   about 60k (Pico datasheet 4.8), so there are no external pull-ups.\n14. Layout: the Pico's USB connector end and J2 at the carrier's edge, both\n   reachable with the Pico soldered flat.\n15. H1-H4: M3 mounting holes in the corners, plated, each ringed with\n   vias, on GND."
 		(exclude_from_sim no)
 		(at 474.98 254 0)
 		(effects

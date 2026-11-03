@@ -195,7 +195,7 @@ keep:
 ```
 
 Config: out and in shift left, no autopull/autopush. `out` base = DSI,
-`in` base = DSO, side-set base = DSCLK, `set` base = DSI_EN (GP5,
+`in` base = DSO, side-set base = DSCLK, `set` base = DSI_EN (GP4,
 count 1).
 
 - The firmware pushes `word << 15`, with bit 14 set for the last word

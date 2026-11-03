@@ -50,7 +50,7 @@ for the log line.
 bdm pins
 ```
 
-Expect FREEZE, RESET and DS low (no carrier: GP4 is pulled down, GP6 and
+Expect FREEZE, RESET and DS low (no carrier: GP5 is pulled down, GP6 and
 GP10 float and may read either way).  VDD reads wherever GP26 floats
 without the carrier's divider: 1.06-1.14 V on an RP2040-Zero.  `bdm halt`
 fails with "no target power" (NoTarget): VDD is under 4.5 V.
