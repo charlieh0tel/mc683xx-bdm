@@ -18,7 +18,7 @@ directory (`production/`) and source files.
 
 ## Ordering checklist (PLAN.md, Hardware)
 
-- 2 layers, 1.6 mm.
+- 4 layers, 1.6 mm, JLC04161H-7628 stackup, ENIG.
 - Assembly: top side SMT.  The Pico (A1) and the BDM header (J1) are
   fitted by hand: A1 is out of the BOM; J1 is through-hole, DNP unless
   the order says otherwise.
