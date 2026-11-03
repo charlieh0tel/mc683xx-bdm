@@ -82,15 +82,15 @@ Pico pins (GPn):
 |---|---|---|
 | 2 | IPIPE/DSO | PIO in |
 | 3 | DSI | PIO out |
-| 4 | BKPT/DSCLK | PIO side-set and set |
+| 4 | DSI_EN, to the 74AHCT1G00 | PIO set, high enables |
 | 5 | FREEZE | in, pull-down |
 | 6 | DS | in |
-| 7 | RESET sense | in |
-| 8 | DSI_EN, to the 74AHCT1G00 | PIO set, high enables |
-| 9 | RESET drive (Q1 gate) | out, high asserts RESET |
-| 10 | BERR drive (Q2 gate) | out, high asserts BERR |
-| 11 | BKPT/DSCLK driver enable (Q3 gate) | out, high enables |
-| 12 | BERR sense | in |
+| 7 | BERR drive (Q2 gate) | out, high asserts BERR |
+| 8 | BERR sense | in |
+| 9 | BKPT/DSCLK | PIO side-set and set |
+| 10 | BKPT/DSCLK driver enable (Q3 gate) | out, high enables |
+| 11 | RESET drive (Q1 gate) | out, high asserts RESET |
+| 12 | RESET sense | in |
 | 25 | LED (on the Pico) | out |
 | 26 | VDD sense (ADC0) | analog |
 
