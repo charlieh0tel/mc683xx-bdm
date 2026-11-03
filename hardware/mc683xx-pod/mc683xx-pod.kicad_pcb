@@ -25545,6 +25545,7 @@
 	)
 	(zone
 		(net "+3V3")
+		(locked yes)
 		(layer "In2.Cu")
 		(uuid "be5f0afa-0ea0-4284-bc02-ad54de4c96d5")
 		(hatch edge 0.5)
