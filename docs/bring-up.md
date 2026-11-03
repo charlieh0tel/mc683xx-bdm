@@ -50,8 +50,8 @@ for the log line.
 bdm pins
 ```
 
-Expect FREEZE, RESET and DS low (no carrier: GP5 is pulled down, GP6 and
-GP7 float and may read either way).  VDD reads wherever GP26 floats
+Expect FREEZE, RESET and DS low (no carrier: GP4 is pulled down, GP5 and
+GP9 float and may read either way).  VDD reads wherever GP26 floats
 without the carrier's divider: 1.06-1.14 V on an RP2040-Zero.  `bdm halt`
 fails with "no target power" (NoTarget): VDD is under 4.5 V.
 
@@ -68,7 +68,7 @@ Expect `loopback: 3600 words ok`.  Each word comes back as sent: DSO is
 sampled at the end of DSCLK's low phase, after DSI changed at the fall
 (PLAN.md, PIO program).
 
-Scope GP4 (DSCLK) and GP3 (DSI) during `bdm loopback`:
+Scope GP7 (DSCLK) and GP3 (DSI) during `bdm loopback`:
 
 - DSCLK idles high, and each word is 17 clocks.
 - The rate is 1 MHz (the default): low and high about 500 ns each.
