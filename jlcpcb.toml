@@ -5,5 +5,5 @@
 name = "mc683xx-pod"
 directory = "hardware/mc683xx-pod"
 copper = ["F.Cu", "In1.Cu", "In2.Cu", "B.Cu"]
-production = "production"
+production = "hardware/production"
 sources = ["hardware/mc683xx-pod/mc683xx-pod.kicad_sym", "PLAN.md", "docs"]

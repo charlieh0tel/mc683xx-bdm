@@ -11,7 +11,7 @@
 
 - `hardware/*/*.kicad_*` are the owner's: edit them only when handed over,
   with KiCad closed.
-- Bump REV in both title blocks before a release.  `production/` holds
+- Bump REV in both title blocks before a release.  `hardware/production/` holds
   what was ordered; do not change it afterwards.
 
 ## Critical Rules

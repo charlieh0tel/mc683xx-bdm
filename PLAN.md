@@ -237,8 +237,8 @@ only for the Pico targets, so it has its own `Cargo.lock`.
 mc683xx-pod/
 ├── hardware/
 │   ├── mc683xx-pod/      # KiCad schematic + board
+│   ├── production/       # each release as ordered
 │   └── ee_tooling/      # shared KiCad tooling and house style (submodule, follows main)
-├── production/          # each release as ordered
 ├── firmware/
 │   ├── bdm-model/       # a CPU32 in background mode at the serial word, and a board around it; no_std; test target
 │   ├── pod-proto/       # BDM words and command sequences; USB commands; no_std

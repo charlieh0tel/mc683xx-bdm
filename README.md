@@ -18,8 +18,7 @@ not yet ordered.
 | `PLAN.md` | the design and why it is the way it is |
 | `TODO.md` | the work list |
 | `docs/` | the host-pod protocol (`usb-protocol.md`), bring-up steps (`bring-up.md`) |
-| `hardware/` | the KiCad carrier board; `ee_tooling/`, the shared tooling (a submodule following its `main`), whose `jlcpcb-release` builds a JLCPCB order; `fastcheck.py`, a report on the BDM link's fast nets (`uv run python fastcheck.py mc683xx-pod/mc683xx-pod.kicad_pcb`) |
-| `production/` | each release as ordered |
+| `hardware/` | the KiCad carrier board; `ee_tooling/`, the shared tooling (a submodule following its `main`), whose `jlcpcb-release` builds a JLCPCB order into `production/`, each release as ordered; `fastcheck.py`, a report on the BDM link's fast nets (`uv run python fastcheck.py mc683xx-pod/mc683xx-pod.kicad_pcb`) |
 | `firmware/` | the Rust workspace: firmware, host CLI, shared crates |
 | `third_party/` | vendor documents and their provenance (`NOTICE`) |
 
@@ -63,7 +62,7 @@ anything else using it.
 ## License
 
 - Hardware: CERN-OHL-S-2.0 (`hardware/LICENSE`): the KiCad designs in
-  `hardware/` and the release packages in `production/`.
+  `hardware/` and the release packages in `hardware/production/`.
 - Everything else of the project's own, firmware and documentation:
   GPL-3.0-only (`LICENSE`).
 - The documents in `third_party/` are their owners' and not covered
