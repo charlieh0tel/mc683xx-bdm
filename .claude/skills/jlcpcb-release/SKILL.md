@@ -19,9 +19,12 @@ directory (`hardware/production/`) and source files.
 ## Ordering checklist (PLAN.md, Hardware)
 
 - 4 layers, 1.6 mm, JLC04161H-7628 stackup, ENIG.
-- Assembly: top side SMT.  The Pico (A1) and the BDM header (J1) are
-  fitted by hand: A1 is out of the BOM; J1 is through-hole, DNP unless
-  the order says otherwise.
+- Assembly: top side SMT.  JLCPCB places the Pico (A1, SC0915,
+  C9900019762).  J1 (C5665) is through-hole, DNP unless the order says
+  otherwise; in the placement preview it needs 90 deg clockwise and
+  5.08 mm south, 1.27 mm east (its zero is its body's center, ours is
+  pin 1).  J2 is DNP in the design (C160403 has been short): fitted by
+  hand.
 - In the BOM preview, compare each matched part's MPN and package with
   the BOM's.
 

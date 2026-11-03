@@ -9,8 +9,8 @@
 	(paper "A4")
 	(title_block
 		(title "mc683xx-pod")
-		(date "2026-10-31")
-		(rev "0.1")
+		(date "2026-11-02")
+		(rev "0.2")
 		(comment 1 "USB BDM pod for CPU32 (683xx): Pico carrier with 5 V level translators")
 	)
 	(layers
@@ -1959,7 +1959,7 @@
 				(pins "1" "2" "3" "MP")
 			)
 		)
-		(attr smd)
+		(attr smd dnp)
 		(duplicate_pad_numbers_are_jumpers no)
 		(fp_line
 			(start -2.61 -1.785)
@@ -9446,7 +9446,7 @@
 				)
 			)
 		)
-		(property "LCSC" ""
+		(property "LCSC" "C9900019762"
 			(at 0 0 0)
 			(layer "F.SilkS")
 			(hide yes)
@@ -9472,7 +9472,7 @@
 				)
 			)
 		)
-		(attr smd exclude_from_bom)
+		(attr smd)
 		(duplicate_pad_numbers_are_jumpers no)
 		(fp_line
 			(start -10.61 -23.07)

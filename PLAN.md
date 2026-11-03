@@ -43,7 +43,7 @@ firmware and documentation are GPL-3.0-only (`LICENSE`).
 
 | Function | Part | Notes |
 |---|---|---|
-| MCU | Pico (RP2040) or Pico 2 (RP2350), soldered flat by its castellated edge | USB to host; same footprint and pinout; hand-soldered, not in the assembly BOM |
+| MCU | Pico (RP2040) or Pico 2 (RP2350), soldered flat by its castellated edge | USB to host; same footprint and pinout; JLCPCB places a Pico (SC0915, C9900019762); a Pico 2 is fitted by hand |
 | 3.3 V → 5 V outputs | 74AHCT1G125 ×2 (U1 BKPT/DSCLK, U2 DSI), VCC = target VDD | 220 Ω series (R1, R2): about 20 mA if DSI and IFETCH overlap (MC68331UM Table A-1: 25 mA per pin), or into an unpowered 74AHCT1G125's output clamp if the cable's signals meet before its VDD (SCLS378P 5.1: ±20 mA); each its own OE |
 | 74AHCT1G125 input pull-downs | 100 kΩ to GND on GP9 and GP3 (R15, R16) | The inputs must not float (SCLS378P 5.3, note 1); the Pico's own pull-downs need it powered |
 | U1 OE pull-up, BKPT/DSCLK | 1 kΩ to target VDD (R4), pulled low by Q3 (BSS138BK, gate on GP10, 100 kΩ gate pull-down) | The OE edge within the 74AHCT1G125's 20 ns/V (SCLS378P 5.3): about 8 ns/V into its 10 pF (5.5) and Q3's 7 pF; 5 mA from VDD while Q3 is on.  Output tristated while the pod is unpowered or booting.  Q3 keeps the target's 5 V off every Pico pin: a GPIO on this pull-up would see 5 V, over the RP2040's and RP2350's 3.63 V limit unpowered (RP2040 datasheet 5.5.2.1, RP2350 14.9.1) |
@@ -95,7 +95,8 @@ Pico pins (GPn):
 | 26 | VDD sense (ADC0) | analog |
 
 Board: a 4-layer carrier (JLCPCB JLC04161H-7628 stackup, ENIG) with the
-translators and the BDM header; the Pico is soldered on flat.  A custom
+translators and the BDM header; the Pico is soldered on flat, placed
+by JLCPCB.  A custom
 RP2040 PCB only if the carrier proves too bulky.  68 x 59 mm.  In1 is
 solid GND; In2 is VDD left of x = 74 mm and +3V3 right of it; GND is
 poured on F.Cu and B.Cu too, stitched along the edge, on a 5 mm grid
