@@ -87,16 +87,16 @@ async fn main(_spawner: Spawner) {
     // and RESET and BERR stay released.
     let lines = Lines {
         dsclk_enable: Output::new(p.PIN_12, Level::Low),
-        reset_drive: Output::new(p.PIN_10, Level::Low),
-        reset: Input::new(p.PIN_9, Pull::None),
-        ds: Input::new(p.PIN_5, Pull::None),
+        reset_drive: Output::new(p.PIN_11, Level::Low),
+        reset: Input::new(p.PIN_10, Pull::None),
+        ds: Input::new(p.PIN_6, Pull::None),
     };
     let freeze = Input::new(p.PIN_4, Pull::Down);
-    let _berr_drive = Output::new(p.PIN_8, Level::Low);
+    let _berr_drive = Output::new(p.PIN_9, Level::Low);
     let _led = Output::new(p.PIN_25, Level::High);
 
     let Pio { mut common, sm0, .. } = Pio::new(p.PIO0, Irqs);
-    let pins = LinkPins { dsclk: p.PIN_7, dsi: p.PIN_3, dso: p.PIN_2, dsi_enable: p.PIN_11 };
+    let pins = LinkPins { dsclk: p.PIN_8, dsi: p.PIN_3, dso: p.PIN_2, dsi_enable: p.PIN_5 };
     let link = PioLink::new(&mut common, sm0, pins, divider(clk_sys_freq(), DEFAULT_HZ));
     let adc = Adc::new(p.ADC, Irqs, adc::Config::default());
     let vdd = adc::Channel::new_pin(p.PIN_26, Pull::None);
