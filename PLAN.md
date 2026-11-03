@@ -98,7 +98,8 @@ Board: a 4-layer carrier (JLCPCB JLC04161H-7628 stackup, ENIG) with the
 translators and the BDM header; the Pico is soldered on flat.  A custom
 RP2040 PCB only if the carrier proves too bulky.  68 x 59 mm.  In1 is
 solid GND; In2 is VDD left of x = 74 mm and +3V3 right of it; GND is
-poured on F.Cu and B.Cu too, stitched along the edge.  Every signal runs
+poured on F.Cu and B.Cu too, stitched along the edge, on a 5 mm grid
+(`stitch --grid 5 --near 2.5`) and by hand.  Every signal runs
 on F.Cu over In1; the Fast net class's nets have no vias
 (`hardware/fastcheck.py` reports the plane under each segment).  VDD
 reaches the sense divider (R8) on the +3V3 side in short runs on B.Cu.
