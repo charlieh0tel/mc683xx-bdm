@@ -1,0 +1,23 @@
+mc683xx-pod 0.1: stackup
+
+Ln  Layer         Type                 Material  Thickness mm  Er   Loss tan  Color  File
+--  ------------  -------------------  --------  ------------  ---  --------  -----  ----------------------------
+-   F.SilkS       Top Silk Screen      -         -             -    -         -      mc683xx-pod-F_Silkscreen.gto
+-   F.Paste       Top Solder Paste     -         -             -    -         -      mc683xx-pod-F_Paste.gtp
+-   F.Mask        Top Solder Mask      -         0.01          -    -         -      mc683xx-pod-F_Mask.gts
+L1  F.Cu          copper               -         0.035         -    -         -      mc683xx-pod-F_Cu.gtl
+-   dielectric 1  prepreg              FR4       0.2104        4.4  0.02      -      -
+L2  In1.Cu        copper               -         0.0152        -    -         -      mc683xx-pod-In1_Cu.g1
+-   dielectric 2  core                 FR4       1.065         4.6  0.02      -      -
+L3  In2.Cu        copper               -         0.0152        -    -         -      mc683xx-pod-In2_Cu.g2
+-   dielectric 3  prepreg              FR4       0.2104        4.4  0.02      -      -
+L4  B.Cu          copper               -         0.035         -    -         -      mc683xx-pod-B_Cu.gbl
+-   B.Mask        Bottom Solder Mask   -         0.01          -    -         -      mc683xx-pod-B_Mask.gbs
+-   B.Paste       Bottom Solder Paste  -         -             -    -         -      mc683xx-pod-B_Paste.gbp
+-   B.SilkS       Bottom Silk Screen   -         -             -    -         -      mc683xx-pod-B_Silkscreen.gbo
+
+Total thickness: 1.6062 mm (board thickness setting: 1.6 mm).
+Copper finish: ENIG
+Impedance-controlled dielectric: no
+
+Impedance control: none (no net class named <ohms>Z_DIFF or <ohms>Z_SE).

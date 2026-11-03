@@ -1,0 +1,19 @@
+mc683xx-pod 0.1: fabrication notes
+Unless otherwise specified.
+
+1.  STANDARD: build and inspect to IPC-6012 and IPC-A-600, class 2 (default; confirm).
+2.  BASE MATERIAL: FR4; Tg [TBD: Tg, deg C].
+3.  LAYERS: 4 copper, L1 (top) to L4 (bottom), per mc683xx-pod-0.1-gerber-map.txt.
+4.  THICKNESS: finished board 1.6062 mm, per mc683xx-pod-0.1-stackup.txt.
+5.  COPPER: finished weights L1 35 um (1 oz), L2 15.2 um (0.5 oz), L3 15.2 um (0.5 oz), L4 35 um (1 oz).
+6.  PLATING: plated holes per IPC-6012 for the class above.
+7.  FINISH: ENIG.
+8.  SOLDER MASK: LPI per IPC-SM-840 over bare copper; top and bottom, [TBD: color].
+9.  SILKSCREEN: top and bottom, [TBD: color]; no scaling or size changes without approval.
+10. IMPEDANCE CONTROL: no.
+11. MINIMUM FEATURES: track 0.25 mm, space 0.2 mm, finished drill 0.3 mm.
+12. ELECTRICAL TEST: [TBD: electrical test, e.g. 100% netlist test per IPC-9252].
+13. DRILLING: drill file sizes are finished hole sizes; plated and non-plated holes are in separate files.
+14. GERBER FILES: do not modify the supplied files without the owner's approval.
+15. TOOLING HOLES: none in the board area but those in the drill files.
+16. MARKING: no added marking, logo or order number in the board area without approval.
