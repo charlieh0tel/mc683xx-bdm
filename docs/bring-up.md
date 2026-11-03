@@ -68,7 +68,7 @@ Expect `loopback: 3600 words ok`.  Each word comes back as sent: DSO is
 sampled at the end of DSCLK's low phase, after DSI changed at the fall
 (PLAN.md, PIO program).
 
-Scope GP8 (DSCLK) and GP3 (DSI) during `bdm loopback`:
+Scope GP9 (DSCLK) and GP3 (DSI) during `bdm loopback`:
 
 - DSCLK idles high, and each word is 17 clocks.
 - The rate is 1 MHz (the default): low and high about 500 ns each.
