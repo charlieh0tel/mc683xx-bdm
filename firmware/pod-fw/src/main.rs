@@ -86,9 +86,9 @@ async fn main(_spawner: Spawner) {
     // The translators' outputs stay off until a halt (PLAN.md, Hardware),
     // and RESET and BERR stay released.
     let lines = Lines {
-        dsclk_enable: Output::new(p.PIN_12, Level::Low),
+        dsclk_enable: Output::new(p.PIN_10, Level::Low),
         reset_drive: Output::new(p.PIN_11, Level::Low),
-        reset: Input::new(p.PIN_10, Pull::None),
+        reset: Input::new(p.PIN_12, Pull::None),
         ds: Input::new(p.PIN_6, Pull::None),
     };
     let freeze = Input::new(p.PIN_5, Pull::Down);
