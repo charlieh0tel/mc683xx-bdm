@@ -8,7 +8,7 @@ are Rust.
 
 Status: firmware and host CLI pass a PIO loopback on a bare RP2040, no
 target yet (`docs/bring-up.md`, steps 1-2); the carrier
-(`hardware/mc683xx-pod/`) is routed, 68 x 59 mm on 2 layers, DRC clean,
+(`hardware/mc683xx-pod/`) is routed, 68 x 59 mm on 4 layers, DRC clean,
 not yet ordered.
 
 ## Layout

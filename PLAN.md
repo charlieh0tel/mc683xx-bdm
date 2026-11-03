@@ -94,12 +94,14 @@ Pico pins (GPn):
 | 25 | LED (on the Pico) | out |
 | 26 | VDD sense (ADC0) | analog |
 
-Board: a 2-layer carrier with the translators and the BDM header; the
-Pico is soldered on flat. A custom RP2040 PCB only if the carrier proves too
-bulky.  68 x 59 mm; GND poured on both layers, stitched along the edge
-and on a grid.  DSCLK and DSI run on F.Cu over the B.Cu pour, DSO partly
-on B.Cu; every crossing and via on them has a GND via within about
-1.5 mm (`hardware/fastcheck.py` reports them).
+Board: a 4-layer carrier (JLCPCB JLC04161H-7628 stackup, ENIG) with the
+translators and the BDM header; the Pico is soldered on flat.  A custom
+RP2040 PCB only if the carrier proves too bulky.  68 x 59 mm.  In1 is
+solid GND; In2 is VDD left of x = 74 mm and +3V3 right of it; GND is
+poured on F.Cu and B.Cu too, stitched along the edge.  Every signal runs
+on F.Cu over In1; the Fast net class's nets have no vias
+(`hardware/fastcheck.py` reports the plane under each segment).  VDD
+reaches the sense divider (R8) on the +3V3 side in short runs on B.Cu.
 
 Translators stay on either Pico: the RP2350's GPIOs are "5 V-tolerant
 (powered) and 3.3 V-failsafe (unpowered)" (RP2350 datasheet, chapter 1

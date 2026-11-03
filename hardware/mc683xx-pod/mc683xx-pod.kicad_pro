@@ -60,32 +60,32 @@
           "hatch_smoothing_level": 0,
           "hatch_smoothing_value": 0.1,
           "hatch_thickness": 1.0,
-          "min_clearance": 0.5,
+          "min_clearance": 0.2,
           "min_island_area": 10.0,
-          "min_thickness": 0.25,
-          "pad_connection": 1,
+          "min_thickness": 0.1,
+          "pad_connection": 2,
           "remove_islands": 0,
-          "thermal_relief_gap": 0.5,
-          "thermal_relief_spoke_width": 0.5
+          "thermal_relief_gap": 0.2,
+          "thermal_relief_spoke_width": 0.2
         }
       },
       "diff_pair_dimensions": [],
       "drc_exclusions": [
         [
           "silk_edge_clearance|101400000|50000000|b75903d3-b512-433f-b883-2a2f4be9d53e|8c7f7b1f-2ee8-445c-a736-1d8d1af1feb4",
-          "ok"
+          ""
         ],
         [
           "silk_edge_clearance|107849428|49999999|b75903d3-b512-433f-b883-2a2f4be9d53e|1f438304-b027-4a4f-944a-a1b080f545e7",
-          "ok"
+          ""
         ],
         [
           "silk_edge_clearance|87150625|49999999|b75903d3-b512-433f-b883-2a2f4be9d53e|298b1a1c-8eeb-45c8-b5b4-8fdf9b16fdbc",
-          "ok"
+          ""
         ],
         [
           "silk_edge_clearance|93600000|50000000|b75903d3-b512-433f-b883-2a2f4be9d53e|7a240a8d-7822-4947-820d-7221397c4385",
-          "ok"
+          ""
         ]
       ],
       "meta": {
@@ -542,11 +542,11 @@
         "line_style": 0,
         "microvia_diameter": 0.3,
         "microvia_drill": 0.1,
-        "name": "Power",
+        "name": "Fast",
         "pcb_color": "rgba(0, 0, 0, 0.000)",
-        "priority": 0,
+        "priority": 1,
         "schematic_color": "rgba(0, 0, 0, 0.000)",
-        "track_width": 0.4,
+        "track_width": 0.25,
         "tuning_profile": "",
         "via_diameter": 0.6,
         "via_drill": 0.3,
@@ -561,11 +561,11 @@
         "line_style": 0,
         "microvia_diameter": 0.3,
         "microvia_drill": 0.1,
-        "name": "Fast",
+        "name": "Power",
         "pcb_color": "rgba(0, 0, 0, 0.000)",
-        "priority": 1,
+        "priority": 0,
         "schematic_color": "rgba(0, 0, 0, 0.000)",
-        "track_width": 0.25,
+        "track_width": 0.4,
         "tuning_profile": "",
         "via_diameter": 0.6,
         "via_drill": 0.3,
