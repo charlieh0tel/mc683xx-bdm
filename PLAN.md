@@ -414,6 +414,9 @@ How to run each item and what to expect: `docs/bring-up.md`.
       4 MHz (1.297 s), 36 words a USB round trip: 1.3 ms a round trip
       at 4 MHz against 0.15 ms on the wire, so USB-limited, about
       28k words/s
+- [ ] Carrier, no target (rev 0.2): USB-flashed, enumerates, inputs
+      low.  VDD sense reads 5.344 V at 5.287 V on the bench supply's
+      display, 1.1% high; to confirm with a meter
 - [ ] Reset into BDM; confirm FREEZE asserts
 - [ ] RSREG ATEMP first (`0x2588`): confirms RSREG's `0x2580`
 - [ ] BGND and a breakpoint after GO: `bdm pins` reports a fresh ATEMP
