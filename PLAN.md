@@ -416,7 +416,9 @@ How to run each item and what to expect: `docs/bring-up.md`.
       28k words/s
 - [ ] Carrier, no target (rev 0.2): USB-flashed, enumerates, inputs
       low.  DS, FREEZE and RESET each read high with 5 V on their J1
-      pin, low without (BERR not reported yet).  VDD sense reads 5.344 V at 5.287 V on the bench supply's
+      pin, low without (BERR not reported yet).  Loopback at J1 (8 to
+      10, FREEZE high), unscoped: 3600 words ok at 1 MHz (0.180 s) and
+      4 MHz (0.132 s).  VDD sense reads 5.344 V at 5.287 V on the bench supply's
       display, 1.1% high; to confirm with a meter
 - [ ] Reset into BDM; confirm FREEZE asserts
 - [ ] RSREG ATEMP first (`0x2588`): confirms RSREG's `0x2580`
