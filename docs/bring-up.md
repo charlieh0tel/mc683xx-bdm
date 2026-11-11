@@ -44,7 +44,8 @@ picotool load -x -f -t elf target/thumbv6m-none-eabi/release/pod-fw
 ```
 
 It logs nothing; the pod enumerating as 1209:0001 (`lsusb`) stands in
-for the log line.
+for the log line.  A rev 0.2 carrier has J2 not fitted: flash it this
+way.
 
 ```
 bdm pins
@@ -55,10 +56,24 @@ GP12 float and may read either way).  VDD reads wherever GP26 floats
 without the carrier's divider: 1.06-1.14 V on an RP2040-Zero.  `bdm halt`
 fails with "no target power" (NoTarget): VDD is under 4.5 V.
 
+On the carrier, step 3's readings apply.
+
 ## 2. Bare Pico: PIO loopback
 
 Jumper GP3 (DSI) to GP2 (DSO).  No carrier, no target.  On an
 RP2040-Zero they are pads 4 and 3, side by side.
+
+On the carrier, not this jumper: U5 drives GP2, and the jumper would
+fight its output.  Loop back at J1 instead, through U2 and U5:
+
+- 5 V on pin 9 (VDD), GND on pin 3: U1-U3 run from target VDD.
+- Pin 8 (DSI) to pin 10 (DSO).
+- Pin 6 (FREEZE) to pin 9: U3 enables U2 only while FREEZE is high.
+- `bdm halt` first, whatever it answers: FREEZE already high, the pod
+  sets DSI_EN and Q3 (DSCLK to pin 4) to read ATEMP.  A raw transfer
+  sets neither.
+
+Scope pins 4 (DSCLK) and 8 (DSI) instead of GP9 and GP3.
 
 ```
 bdm loopback --rounds 100
