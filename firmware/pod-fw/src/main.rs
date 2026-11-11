@@ -90,6 +90,7 @@ async fn main(_spawner: Spawner) {
         reset_drive: Output::new(p.PIN_11, Level::Low),
         reset: Input::new(p.PIN_12, Pull::None),
         ds: Input::new(p.PIN_6, Pull::None),
+        berr: Input::new(p.PIN_8, Pull::None),
     };
     let freeze = Input::new(p.PIN_5, Pull::Down);
     let _berr_drive = Output::new(p.PIN_7, Level::Low);

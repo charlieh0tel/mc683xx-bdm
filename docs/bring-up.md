@@ -35,12 +35,14 @@ cargo run --release              # flashes over SWD, then shows defmt logs
 Expect `mc683xx-pod up` in the log, and the Pico's LED (GP25) on; an
 RP2040-Zero has none there (its RGB LED on GP16 stays dark).
 
-Without a probe, flash a build without RTT over USB (`-f` reboots a
-running Pico into BOOTSEL; a blank one is there already):
+Without a probe, flash a build without RTT over USB.  A blank Pico is
+in BOOTSEL already; a flashed one needs BOOTSEL held as USB is plugged
+in (the firmware has no picotool reset interface, so `-f` cannot reboot
+it):
 
 ```
 cargo build --release --no-default-features -F rp2040
-picotool load -x -f -t elf target/thumbv6m-none-eabi/release/pod-fw
+picotool load -x -t elf target/thumbv6m-none-eabi/release/pod-fw
 ```
 
 It logs nothing; the pod enumerating as 1209:0001 (`lsusb`) stands in
@@ -51,8 +53,8 @@ way.
 bdm pins
 ```
 
-Expect FREEZE, RESET and DS low (no carrier: GP5 is pulled down, GP6 and
-GP12 float and may read either way).  VDD reads wherever GP26 floats
+Expect FREEZE, RESET, DS and BERR low (no carrier: GP5 is pulled down,
+GP6, GP8 and GP12 float and may read either way).  VDD reads wherever GP26 floats
 without the carrier's divider: 1.06-1.14 V on an RP2040-Zero.  `bdm halt`
 fails with "no target power" (NoTarget): VDD is under 4.5 V.
 
@@ -108,10 +110,13 @@ The Pico on the carrier, the BDM cable unplugged.
 bdm pins
 ```
 
-Expect FREEZE, RESET and DS low (the 100 kOhm pull-downs on the U4-U8 inputs)
-and VDD near 0 V.  With a 5 V bench supply on J1 pin 9 (VDD) and pin 3
-(GND), VDD should read 5.0 V within a few percent (the 100k/100k
-divider and the Pico's 3.3 V reference).  Record the error.
+Expect FREEZE, RESET, DS and BERR low (the 100 kOhm pull-downs on the
+U4-U8 inputs) and VDD near 0 V.  With a 5 V bench supply on J1 pin 9
+(VDD) and pin 3 (GND), VDD should read 5.0 V within a few percent (the
+100k/100k divider and the Pico's 3.3 V reference).  Record the error.
+
+With the supply on, 5 V on each input in turn reads high: pin 1 (DS),
+pin 2 (BERR), pin 6 (FREEZE), pin 7 (RESET).
 
 ## 4. Target, pod unpowered
 
@@ -126,7 +131,7 @@ Plug the cable into a running target with the pod's USB unplugged.
 USB plugged in, target powered.
 
 ```
-bdm pins                         # FREEZE low, RESET high, VDD about 5 V
+bdm pins                         # FREEZE low, RESET and BERR high, VDD about 5 V
 bdm reset                        # halted: breakpoint
 bdm pins                         # FREEZE high, ATEMP $00000000 (breakpoint)
 ```

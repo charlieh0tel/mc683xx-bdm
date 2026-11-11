@@ -10,8 +10,6 @@
 
 ## Firmware
 
-- BERR sense: read GP8 (U8) and report it in Pins (PLAN.md, Firmware;
-  docs/usb-protocol.md).
 - DSCLK above 4 MHz, once the throughput test measures the margin.
 - A `Link` adapter onto m683xx-emu's BDM serial exchange once it
   lands; then delete `bdm-model`.

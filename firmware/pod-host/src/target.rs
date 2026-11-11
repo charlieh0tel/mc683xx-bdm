@@ -298,7 +298,8 @@ mod tests {
     /// is `Atemp::None`.
     fn pins(atemp: Atemp) -> Vec<u8> {
         let mut packet = [0; PACKET];
-        let pins = Pins { freeze: atemp != Atemp::None, reset: true, ds: true, vdd_mv: 5000, atemp };
+        let pins =
+            Pins { freeze: atemp != Atemp::None, reset: true, ds: true, berr: true, vdd_mv: 5000, atemp };
         let length = encode_pins(&pins, &mut packet);
         packet[..length].to_vec()
     }

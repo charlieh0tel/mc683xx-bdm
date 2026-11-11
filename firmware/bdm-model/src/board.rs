@@ -91,6 +91,10 @@ impl<const RAM: usize> Board for ModelBoard<RAM> {
         true
     }
 
+    fn berr_high(&self) -> bool {
+        true
+    }
+
     async fn vdd_mv(&mut self) -> Result<u16, VddError> {
         Ok(VDD_MV)
     }

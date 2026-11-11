@@ -21,7 +21,7 @@ pub const PACKET: usize = 64;
 
 /// This protocol's version, in the Hello reply: raised on any change
 /// to a request or reply (docs/usb-protocol.md).
-pub const PROTOCOL_VERSION: u32 = 2;
+pub const PROTOCOL_VERSION: u32 = 3;
 
 /// Bytes a reply's status takes.
 const STATUS_BYTES: usize = 1;
@@ -54,6 +54,7 @@ const HELLO: u8 = 0x0E;
 const FREEZE: u8 = 1 << 0;
 const RESET: u8 = 1 << 1;
 const DS: u8 = 1 << 2;
+const BERR: u8 = 1 << 3;
 
 /// Bytes in a 32-bit field.
 const LONG: usize = 4;
@@ -435,6 +436,8 @@ pub struct Pins {
     pub reset: bool,
     /// DS high: no data strobe.
     pub ds: bool,
+    /// BERR high: no bus error.
+    pub berr: bool,
     /// Target VDD, millivolts.
     pub vdd_mv: u16,
     /// ATEMP for the CPU's current stay in background mode.
@@ -500,7 +503,7 @@ pub fn encode_transfer_reply(responses: &[u32], packet: &mut [u8; PACKET]) -> us
 
 /// Writes a Pins reply, returning its length.
 pub fn encode_pins(pins: &Pins, packet: &mut [u8; PACKET]) -> usize {
-    let levels = [(pins.freeze, FREEZE), (pins.reset, RESET), (pins.ds, DS)]
+    let levels = [(pins.freeze, FREEZE), (pins.reset, RESET), (pins.ds, DS), (pins.berr, BERR)]
         .into_iter()
         .filter(|(high, _)| *high)
         .fold(0, |bits, (_, bit)| bits | bit);
@@ -573,6 +576,7 @@ pub fn parse_pins(body: &[u8]) -> Result<Pins, ReplyError> {
         freeze,
         reset: levels & RESET != 0,
         ds: levels & DS != 0,
+        berr: levels & BERR != 0,
         vdd_mv: u16::from_le_bytes([low, high]),
         atemp,
     })
@@ -604,6 +608,8 @@ mod tests {
     use super::ATEMP_NONE;
     use super::Address;
     use super::Atemp;
+    use super::BERR;
+    use super::DS;
     use super::FREEZE;
     use super::MAX_MEMORY_BYTES;
     use super::MAX_TRANSFER_WORDS;
@@ -747,8 +753,15 @@ mod tests {
     fn pins_reply() {
         let mut packet = [0; PACKET];
         for (freeze, atemp) in [(true, Atemp::Fresh(1)), (true, Atemp::Stale(0)), (false, Atemp::None)] {
-            let pins = Pins { freeze, reset: true, ds: false, vdd_mv: 5012, atemp };
+            let pins = Pins { freeze, reset: true, ds: false, berr: true, vdd_mv: 5012, atemp };
             let length = encode_pins(&pins, &mut packet);
+            assert_eq!(parse_pins(parse_reply(&packet[..length]).unwrap()), Ok(pins));
+        }
+        // Each level in its own bit.
+        for (berr, levels) in [(true, DS | BERR), (false, DS)] {
+            let pins = Pins { freeze: false, reset: false, ds: true, berr, vdd_mv: 0, atemp: Atemp::None };
+            let length = encode_pins(&pins, &mut packet);
+            assert_eq!(packet[1], levels);
             assert_eq!(parse_pins(parse_reply(&packet[..length]).unwrap()), Ok(pins));
         }
         assert_eq!(parse_pins(&[0, 0]), Err(ReplyError::Malformed));

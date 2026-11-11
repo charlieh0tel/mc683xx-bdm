@@ -273,11 +273,10 @@ the pod has its own.  Requests:
 - Transfer: up to 15 raw words, each answered with the 17 bits shifted
   in, for bring-up and commands the pod does not sequence.  Not
   guarded: with the target running its clocks are BKPT pulses.
-- Pins: FREEZE, RESET, DS levels, VDD in millivolts, and ATEMP for
+- Pins: FREEZE, RESET, DS, BERR levels, VDD in millivolts, and ATEMP for
   the current stay in background mode (below).  DSO is a PIO
   pin, which embassy-rp gives no way to read, so it is not reported.
-  BERR is sensed on GP8 (U8); the firmware does not read it yet
-  (TODO.md).
+  BERR is sensed on GP8 (U8).
 - ResetHalt, Halt: the sequences in Protocol summary; refused without
   VDD, and NoFreeze if FREEZE does not assert in 100 ms.  Each returns
   ATEMP.  Halt on a CPU already in background mode only returns it.
@@ -415,8 +414,8 @@ How to run each item and what to expect: `docs/bring-up.md`.
       at 4 MHz against 0.15 ms on the wire, so USB-limited, about
       28k words/s
 - [ ] Carrier, no target (rev 0.2): USB-flashed, enumerates, inputs
-      low.  DS, FREEZE and RESET each read high with 5 V on their J1
-      pin, low without (BERR not reported yet).  Loopback at J1 (8 to
+      low.  DS, BERR, FREEZE and RESET each read high with 5 V on
+      their J1 pin, low without.  Loopback at J1 (8 to
       10, FREEZE high), unscoped: 3600 words ok at 1 MHz (0.180 s) and
       4 MHz (0.132 s).  VDD sense reads 5.344 V at 5.287 V on the bench supply's
       display, 1.1% high; to confirm with a meter

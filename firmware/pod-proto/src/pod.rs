@@ -49,6 +49,9 @@ pub trait Board: Link {
     /// DS high: no data strobe.
     fn ds_high(&self) -> bool;
 
+    /// BERR high: no bus error.
+    fn berr_high(&self) -> bool;
+
     /// Target VDD in millivolts, saturating.
     ///
     /// # Errors
@@ -205,6 +208,7 @@ impl<B: Board> Pod<B> {
             freeze: atemp != Atemp::None,
             reset: board.reset_high(),
             ds: board.ds_high(),
+            berr: board.berr_high(),
             vdd_mv: board.vdd_mv().await.map_err(|_| Status::Unexpected)?,
             atemp,
         })

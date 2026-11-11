@@ -240,6 +240,7 @@ fn execute<T: Transport>(target: &mut PodTarget<T>, command: Command) -> Result<
             println!("FREEZE {}", level(pins.freeze));
             println!("RESET  {}", level(pins.reset));
             println!("DS     {}", level(pins.ds));
+            println!("BERR   {}", level(pins.berr));
             println!("VDD    {}.{:03} V", pins.vdd_mv / 1000, pins.vdd_mv % 1000);
             match pins.atemp {
                 Atemp::None => {}

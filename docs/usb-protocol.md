@@ -7,7 +7,7 @@ it alone answers as the pod does.  The pod's implementation is
 `firmware/pod-proto/src/usb.rs`; where the two disagree, that is a bug
 in one of them.
 
-Protocol version: **2** (`PROTOCOL_VERSION`), raised on any change to a
+Protocol version: **3** (`PROTOCOL_VERSION`), raised on any change to a
 request or reply.
 
 ## Transport
@@ -85,8 +85,8 @@ Fields:
   or long access at an odd address is the target's address error,
   BusError.
 - DSCLK Hz: any u32 (below).
-- Pins levels: bit 0 FREEZE, bit 1 RESET, bit 2 DS; set means high;
-  bits 3-7 zero.  DSO is not reported; BERR is not sensed.
+- Pins levels: bit 0 FREEZE, bit 1 RESET, bit 2 DS, bit 3 BERR; set
+  means high; bits 4-7 zero.  DSO is not reported.
 - VDD: millivolts, read through the pod's divider, saturating at
   65535.  A stand-in with no supply to measure reports 5000.
 - ATEMP field: u8 kind, then u32 ATEMP.  Kind 0: not in background

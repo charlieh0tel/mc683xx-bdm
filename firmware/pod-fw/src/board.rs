@@ -44,6 +44,7 @@ pub(crate) struct PicoBoard<'d> {
     reset_drive: Output<'d>,
     reset: Input<'d>,
     ds: Input<'d>,
+    berr: Input<'d>,
     adc: Adc<'d, Async>,
     vdd: Channel<'d>,
 }
@@ -58,6 +59,8 @@ pub(crate) struct Lines<'d> {
     pub(crate) reset: Input<'d>,
     /// DS, low during a bus cycle's data phase.
     pub(crate) ds: Input<'d>,
+    /// BERR, low on a bus error.
+    pub(crate) berr: Input<'d>,
 }
 
 impl<'d> PicoBoard<'d> {
@@ -68,6 +71,7 @@ impl<'d> PicoBoard<'d> {
             reset_drive: lines.reset_drive,
             reset: lines.reset,
             ds: lines.ds,
+            berr: lines.berr,
             adc,
             vdd,
         }
@@ -124,6 +128,10 @@ impl Board for PicoBoard<'_> {
 
     fn ds_high(&self) -> bool {
         self.ds.is_high()
+    }
+
+    fn berr_high(&self) -> bool {
+        self.berr.is_high()
     }
 
     async fn vdd_mv(&mut self) -> Result<u16, VddError> {
