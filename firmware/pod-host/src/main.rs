@@ -288,13 +288,10 @@ fn run(pod: Option<&str>, command: Command) -> Result<()> {
         return list(&mut std::io::stdout().lock());
     }
     let pod = pod.unwrap_or(DEFAULT_POD);
-    match command {
-        Command::Bootsel => {
-            reboot_to_bootloader(usb_serial(pod, "bootsel")?.as_deref())?;
-            writeln!(std::io::stdout(), "bootloader: copy the UF2 onto the RPI-RP2 drive")?;
-            return Ok(());
-        }
-        _ => {}
+    if matches!(command, Command::Bootsel) {
+        reboot_to_bootloader(usb_serial(pod, "bootsel")?.as_deref())?;
+        writeln!(std::io::stdout(), "bootloader: copy the UF2 onto the RPI-RP2 drive")?;
+        return Ok(());
     }
     let mut target = PodTarget::new(Pod::new(connect(pod)?));
     target.pod().check_protocol()?;
