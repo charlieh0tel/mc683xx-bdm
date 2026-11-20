@@ -6,6 +6,7 @@ use std::net::TcpStream;
 use std::os::unix::net::UnixStream;
 use std::time::Duration;
 
+use nusb::DeviceInfo;
 use nusb::Endpoint;
 use nusb::MaybeFuture;
 use nusb::descriptors::TransferType;
@@ -85,6 +86,14 @@ pub enum TransportError {
     MessageLength(usize),
 }
 
+/// The first pod found on USB.
+fn find_pod() -> Result<DeviceInfo, TransportError> {
+    nusb::list_devices()
+        .wait()?
+        .find(|device| device.vendor_id() == VID && device.product_id() == PID)
+        .ok_or(TransportError::NotFound)
+}
+
 /// The pod on USB.
 #[derive(Debug)]
 pub struct UsbTransport {
@@ -98,10 +107,7 @@ impl UsbTransport {
     /// # Errors
     /// No pod, or it cannot be opened or claimed.
     pub fn open() -> Result<Self, TransportError> {
-        let info = nusb::list_devices()
-            .wait()?
-            .find(|device| device.vendor_id() == VID && device.product_id() == PID)
-            .ok_or(TransportError::NotFound)?;
+        let info = find_pod()?;
         let interface = info.open().wait()?.claim_interface(INTERFACE).wait()?;
         let bulk = |direction: Direction| {
             interface
@@ -126,11 +132,7 @@ impl UsbTransport {
 /// # Errors
 /// No pod, no reset interface, or no bootloader afterwards.
 pub fn reboot_to_bootloader() -> Result<(), TransportError> {
-    let info = nusb::list_devices()
-        .wait()?
-        .find(|device| device.vendor_id() == VID && device.product_id() == PID)
-        .ok_or(TransportError::NotFound)?;
-    let device = info.open().wait()?;
+    let device = find_pod()?.open().wait()?;
     let number = device
         .active_configuration()
         .map_err(|_| TransportError::NoResetInterface)?
