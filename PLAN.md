@@ -239,7 +239,7 @@ mc683xx-bdm/
 ├── hardware/
 │   ├── mc683xx-pod/      # KiCad schematic + board
 │   ├── production/       # each release as ordered
-│   └── ee_tooling/      # shared KiCad tooling and house style (submodule, follows main)
+│   └── ee_tooling/      # shared KiCad tooling and house style (submodule, pinned)
 ├── firmware/
 │   ├── bdm-model/       # a CPU32 in background mode at the serial word, and a board around it; no_std; test target
 │   ├── pod-proto/       # BDM words and command sequences; USB commands; no_std
