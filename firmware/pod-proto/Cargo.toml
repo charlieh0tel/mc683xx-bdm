@@ -5,7 +5,7 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
-mc683xx-target = { git = "https://github.com/charlieh0tel/mc683xx", rev = "5dec517bdfc4456228fa2681fc1d1229172a1aae", version = "0.2.0" }
+mc683xx-target = "0.6.0"
 thiserror = { version = "2.0.21", default-features = false }
 
 [lints]

@@ -912,8 +912,9 @@ dependencies = [
 
 [[package]]
 name = "mc683xx-target"
-version = "0.2.0"
-source = "git+https://github.com/charlieh0tel/mc683xx?rev=5dec517bdfc4456228fa2681fc1d1229172a1aae#5dec517bdfc4456228fa2681fc1d1229172a1aae"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "eec0f86c3cb65bd0a38e3e529e3ff0e884345da37018f7cf95ada2e59059c539"
 dependencies = [
  "thiserror",
 ]

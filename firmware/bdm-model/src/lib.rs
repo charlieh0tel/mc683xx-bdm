@@ -93,7 +93,7 @@ enum Op {
 impl Op {
     fn decode(word: u16) -> Option<Self> {
         let low = word & LOW_NIBBLE;
-        let size = Size::from_field(word >> SIZE_SHIFT);
+        let size = Size::from_field((word >> SIZE_SHIFT) & Size::FIELD_MASK);
         match (word & REGISTER_MASK, word & SIZED_MASK) {
             (0x2180, _) => Register::from_code(low).map(Self::ReadRegister),
             (0x2080, _) => Register::from_code(low).map(Self::WriteRegister),

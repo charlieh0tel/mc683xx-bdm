@@ -10,7 +10,7 @@ anyhow = "1.0.104"
 bdm-model = { version = "0.1.0", path = "../bdm-model" }
 clap = { version = "4.6.7", features = ["derive"] }
 embassy-futures = "0.1.2"
-mc683xx-target = { git = "https://github.com/charlieh0tel/mc683xx", rev = "5dec517bdfc4456228fa2681fc1d1229172a1aae", version = "0.2.0" }
+mc683xx-target = "0.6.0"
 nusb = "0.2.9"
 pod-proto = { version = "0.1.0", path = "../pod-proto" }
 thiserror = "2.0.21"

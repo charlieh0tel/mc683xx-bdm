@@ -50,6 +50,9 @@ pub enum Error {
     /// The pod speaks another protocol version than this host.
     #[error("the pod speaks protocol {0}, this host {PROTOCOL_VERSION}")]
     Protocol(u32),
+    /// A call the pod cannot make yet.
+    #[error("{0} is not supported yet")]
+    Unsupported(&'static str),
 }
 
 /// The function code `bits` gives, if it fits FC\[2:0\].

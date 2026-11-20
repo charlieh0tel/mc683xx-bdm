@@ -206,6 +206,12 @@ impl<T: Transport> Cpu32Target for PodTarget<T> {
         self.pod.go()
     }
 
+    /// Not yet: T1 tracing through a stub in scratch RAM (PLAN.md,
+    /// Host, gdb).
+    fn step(&mut self) -> Result<Entry, Error> {
+        Err(Error::Unsupported("step"))
+    }
+
     fn read_register(&mut self, register: Register) -> Result<u32, Error> {
         self.halted_state()?;
         self.pod.read_register(register)

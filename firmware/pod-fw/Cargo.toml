@@ -17,7 +17,7 @@ embassy-sync = "0.8.0"
 embassy-time = "0.5.1"
 embassy-usb = "0.6.0"
 fixed = "1.31.0"
-mc683xx-target = { git = "https://github.com/charlieh0tel/mc683xx", rev = "5dec517bdfc4456228fa2681fc1d1229172a1aae", version = "0.2.0" }
+mc683xx-target = "0.6.0"
 panic-halt = "1.0.0"
 panic-probe = { version = "1.0.0", features = ["print-defmt"], optional = true }
 # embassy-rp 0.10 loads pio 0.3 programs.

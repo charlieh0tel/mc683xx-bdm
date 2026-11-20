@@ -370,9 +370,9 @@ fn system_register_from(byte: u8) -> Option<SystemRegister> {
     SystemRegister::from_code(u16::from(byte))
 }
 
-/// The size a byte names; `from_field` alone would read 4 as a byte.
+/// The size a byte names.
 fn size_from(byte: u8) -> Option<Size> {
-    Size::from_field(u16::from(byte)).filter(|size| size.field() == u16::from(byte))
+    Size::from_field(u16::from(byte))
 }
 
 /// A memory request's length: whole accesses, at least one, at most

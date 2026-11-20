@@ -39,8 +39,6 @@
   example image, once m683xx-emu's virtual cable lands.
 - A second Pico as a stand-in CPU32: a target-side PIO program around
   `bdm-model`, driving FREEZE and watching BKPT and RESET.
-- `mc683xx-target` from crates.io once 0.3.0 is published, in place of
-  the pinned git rev.
 - Bring-up, what is left (PLAN.md, Bring-up checklist; docs/bring-up.md):
   - Watchdog (docs/bring-up.md, step 1): idle a minute without a
     restart, BOOTSEL staying up past 8 s, a probe-rs halt not reset.

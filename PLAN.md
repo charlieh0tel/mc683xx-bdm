@@ -11,8 +11,7 @@ Goals:
 - Share a `Cpu32Target` trait with the `cpu32`/`mc68331` emulator
   crates so the smartclock harness can run against silicon or the
   emulator.  The trait is m683xx-emu's `mc683xx-target` crate
-  (github.com/charlieh0tel/mc683xx, crates/target); the pod depends on
-  it by git, pinned to a rev.
+  (github.com/charlieh0tel/mc683xx, crates/target), from crates.io.
 
 - gdb on silicon through the pod, with the same adapter as the
   emulator (Host, gdb).
@@ -457,8 +456,7 @@ code and no `unsafe`; no USB request, so the protocol is unchanged.
   `Cpu32Target` and the types every crate here uses: Address, Size,
   Register, SystemRegister, FunctionCode, Entry.  Memory calls name
   their function code; halting returns the entry source decoded from
-  ATEMP.  Taken by git at a pinned rev until its crates.io release
-  (0.3.0).
+  ATEMP.  From crates.io (0.6).
 - Loading and init (agreed with m683xx-emu, 2026-11-01):
   `mc683xx-debug`, in m683xx-emu (MIT OR Apache-2.0), over
   `Cpu32Target`.
