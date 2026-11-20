@@ -6,11 +6,11 @@ Pico 2 on a carrier board with 5 V level translators and the standard
 10-pin BDM header.  PIO clocks the BDM serial link; firmware and host
 are Rust.
 
-Status: firmware and host CLI pass a PIO loopback on a bare RP2040, no
-target yet (`docs/bring-up.md`, steps 1-2); the carrier
-(`hardware/mc683xx-pod/`) is 68 x 59 mm on 4 layers; rev 0.2 is ordered
-from JLCPCB, assembled with the Pico, J2 not fitted
-(`hardware/production/20261102-0.2/`).
+Status: the rev 0.2 carrier (`hardware/mc683xx-pod/`, 68 x 59 mm, 4
+layers; `hardware/production/20261102-0.2/`, assembled with the Pico,
+J2 not fitted) passes its checks without a target: inputs, VDD sense
+and a loopback through its buffers (`docs/bring-up.md`, steps 1-3).
+The first target is a Motorola Oncore VP (`docs/oncore-vp.md`).
 
 ## Layout
 
@@ -18,7 +18,7 @@ from JLCPCB, assembled with the Pico, J2 not fitted
 |---|---|
 | `PLAN.md` | the design and why it is the way it is |
 | `TODO.md` | the work list |
-| `docs/` | the host-pod protocol (`usb-protocol.md`), bring-up steps (`bring-up.md`) |
+| `docs/` | the host-pod protocol (`usb-protocol.md`), bring-up steps (`bring-up.md`), the Oncore VP target (`oncore-vp.md`) |
 | `hardware/` | the KiCad carrier board; `ee_tooling/`, the shared tooling (a submodule following its `main`), whose `jlcpcb-release` builds a JLCPCB order into `production/`, each release as ordered; `fastcheck.py`, a report on the BDM link's fast nets (`uv run python fastcheck.py mc683xx-pod/mc683xx-pod.kicad_pcb`) |
 | `firmware/` | the Rust workspace: firmware, host CLI, shared crates |
 | `third_party/` | vendor documents and their provenance (`NOTICE`) |
