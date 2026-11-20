@@ -60,7 +60,8 @@ pub trait Board: Link {
 
     /// Drives BKPT/DSCLK high and DSI, for commands to a CPU already in
     /// background mode, which may have entered on its own with DSI off
-    /// since GO.
+    /// since GO.  Makes no DSCLK edge: BKPT held low by a halt stays
+    /// low, for the first word's first rising edge to release.
     fn drive_link(&mut self);
 
     /// Holds BKPT low until FREEZE asserts, within the halt timeout;

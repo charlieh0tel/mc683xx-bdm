@@ -140,9 +140,14 @@ impl Board for PicoBoard<'_> {
         Ok(u16::try_from(mv).unwrap_or(u16::MAX))
     }
 
+    /// Raises DSCLK only while the pod is not driving it: after a halt
+    /// it is held low, and a rising edge now would be a bit to the CPU,
+    /// putting every later word out of frame.
     fn drive_link(&mut self) {
-        self.link.set_dsclk(Level::High);
-        self.dsclk_enable.set_high();
+        if self.dsclk_enable.is_set_low() {
+            self.link.set_dsclk(Level::High);
+            self.dsclk_enable.set_high();
+        }
         self.link.set_dsi_enabled(true);
     }
 
