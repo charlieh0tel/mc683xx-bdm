@@ -83,6 +83,17 @@ td.n { font-family: var(--mono); white-space: nowrap; }
   </section>
 
   <section>
+    <h2>Positions</h2>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Feature</th><th>x (mm)</th><th>y (mm)</th><th>x (in)</th><th>y (in)</th></tr></thead>
+        <tbody id="positions"></tbody>
+      </table>
+    </div>
+    <p class="caption">From a 600 dpi scan of board DEVT9614, about ±0.2 mm. Board as in the photo: component side up, test-point row along the bottom edge. Origin: the bottom-left mounting hole's center; x right, y up. The holes fit a 1.750 × 3.000 in rectangle; B1–B10 a 0.100 in pitch, B11 0.250 in past B10. The notch's center is on the board edge; its radius, about 1.7 mm, is from a photo.</p>
+  </section>
+
+  <section>
     <h2>CPU lower edge and BDM header</h2>
     <div class="figure">
       <svg viewBox="0 0 800 400" role="img" aria-label="The MC68331's lower-edge pins, and the standard 10-pin BDM header with the test point for each pin">
@@ -225,6 +236,24 @@ CHIP.forEach(([n, name, role], i) => {
   chip.appendChild(el("rect", { x, y: 318, width: 10, height: 10, fill: ROLE_COLOR[role] }));
   chip.appendChild(el("text", { x: x + 15, y: 327, fill: "var(--silk)", "font-size": 11 }, text));
 });
+
+// Positions from the 600 dpi scan: feature, x mm, y mm (origin bottom-left mounting hole, x right, y up).
+const POSITIONS = [
+  ["Mounting hole, bottom left", 0.00, 0.00], ["Mounting hole, bottom right", 44.34, 0.00],
+  ["Mounting hole, top left", -0.20, 75.81], ["Mounting hole, top right", 43.83, 76.30],
+  ["Notch, bottom edge (semicircle)", 31.85, -2.75], ["L6", -0.27, 8.89],
+  ["B1", 5.40, -0.56], ["B2", 7.98, -0.56], ["B3", 10.52, -0.57], ["B4", 13.02, -0.43], ["B5", 15.50, -0.36],
+  ["B6", 18.05, -0.46], ["B7", 20.58, -0.59], ["B8", 23.16, -0.56], ["B9", 25.62, -0.58], ["B10", 28.24, -0.64],
+  ["B11", 34.54, -0.64],
+];
+const MM_PER_IN = 25.4;
+const positions = document.getElementById("positions");
+for (const [name, x, y] of POSITIONS) {
+  const tr = document.createElement("tr");
+  tr.innerHTML = `<td>${name}</td><td class="n">${x.toFixed(2)}</td><td class="n">${y.toFixed(2)}</td>` +
+    `<td class="n">${(x / MM_PER_IN).toFixed(3)}</td><td class="n">${(y / MM_PER_IN).toFixed(3)}</td>`;
+  positions.appendChild(tr);
+}
 
 // Wire table.
 const wires = document.getElementById("wires");
