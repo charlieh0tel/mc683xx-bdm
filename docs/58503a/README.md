@@ -66,7 +66,11 @@ The bench unit's flash, read this way, is identical to smartclock's
 ## Back to running
 
 `bdm reset --run` restarts the firmware without a power cycle, with
-background mode off.  `bdm go` straight after `bdm reset` also starts
+background mode off.  Halting it afterwards still answers "halted: breakpoint",
+but with RPC at the reset vector and RSR $10: with background mode off,
+BKPT is a breakpoint exception, the firmware does not survive it, the
+halt monitor resets the CPU, and BKPT, still held low, enables
+background mode at that reset.  `bdm go` straight after `bdm reset` also starts
 it from the reset vector.
 
 ## To check
