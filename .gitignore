@@ -10,6 +10,8 @@ target/
 __pycache__/
 .pytest_cache/
 .ruff_cache/
+# The module maturin builds into the Python bindings' package
+*.abi3.so
 
 # KiCad
 *-backups/

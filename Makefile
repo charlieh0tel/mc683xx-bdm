@@ -23,15 +23,18 @@ hooks:
 # Firmware).
 BUILDS = rp2040:thumbv6m-none-eabi rp235xa:thumbv8m.main-none-eabihf
 
-# Before each commit (AGENTS.md): rustfmt, clippy on the workspace and on
-# every firmware build, warnings as errors, ee_tooling's schematic
-# drawing-rule check, and ruff and pytest on hardware/'s own Python.
+# Before each commit (AGENTS.md): rustfmt, clippy on the workspace (the
+# Python bindings with their `python` feature too) and on every firmware
+# build, warnings as errors, ee_tooling's schematic drawing-rule check,
+# ruff and pytest on hardware/'s own Python, and ruff and pytest on the
+# Python bindings (firmware/pod-py), which uv builds with maturin.
 lint:
 	@# No wildcard imports, `use super::*` in tests included (AGENTS.md):
 	@# clippy's wildcard_imports does not report these.
 	@if git grep -nE '^\s*(pub(\([a-z]+\))? )?use [^;]*::\*;' -- 'firmware/*.rs'; then \
 		echo "wildcard imports (above)"; exit 1; fi
 	cd firmware && cargo fmt --check && cargo clippy --all-targets -- -D warnings
+	cd firmware && cargo clippy -p pod-py --all-targets --features python -- -D warnings
 	cd firmware/pod-fw && cargo fmt --check
 	for build in $(BUILDS); do \
 		chip=$${build%%:*}; target=$${build#*:}; \
@@ -42,3 +45,4 @@ lint:
 	done
 	cd hardware && uv run kicad-style-check mc683xx-pod/mc683xx-pod.kicad_sch
 	cd hardware && uv run ruff format --check && uv run ruff check && uv run pytest -q
+	cd firmware/pod-py && uv run ruff format --check && uv run ruff check && uv run pytest -q

@@ -29,7 +29,7 @@ registers and SIM registers, and reads 512 KB of flash correctly.
 
 ```
 cd firmware
-cargo test                     # pod-proto, bdm-model and pod-host, on the host
+cargo test                     # pod-proto, bdm-model, pod-host and pod-py, on the host
 
 cd pod-fw
 cargo run --release            # Pico, defmt over RTT, through an SWD probe
@@ -68,6 +68,47 @@ and to group `plugdev`, mode 0660, since uaccess does nothing for a
 login over ssh: add a remote user with `sudo adduser USER plugdev`.
 Replug the pod after installing the rule.  1209:0001 is pid.codes'
 shared test pair, so the rule also matches anything else using it.
+
+### Python
+
+`firmware/pod-py` is the Python module `mc683xx_bdm`, PyO3 bindings
+over `pod-host`: one open pod across calls, for scripts with loops and
+polling.  uv builds it with maturin into the crate's `.venv`:
+
+```
+cd firmware/pod-py
+uv sync                        # builds and installs the module
+uv run pytest                  # against bdm-stand-in, no hardware
+uv build --wheel               # a wheel, to pip install elsewhere
+```
+
+```python
+import time
+import mc683xx_bdm
+
+with mc683xx_bdm.Pod("usb") as pod:  # or "usb:SERIAL", "unix:/tmp/pod.sock"
+    print(pod.reset_with_breakpoint())      # breakpoint
+    pod.write_register("PC", 0x100000)
+    pod.write_memory(0x100000, bytes.fromhex("4e714afa"), size=2)
+    pod.go()
+    while pod.background is None:           # poll until it halts
+        time.sleep(0.01)
+    print(pod.registers())
+    print(hex(pod.bus_read(0xFFFA00, 2)))   # SIMCR
+```
+
+The names follow the emulator's bindings (`mc683xx`, in m683xx-emu's
+`crates/cpu32-py`): `halt`, `go`, `reset_with_breakpoint`, `background`,
+`read_register("D0")`, `registers()`, `bus_read(address, size,
+function_code=5)`, `Entry`, `BusError`, `TargetError`.  Blocks are
+`read_memory(address, length, *, size=1, function_code=5)` and
+`write_memory(address, data, ...)`; `pins`, `version`, `hello`,
+`set_clock`, `resync`, `call`, `reset` (to run) and `transfer` are the
+pod's own.  Leaving the `with` block, or `close()`, puts back the
+program's SFC and DFC, as `bdm` does.  Exceptions: `TransportError`
+(an `OSError`), `ProtocolError`, `TargetError`, `BusError`, and
+`ValueError` for a bad name, size or function code.  Types:
+`python/mc683xx_bdm/__init__.pyi`.
 
 ### Debian package
 

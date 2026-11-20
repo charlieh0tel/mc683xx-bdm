@@ -36,13 +36,17 @@ pub const SYSTEM_REGISTERS: [SystemRegister; 9] = [
 
 impl Named {
     /// The register `name` names, in any case: `d0`-`a7`, `sp` for A7,
-    /// or a system register.
+    /// `pc` for RPC (the emulator's name, where GO resumes), or a system
+    /// register.
     ///
     /// # Errors
     /// `name` names no register.
     pub fn parse(name: &str) -> Result<Self, UnknownRegister> {
         if name.eq_ignore_ascii_case("sp") {
             return Ok(Self::Data(Register::A7));
+        }
+        if name.eq_ignore_ascii_case("pc") {
+            return Ok(Self::System(SystemRegister::Rpc));
         }
         name.parse()
             .map(Self::Data)
@@ -86,6 +90,7 @@ mod tests {
         assert_eq!(Named::parse("d0"), Ok(Named::Data(Register::D0)));
         assert_eq!(Named::parse("A7"), Ok(Named::Data(Register::A7)));
         assert_eq!(Named::parse("SP"), Ok(Named::Data(Register::A7)));
+        assert_eq!(Named::parse("PC"), Ok(Named::System(SystemRegister::Rpc)));
         assert_eq!(Named::parse("sfc"), Ok(Named::System(SystemRegister::Sfc)));
         assert_eq!(Named::parse("d8"), Err(UnknownRegister("d8".to_owned())));
         assert!(Named::parse("x1").is_err());

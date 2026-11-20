@@ -101,8 +101,8 @@ enum Command {
     },
     /// Every data, address and system register.
     Regs,
-    /// One register: d0-d7, a0-a7, sp, or a system register (rpc, pcc,
-    /// atemp, far, vbr, sr, usp, ssp, sfc, dfc).
+    /// One register: d0-d7, a0-a7, sp, pc (rpc), or a system register
+    /// (rpc, pcc, atemp, far, vbr, sr, usp, ssp, sfc, dfc).
     Get { register: String },
     /// Write a register.
     Set {

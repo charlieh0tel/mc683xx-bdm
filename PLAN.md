@@ -244,7 +244,8 @@ mc683xx-bdm/
 │   ├── bdm-model/       # a CPU32 in background mode at the serial word, and a board around it; no_std; test target
 │   ├── pod-proto/       # BDM words and command sequences; USB commands; no_std
 │   ├── pod-fw/          # Pico / Pico 2 firmware, embassy-rp, PIO
-│   └── pod-host/        # Rust library + `bdm` CLI (nusb)
+│   ├── pod-host/        # Rust library + `bdm` CLI (nusb)
+│   └── pod-py/          # Python bindings, `mc683xx_bdm` (PyO3, maturin, uv)
 ├── third_party/         # vendor manuals + NOTICE
 ├── README.md
 ├── PLAN.md
@@ -393,9 +394,10 @@ code and no `unsafe`; no USB request, so the protocol is unchanged.
   protocol is `docs/usb-protocol.md`; this repo owns it.  `bdm`
   sends Hello first and stops on another protocol version
   (`Pod::check_protocol`).
-- `pod-host`'s `register`: registers by name, `d0`-`a7`, `sp` and the
-  system registers, read and written through any `Cpu32Target`, and
-  the system registers in listing order.
+- `pod-host`'s `register`: registers by name, `d0`-`a7`, `sp`, `pc`
+  (RPC, the emulator's name) and the system registers, read and
+  written through any `Cpu32Target`, and the system registers in
+  listing order.
 - `pod-host`'s `pod`: each USB request as a call.  Memory goes as
   56-byte requests and raw transfers as 15-word ones; a chunk never
   splits an access.  Tested against scripted replies.
@@ -421,6 +423,24 @@ code and no `unsafe`; no USB request, so the protocol is unchanged.
   hex listing.
   Each run restores SFC and DFC before it exits, since the next run
   knows nothing of it.
+- Scripting: Python bindings, `pod-py` (Python module `mc683xx_bdm`),
+  PyO3 over `PodTarget`, so a script keeps one pod open across calls
+  and uses Python's loops and polling.  No script mode in `bdm`, which
+  would be a language of its own, and no sharing of a pod between
+  processes: one process opens it, as USB allows.  The layer is thin:
+  each method is one `PodTarget` or `Pod` call, with the GIL released
+  while it waits on the pod; register names, the protocol check and
+  the pod's address (`PodAddress`, `usb:SERIAL` included) are
+  `pod-host`'s, shared with `bdm`.  The API follows the emulator's
+  bindings (m683xx-emu's `cpu32-py`, module `mc683xx`)
+  where the concepts match, so a script can drive either: `halt`,
+  `go`, `reset_with_breakpoint`, `background`, `read_register(name)`,
+  `registers()`, `bus_read`/`bus_write(address, size, ...,
+  function_code=5)`, `Entry`, `BusError`, `TargetError`.  Its build is
+  cpu32-py's (maturin, a `python` feature so `cargo test` needs no
+  Python, abi3 from 3.10, stubs in `python/`), but in a uv project
+  (AGENTS.md, Python) rather than a Makefile's venv.  `make lint` runs
+  clippy with `python`, ruff and pytest against `bdm-stand-in`.
 - Linux needs a udev rule for access without root
   (`packaging/udev/70-mc683xx-pod.rules`, README.md): uaccess for the
   user at the seat, and group plugdev, mode 0660, for a login over

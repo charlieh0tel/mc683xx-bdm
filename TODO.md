@@ -27,6 +27,14 @@
 - gdb: `PodTarget::step` by T1 trace once `step()` is in `Cpu32Target`,
   and `bdm gdb` serving m683xx-emu's adapter over `PodTarget` (PLAN.md,
   Host, gdb).
+- CALL whose stacking takes a bus error (SP unmapped) reports success:
+  `pod-proto`'s CALL expects no reply (`Reply::Exit`), so the bus
+  error the CPU answers with (CPU32RM 7.2.8.13) goes unread and the
+  CPU stays halted.  Seen through the Python bindings on
+  `bdm-stand-in`; read the response or check FREEZE after CALL.
+- Python bindings (`pod-py`): `step` once `PodTarget::step` lands;
+  `__init__.pyi` checked against the module with mypy's stubtest, as
+  cpu32-py's is, once mypy is agreed as a dependency.
 - `pod-host` integration test against `mc683xx-run --bdm` and its
   example image, once m683xx-emu's virtual cable lands.
 - A second Pico as a stand-in CPU32: a target-side PIO program around
