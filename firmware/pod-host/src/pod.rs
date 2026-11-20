@@ -99,6 +99,19 @@ impl<T: Transport> Pod<T> {
         self.atemp(&Request::ResetHalt)
     }
 
+    /// The pod firmware's version: crate version and git commit.
+    ///
+    /// # Errors
+    /// As [`Error`]; the reply is not ASCII.
+    pub fn version(&mut self) -> Result<String, Error> {
+        let mut reply = [0; PACKET];
+        let body = self.request(&Request::Version, &mut reply)?;
+        if !body.is_ascii() {
+            return Err(ReplyError::Malformed.into());
+        }
+        Ok(String::from_utf8_lossy(body).into_owned())
+    }
+
     /// Brings a halted target's serial link back into frame; returns
     /// ATEMP, stale.
     ///

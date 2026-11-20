@@ -200,6 +200,13 @@ fn a_pod_started_under_a_halted_cpu_out_of_frame_resyncs_itself() {
 }
 
 #[test]
+fn version_is_the_boards_and_needs_no_target() {
+    let mut pod = pod(false);
+    let reply = send(&mut pod, &Request::Version);
+    assert_eq!(status(&reply), Ok(concat!("bdm-model ", env!("CARGO_PKG_VERSION")).as_bytes()));
+}
+
+#[test]
 fn memory_round_trips() {
     let mut pod = pod(true);
     send(&mut pod, &Request::ResetHalt);

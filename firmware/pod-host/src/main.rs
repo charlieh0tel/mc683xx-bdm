@@ -54,9 +54,12 @@ fn loopback_mismatch(words: &[u16], responses: &[u32]) -> Option<(usize, u16, u3
         .map(|(n, (word, response))| (n, *word, *response))
 }
 
+/// bdm's version: crate version and git commit.
+const VERSION: &str = concat!(env!("CARGO_PKG_VERSION"), " ", env!("GIT_VERSION"));
+
 /// The CPU32 BDM pod (PLAN.md).
 #[derive(Debug, Parser)]
-#[command(name = "bdm", version)]
+#[command(name = "bdm", version = VERSION)]
 struct Cli {
     /// The pod: `usb`, or a stand-in on `unix:PATH` or `tcp:HOST:PORT`
     /// (docs/usb-protocol.md).
@@ -142,6 +145,8 @@ enum Command {
     },
     /// Reboot the pod into the RP2040's USB bootloader, for a new UF2.
     Bootsel,
+    /// bdm's version and the pod firmware's, and their protocol.
+    Version,
     /// Bring a halted target's serial link back into frame, after a pod
     /// restart, without resetting it.
     Resync,
@@ -357,6 +362,11 @@ fn execute<T: Transport>(target: &mut PodTarget<T>, command: Command, out: &mut 
             }
             let total = words.len() * usize::try_from(rounds)?;
             writeln!(out, "loopback: {total} words ok in {:.3} s", started.elapsed().as_secs_f64())?;
+        }
+        Command::Version => {
+            writeln!(out, "bdm {VERSION}")?;
+            writeln!(out, "pod {}", target.pod().version()?)?;
+            writeln!(out, "protocol {PROTOCOL_VERSION}")?;
         }
         Command::Resync => match target.resync()? {
             Atemp::Stale(atemp) => writeln!(out, "in frame; ATEMP ${atemp:08x} (stale)")?,

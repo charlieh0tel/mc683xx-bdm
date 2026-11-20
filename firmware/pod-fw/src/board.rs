@@ -182,6 +182,10 @@ impl Board for PicoBoard<'_> {
         let _ = with_timeout(FREEZE_TIMEOUT, self.reset.wait_for_high()).await;
     }
 
+    fn version(&self) -> &'static str {
+        concat!(env!("CARGO_PKG_VERSION"), " ", env!("GIT_VERSION"))
+    }
+
     async fn clock_bit(&mut self) {
         self.link.set_dsclk(Level::Low);
         Timer::after(EDGE_PHASE).await;

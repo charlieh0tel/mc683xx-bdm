@@ -21,7 +21,7 @@ pub const PACKET: usize = 64;
 
 /// This protocol's version, in the Hello reply: raised on any change
 /// to a request or reply (docs/usb-protocol.md).
-pub const PROTOCOL_VERSION: u32 = 6;
+pub const PROTOCOL_VERSION: u32 = 7;
 
 /// Bytes a reply's status takes.
 const STATUS_BYTES: usize = 1;
@@ -51,6 +51,7 @@ const CALL: u8 = 0x0D;
 const HELLO: u8 = 0x0E;
 const RESET_RUN: u8 = 0x0F;
 const RESYNC: u8 = 0x10;
+const VERSION: u8 = 0x11;
 
 /// Pin level bits in a Pins reply: set for high.
 const FREEZE: u8 = 1 << 0;
@@ -87,6 +88,8 @@ pub enum Request<'a> {
     /// Bring a halted target's serial link back into frame; the reply
     /// is ATEMP, stale.
     Resync,
+    /// The firmware's version, ASCII: crate version and git commit.
+    Version,
     /// Stop the running target in background mode; the reply is ATEMP.
     Halt,
     /// GO: resume at RPC.
@@ -196,6 +199,7 @@ impl<'a> Request<'a> {
             RESET_HALT => empty(Self::ResetHalt),
             RESET_RUN => empty(Self::ResetRun),
             RESYNC => empty(Self::Resync),
+            VERSION => empty(Self::Version),
             HALT => empty(Self::Halt),
             GO => empty(Self::Go),
             SET_CLOCK => Ok(Self::SetClock { dsclk_hz: long(exact::<LONG>(body).ok_or(length)?) }),
@@ -261,6 +265,9 @@ impl<'a> Request<'a> {
             }
             Self::Resync => {
                 out.put(&[RESYNC]);
+            }
+            Self::Version => {
+                out.put(&[VERSION]);
             }
             Self::Halt => {
                 out.put(&[HALT]);
@@ -671,6 +678,7 @@ mod tests {
         round_trip(Request::ResetHalt);
         round_trip(Request::ResetRun);
         round_trip(Request::Resync);
+        round_trip(Request::Version);
         round_trip(Request::Halt);
         round_trip(Request::Go);
         round_trip(Request::SetClock { dsclk_hz: 1_000_000 });

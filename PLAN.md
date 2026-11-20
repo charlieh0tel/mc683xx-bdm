@@ -362,7 +362,7 @@ code and no `unsafe`; no USB request, so the protocol is unchanged.
   5 V; a halt or reset enters with a breakpoint, and a reset keeps
   registers and memory.  Not the emulator: no instructions run, so a
   test enters background mode itself.
-- `bdm`: pins, halt, reset (`--run`: ResetRun), resync, bootsel, go, call, clock, regs, get, set, dump,
+- `bdm`: pins, halt, reset (`--run`: ResetRun), resync, bootsel, version, go, call, clock, regs, get, set, dump,
   write, xfer, loopback, through `PodTarget`.  Halt and reset print the entry
   source.  Dump and write take `--fc`, default 5 (supervisor data).
   Dump with `--output FILE` writes the raw bytes to FILE instead of a

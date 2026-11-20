@@ -84,6 +84,10 @@ pub trait Board: Link {
     /// running, background mode off, and waits for RESET to rise.
     async fn reset_run(&mut self);
 
+    /// The firmware's version: crate version and git commit, ASCII,
+    /// shorter than a packet.
+    fn version(&self) -> &'static str;
+
     /// One DSCLK rising edge outside a word, DSI as the last word left
     /// it: the CPU takes it as a bit, moving its frame on by one.  For
     /// resynchronizing only.
@@ -111,6 +115,8 @@ enum Answer {
     Pins(Pins),
     /// The first `n` bytes of the memory buffer.
     Data(usize),
+    /// Text that lasts.
+    Text(&'static str),
     /// The first `n` responses of the transfer buffer.
     Responses(usize),
 }
@@ -142,7 +148,7 @@ impl<B: Board> Pod<B> {
         };
         // A reset makes the entry moot, and a link out of frame must not
         // stop the reset that frames it again.
-        if !matches!(request, Request::ResetHalt | Request::ResetRun | Request::Resync)
+        if !matches!(request, Request::ResetHalt | Request::ResetRun | Request::Resync | Request::Version)
             && let Err(status) = self.read_entry().await
         {
             return encode_status(status, reply);
@@ -155,6 +161,7 @@ impl<B: Board> Pod<B> {
             Ok(Answer::Atemp(atemp)) => encode_atemp(atemp, reply),
             Ok(Answer::Pins(pins)) => encode_pins(&pins, reply),
             Ok(Answer::Data(n)) => encode_data(&data[..n], reply),
+            Ok(Answer::Text(text)) => encode_data(text.as_bytes(), reply),
             Ok(Answer::Responses(n)) => encode_transfer_reply(&responses[..n], reply),
             Err(status) => encode_status(status, reply),
         }
@@ -183,6 +190,7 @@ impl<B: Board> Pod<B> {
             Request::Go => self.command(&Command::Go).await.map(|_| Answer::Done),
             Request::Call(address) => self.command(&Command::Call(address)).await.map(|_| Answer::Done),
             Request::Hello => Ok(Answer::Value(PROTOCOL_VERSION)),
+            Request::Version => Ok(Answer::Text(self.session.link_mut().version())),
             Request::ReadRegister(register) => {
                 self.command(&Command::ReadRegister(register)).await.map(Answer::Value)
             }
