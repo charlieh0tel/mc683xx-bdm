@@ -23,22 +23,24 @@ probably repeats from 0x40000.
 
 No BDM header.  A test-point row along the board edge, below the CPU's
 lower edge (pins 51-83, pin 1 at the top center of the package), carries
-a programming fixture's BDM set:
+most of a programming fixture's BDM set:
 
 | Test point | MC68331 pin | Signal | BDM header pin | State |
 |---|---|---|---|---|
+| B5 | VSS | GND | 3, 5 | buzzed |
 | B6 | 54 | IPIPE/DSO | 10 | traced by eye |
 | B7 | 55 | IFETCH/DSI | 8 | traced by eye; pull resistor, rail to confirm |
 | B8 | 56 | BKPT/DSCLK | 4 | traced by eye; pull resistor, same rail as B7 |
 | B9 | 58 | FREEZE/QUOT | 6 | traced by eye |
-| B10 | 65 | VDD | 9 | buzzed, to recount |
-| B11 | 68 | RESET | 7 | buzzed, to recount |
+| B10 | ? | not VDD | - | buzzed; 64 (XFC) or 66 (CLKOUT) if one lead off |
+| B11 | 68 | RESET | 7 | buzzed, to recount: 67 (VSS) or 69 (HALT) if one lead off |
 
-B1-B5, the same row's left end, run to the GPS output header.
+B1-B4, the same row's left end, run to the GPS output header.  L6, in
+the column of test points at the board's left edge, is +5 V (buzzed):
+BDM header pin 9.
 
 The rest of a 10-pin BDM header:
 
-- GND (pins 3, 5): any VSS; on the lower edge, pins 51, 59, 67, 83.
 - BERR (pin 2): pin 70, no test point.  Tack a wire, or leave it open:
   the pod's pull-down then reports BERR low.
 - DS (pin 1): pin 85 (PE5/DS), optional; the pod only reports it.
