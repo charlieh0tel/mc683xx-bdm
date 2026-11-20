@@ -1,4 +1,4 @@
-# Claude Instructions for mc683xx-pod
+# Claude Instructions for mc683xx-bdm
 
 ## Project
 

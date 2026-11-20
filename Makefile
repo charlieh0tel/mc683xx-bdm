@@ -4,7 +4,7 @@
 .PHONY: deb hooks lint
 
 # The bdm Debian package, as rust-build-deb (deb-workflows) builds it:
-# firmware/target/debian/mc683xx-pod_*.deb.
+# firmware/target/debian/mc683xx-bdm_*.deb.
 deb:
 	cd firmware && cargo deb -p pod-host
 

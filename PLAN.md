@@ -1,4 +1,4 @@
-# mc683xx-pod
+# mc683xx-bdm
 
 USB background debug mode (BDM) pod for Motorola/Freescale CPU32
 (683xx) parts, primarily the MC68331. Raspberry Pi Pico (RP2040) or
@@ -235,7 +235,7 @@ pinned toolchain (`firmware/rust-toolchain.toml`).  `pod-fw` builds
 only for the Pico targets, so it has its own `Cargo.lock`.
 
 ```
-mc683xx-pod/
+mc683xx-bdm/
 ├── hardware/
 │   ├── mc683xx-pod/      # KiCad schematic + board
 │   ├── production/       # each release as ordered
@@ -366,7 +366,7 @@ code and no `unsafe`; no USB request, so the protocol is unchanged.
   (`packaging/udev/70-mc683xx-pod.rules`, README.md): uaccess for the
   user at the seat, and group plugdev, mode 0660, for a login over
   ssh, which uaccess does not reach.
-- Debian package `mc683xx-pod` (`make deb`): `bdm` and the udev rule,
+- Debian package `mc683xx-bdm` (`make deb`): `bdm` and the udev rule,
   built by cargo-deb as deb-workflows' `rust-build-deb` builds it.
   `bdm-stand-in` is a test aid and does not ship.
 - `mc683xx-target` (m683xx-emu, no_std, MIT OR Apache-2.0) holds

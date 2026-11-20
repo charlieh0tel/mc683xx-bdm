@@ -6,7 +6,7 @@ a photo or one buzz-out and still needs a check.
 
 | File | What |
 |---|---|
-| `test-points.html` | the test points labeled on a photo, their positions, the CPU's lower-edge pins, and the wiring to a 10-pin BDM header ([rendered](https://htmlpreview.github.io/?https://github.com/charlieh0tel/mc683xx-pod/blob/main/docs/oncore-vp/test-points.html)) |
+| `test-points.html` | the test points labeled on a photo, their positions, the CPU's lower-edge pins, and the wiring to a 10-pin BDM header ([rendered](https://htmlpreview.github.io/?https://github.com/charlieh0tel/mc683xx-bdm/blob/main/docs/oncore-vp/test-points.html)) |
 | `front-denu9621.jpg` | CPU, RTC, GPS header and test points (board DENU9621) |
 | `lower-edge-devt9614.jpg` | the CPU's lower edge, its pull-ups and B5-B11, traces visible (board DEVT9614) |
 | `scan-devt9614-600dpi.jpg` | the whole board, component side, 600 dpi, turned to match the photos; the positions below come from it |

@@ -25,7 +25,7 @@ path = "src/main.rs"
 # The Debian package: `make deb`.  Only `bdm` ships; `bdm-stand-in` is a
 # test aid.
 [package.metadata.deb]
-name = "mc683xx-pod"
+name = "mc683xx-bdm"
 maintainer = "Christopher Hoover <ch@murgatroid.com>"
 copyright = "2026, Christopher Hoover"
 extended-description = """\
@@ -40,6 +40,6 @@ depends = "$auto"
 assets = [
     ["target/release/bdm", "usr/bin/", "755"],
     ["../../packaging/udev/70-mc683xx-pod.rules", "usr/lib/udev/rules.d/70-mc683xx-pod.rules", "644"],
-    ["../../README.md", "usr/share/doc/mc683xx-pod/README.md", "644"],
+    ["../../README.md", "usr/share/doc/mc683xx-bdm/README.md", "644"],
 ]
 changelog = "../../packaging/debian/changelog"

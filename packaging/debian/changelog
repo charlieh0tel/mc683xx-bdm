@@ -1,4 +1,4 @@
-mc683xx-pod (0.1.0-1) unstable; urgency=low
+mc683xx-bdm (0.1.0-1) unstable; urgency=low
 
   * First package: bdm and the pod's udev rule.
 

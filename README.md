@@ -1,4 +1,4 @@
-# mc683xx-pod
+# mc683xx-bdm
 
 A USB background debug mode (BDM) pod for Motorola/Freescale CPU32
 (683xx) microcontrollers, primarily the MC68331: a Raspberry Pi Pico or
@@ -62,9 +62,9 @@ shared test pair, so the rule also matches anything else using it.
 
 ### Debian package
 
-`make deb` builds `mc683xx-pod`, `bdm` and the udev rule, with
+`make deb` builds `mc683xx-bdm`, `bdm` and the udev rule, with
 cargo-deb 3.8.0 (deb-workflows' `rust-build-deb` pin):
-`firmware/target/debian/mc683xx-pod_VERSION-1_ARCH.deb`.  Metadata:
+`firmware/target/debian/mc683xx-bdm_VERSION-1_ARCH.deb`.  Metadata:
 `[package.metadata.deb]` in `firmware/pod-host/Cargo.toml`; changelog:
 `packaging/debian/changelog`.  No release workflow yet:
 `rust-build-deb` runs cargo at the repository's root, and the

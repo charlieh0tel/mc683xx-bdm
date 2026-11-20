@@ -11,7 +11,7 @@
 
 ## Firmware
 
-- Release workflow for the `mc683xx-pod` package, calling
+- Release workflow for the `mc683xx-bdm` package, calling
   deb-workflows' `rust-build-deb`, once it can build a workspace below
   the repository's root (`firmware/`).
 - DSCLK above 4 MHz, once the throughput test measures the margin.
