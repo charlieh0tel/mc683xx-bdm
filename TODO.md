@@ -29,6 +29,11 @@
   code in ROM (PLAN.md, Host, gdb).
 - `monitor init` and `monitor load` in `bdm gdb`, once `mc683xx-debug`
   is in (PLAN.md, Host, Loading and init).
+- BKPT glitch on the reboots bootsel does not cover (docs/bring-up.md,
+  step 5): a panic handler that turns U1 off (GP10 low) before it
+  waits for the watchdog; on the next carrier, U1's enable falling
+  before its input (a stronger or faster OE path than GP9's), so a
+  power loss or replug cannot glitch BKPT either.
 - CALL whose stacking takes a bus error (SP unmapped) reports success:
   `pod-proto`'s CALL expects no reply (`Reply::Exit`), so the bus
   error the CPU answers with (CPU32RM 7.2.8.13) goes unread and the
