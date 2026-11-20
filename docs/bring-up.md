@@ -61,6 +61,15 @@ fails with "no target power" (NoTarget): VDD is under 4.5 V.
 
 On the carrier, step 3's readings apply.
 
+The watchdog (PLAN.md, Firmware, Watchdog), production build:
+
+- Leave the pod idle a minute, then `bdm pins`: it answers, and the
+  kernel log (`journalctl -k`) shows no new enumeration.
+- `bdm bootsel`, then wait 30 s: the RPI-RP2 drive stays mounted, and
+  `picotool load` still takes the UF2.
+- With the `rtt` build under probe-rs, halt the core for over 8 s and
+  resume: the pod is not reset.
+
 ## 2. Bare Pico: PIO loopback
 
 Jumper GP3 (DSI) to GP2 (DSO).  No carrier, no target.  On an
@@ -157,7 +166,8 @@ leaves the CPU's serial link out of frame: while the Pico boots, U1
 lets DSCLK go, R3 pulls it high, and the CPU takes the edges as bits.
 The pod frames it again itself before its first request (`bdm pins`
 then shows a stale ATEMP), or on `bdm resync`; `bdm reset` also does,
-resetting the target.
+resetting the target.  A watchdog reset of the pod is such a restart; it
+should be rare (PLAN.md, Firmware, Watchdog).
 
 To leave the target running: `bdm go` straight after `bdm reset`
 starts it from the reset vector; `bdm reset --run` resets it to run

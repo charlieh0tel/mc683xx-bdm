@@ -25,6 +25,11 @@ USB:
   it.
 - One request per OUT packet, one reply per IN packet.  An OUT
   packet longer than 64 bytes is answered BadRequest.
+- A request that goes 8 s without a word over the BDM link is a
+  firmware fault: the pod's watchdog resets it (PLAN.md, Firmware,
+  Watchdog), so it leaves the bus without a reply and enumerates
+  again.  A host that waits for a reply gives up well before.  An idle
+  host never trips it.
 
 Stream (Unix or TCP socket):
 

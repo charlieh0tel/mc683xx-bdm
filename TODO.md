@@ -14,6 +14,9 @@
   deb-workflows' `rust-build-deb`, once it can build a workspace below
   the repository's root (`firmware/`).
 - DSCLK above 4 MHz, once the throughput test measures the margin.
+- Report a watchdog reset to the host (WATCHDOG's REASON at start,
+  say in Pins or Version, and in `bdm pins`): a protocol change, so
+  `PROTOCOL_VERSION`, `docs/usb-protocol.md` and `pod-host` with it.
 - A `Link` adapter onto m683xx-emu's BDM serial exchange once it
   lands; then delete `bdm-model`.
 - `bdm load` and `bdm init` over m683xx-emu's `mc683xx-debug` once it
@@ -31,6 +34,8 @@
 - `mc683xx-target` from crates.io once 0.3.0 is published, in place of
   the pinned git rev.
 - Bring-up, what is left (PLAN.md, Bring-up checklist; docs/bring-up.md):
+  - Watchdog (docs/bring-up.md, step 1): idle a minute without a
+    restart, BOOTSEL staying up past 8 s, a probe-rs halt not reset.
   - On the scope: PIO framing and idle high; IFETCH against FREEZE
     falling and U2's (74AHCT1G125) output turning off; U1 driving BKPT
     into 1 kOhm.

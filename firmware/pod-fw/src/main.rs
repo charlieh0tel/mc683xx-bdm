@@ -9,11 +9,12 @@ mod board;
 mod freeze;
 mod link;
 mod reset;
+mod watchdog;
 
 #[cfg(feature = "rtt")]
 use defmt_rtt as _;
 use embassy_executor::Spawner;
-use embassy_futures::join::join3;
+use embassy_futures::join::join4;
 use embassy_rp::adc;
 use embassy_rp::adc::Adc;
 use embassy_rp::bind_interrupts;
@@ -51,6 +52,7 @@ use crate::board::PicoBoard;
 use crate::link::LinkPins;
 use crate::link::PioLink;
 use crate::reset::ResetInterface;
+use crate::watchdog::ACTIVITY;
 
 #[cfg(all(feature = "rp2040", feature = "rp235xa"))]
 compile_error!("choose one chip feature, not both");
@@ -139,7 +141,13 @@ async fn main(_spawner: Spawner) {
     #[cfg(feature = "rtt")]
     defmt::info!("mc683xx-pod up");
     // The watcher first, so FREEZE's level is in before a request.
-    join3(freeze::watch(freeze), usb.run(), serve(&mut pod, &mut from_host, &mut to_host)).await;
+    join4(
+        freeze::watch(freeze),
+        watchdog::feed(p.WATCHDOG),
+        usb.run(),
+        serve(&mut pod, &mut from_host, &mut to_host),
+    )
+    .await;
 }
 
 /// Answers each request packet with one reply packet, for as long as
@@ -155,7 +163,10 @@ async fn serve(
         from_host.wait_enabled().await;
         loop {
             let length = match from_host.read(&mut request).await {
-                Ok(n) => pod.handle(&request[..n], &mut reply).await,
+                Ok(n) => {
+                    let _busy = ACTIVITY.request();
+                    pod.handle(&request[..n], &mut reply).await
+                }
                 Err(EndpointError::BufferOverflow) => encode_status(Status::BadRequest, &mut reply),
                 Err(EndpointError::Disabled) => break,
             };

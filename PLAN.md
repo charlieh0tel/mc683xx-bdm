@@ -308,8 +308,44 @@ the pod has its own.  Requests:
     and DFC, which the host sets.
   - Go, Call: the last word through `Link::transfer_exit`.
 
-The firmware's own sizes, release builds: 26144 bytes of text on the
-RP2040 and 25052 on the RP2350, 2740 bytes of statics on either.
+Watchdog (`watchdog.rs`, `pod-proto`'s `watchdog`): the chip's
+hardware watchdog, 8 s on either chip, the RP2040's longest (2^24
+ticks of 1 us, counted twice: RP2040-E1).  A task checks once a second
+and feeds it while the serve loop waits for a request, however long
+the host is idle, and while the request it is carrying out makes
+progress: a word over the link (each PIO word counts) or the request's
+end.  So the chip resets when the executor stops (a loop without an
+await, panic-halt's loop, a hard fault) or a request goes 8 s without
+a link word.
+- Not a free-running ticker: that feeds through a request stuck on an
+  await that never ends.  Not fed by the serve loop alone: it sleeps
+  in its read for as long as the host is idle.
+- The longest legitimate gaps between words: ResetHalt's 10 ms RESET
+  pulse and up to 100 ms for FREEZE, and one word at the slowest DSCLK
+  (about 120 Hz: 143 ms).  Not-ready retries (up to 1000 NOPs), a long
+  DUMP or FILL and Resync are word after word.
+- A reply the host does not collect waits in the USB write, which
+  counts as idle.  Not caught: a USB stack that stops answering while
+  the serve loop waits for a request.
+- A watchdog reset is a pod restart: under a halted CPU it takes the
+  serial link out of frame and loses the kept ATEMP (`docs/bring-up.md`,
+  step 5).  So the timeout is generous and the reset rare: recovery from
+  a firmware fault in place of a replug, not part of normal running.
+- Panics: panic-halt spins and starves it, a reset 8 s later.  With
+  `rtt`, panic-probe faults the core; the watchdog pauses while a
+  debugger halts the core (CTRL's PAUSE_DBG0/1 and PAUSE_JTAG), so
+  under probe-rs the panic stays for inspection; with no probe attached
+  it resets as panic-halt does.
+- `bdm bootsel`: the boot ROM's `reset_to_usb_boot` reprograms the
+  watchdog for its own reboot into BOOTSEL (RP2040 datasheet 2.8.3.1.5,
+  Table 168).  The boot ROM's device staying up past the timeout is a
+  bring-up check (`docs/bring-up.md`, step 1).
+- With `rtt`, a reset by the watchdog's timeout is logged at start
+  (WATCHDOG's REASON).  Not reported over USB: that is a protocol
+  change (TODO.md).
+
+The firmware's own sizes, release builds: 28788 bytes of text on the
+RP2040 and 27180 on the RP2350, 2812 bytes of statics on either.
 
 Handle not-ready retries in firmware; report BERR and illegal-command
 errors to the host.  `pod-proto`'s `session` does both, over a `Link`

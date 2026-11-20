@@ -24,6 +24,8 @@ use fixed::FixedU32;
 use pod_proto::dsclk::Divider;
 use pod_proto::session::Link;
 
+use crate::watchdog::ACTIVITY;
+
 /// Bits in a serial word.
 const WORD_BITS: u32 = 17;
 /// The OSR shifts left, so a word goes in left-justified.
@@ -128,9 +130,12 @@ impl<'d> PioLink<'d> {
         self.sm.set_clock_divider(FixedU32::from_bits(divider.bits));
     }
 
+    /// One word out and in; each counts as progress for the watchdog.
     async fn shift(&mut self, osr: u32) -> u32 {
         self.sm.tx().wait_push(osr).await;
-        self.sm.rx().wait_pull().await & WORD_MASK
+        let word = self.sm.rx().wait_pull().await & WORD_MASK;
+        ACTIVITY.step();
+        word
     }
 }
 
