@@ -33,7 +33,7 @@ most of a programming fixture's BDM set:
 | B8 | 56 | BKPT/DSCLK | 4 | traced; 10 kOhm pull-up, same via as B7 |
 | B9 | 58 | FREEZE/QUOT | 6 | traced by eye |
 | B10 | 66 | CLKOUT | - | traced; not VDD (buzzed) |
-| B11 | 68 | RESET | 7 | to confirm; its trace goes to a via, to the back |
+| B11 | 68 | RESET | 7 | buzzed; its trace goes to a via, to the back |
 
 The resistors below the lower edge are 10 kOhm ("103") pull-ups.  A bus
 joining pins 61 (VDDSYN), 63 and 65 (VDD) pulls up pin 57 or 58 (which
