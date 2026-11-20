@@ -19,6 +19,7 @@ registers and SIM registers, and reads 512 KB of flash correctly.
 |---|---|
 | `PLAN.md` | the design and why it is the way it is |
 | `TODO.md` | the work list |
+| `RELEASING.md` | cutting a firmware, `bdm` or board release |
 | `docs/` | the host-pod protocol (`usb-protocol.md`), bring-up steps (`bring-up.md`); `oncore-vp/`, notes on the Motorola Oncore VP's BDM test points; `58503a/`, the HP 58503A's BDM header and reading its flash |
 | `hardware/` | the KiCad carrier board; `ee_tooling/`, the shared tooling (a submodule following its `main`), whose `jlcpcb-release` builds a JLCPCB order into `production/`, each release as ordered; `fastcheck.py`, a report on the BDM link's fast nets (`uv run python fastcheck.py mc683xx-pod/mc683xx-pod.kicad_pcb`) |
 | `firmware/` | the Rust workspace: firmware, host CLI, shared crates |

@@ -1,0 +1,31 @@
+# Releasing
+
+## Firmware and `bdm`
+
+Released together: the pod and `bdm` refuse each other unless their
+`PROTOCOL_VERSION` (`pod-proto/src/usb.rs`) matches.
+
+1. Bump `version` in `firmware/*/Cargo.toml`; add a
+   `packaging/debian/changelog` entry.  Raise `PROTOCOL_VERSION` and
+   `docs/usb-protocol.md` if the wire changed.
+2. `make lint`, `cd firmware && cargo test`.
+3. Build:
+   ```
+   cd firmware/pod-fw && cargo build --release --no-default-features -F rp2040
+   picotool uf2 convert -t elf target/thumbv6m-none-eabi/release/pod-fw pod-fw.uf2
+   cd ../.. && make deb
+   ```
+4. Report flash, RAM and stack peak (AGENTS.md, Stack and RAM).
+5. On a target: `docs/bring-up.md` steps 5-12.
+6. Tag `vX.Y.Z`; `gh release create vX.Y.Z` with `pod-fw.uf2` and
+   `firmware/target/debian/mc683xx-bdm_X.Y.Z-1_amd64.deb`.
+
+No release workflow yet (TODO.md).
+
+## Carrier board
+
+1. Bump REV in both title blocks.
+2. `jlcpcb-release` skill: package in `hardware/production/YYYYMMDD-REV/`,
+   then its ordering checklist.
+3. Tag `mc683xx-pod-YYYYMMDD-REV` on the commit ordered.  The production
+   directory is not changed afterwards.
