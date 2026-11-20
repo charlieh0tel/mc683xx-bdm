@@ -110,6 +110,16 @@ impl<T: Transport> PodTarget<T> {
         Ok(())
     }
 
+    /// Resets the target to run, background mode off; forgets the
+    /// halted state.
+    ///
+    /// # Errors
+    /// As [`Error`].
+    pub fn reset_running(&mut self) -> Result<(), Error> {
+        self.halted = None;
+        self.pod.reset_run()
+    }
+
     /// The halted state, asking the pod for the entry source if this is
     /// the first look since the target stopped.
     ///

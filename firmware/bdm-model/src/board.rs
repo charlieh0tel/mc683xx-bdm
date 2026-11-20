@@ -129,6 +129,14 @@ impl<const RAM: usize> Board for ModelBoard<RAM> {
         true
     }
 
+    async fn reset_run(&mut self) {
+        if self.target.frozen() {
+            self.edges = self.edges.wrapping_add(1);
+        }
+        self.bdm_enabled = false;
+        self.target.reset_running();
+    }
+
     fn set_clock(&mut self, dsclk_hz: u32) -> u32 {
         dsclk_hz.clamp(1, MAX_HZ)
     }

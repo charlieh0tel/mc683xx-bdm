@@ -280,6 +280,9 @@ the pod has its own.  Requests:
 - ResetHalt, Halt: the sequences in Protocol summary; refused without
   VDD, and NoFreeze if FREEZE does not assert in 100 ms.  Each returns
   ATEMP.  Halt on a CPU already in background mode only returns it.
+- ResetRun: RESET pulsed with BKPT high, so the CPU runs with
+  background mode off; refused without VDD.  It and ResetHalt skip the
+  ATEMP read, so a link out of frame cannot stop them.
 - ATEMP holds the entry source only until the first command after
   entry, and the CPU can enter on its own (BGND, a breakpoint, a double
   bus fault).  A task watches FREEZE and counts its edges (`freeze.rs`);
@@ -355,7 +358,7 @@ code and no `unsafe`; no USB request, so the protocol is unchanged.
   5 V; a halt or reset enters with a breakpoint, and a reset keeps
   registers and memory.  Not the emulator: no instructions run, so a
   test enters background mode itself.
-- `bdm`: pins, halt, reset, go, call, clock, regs, get, set, dump,
+- `bdm`: pins, halt, reset (`--run`: ResetRun), go, call, clock, regs, get, set, dump,
   write, xfer, loopback, through `PodTarget`.  Halt and reset print the entry
   source.  Dump and write take `--fc`, default 5 (supervisor data).
   Dump with `--output FILE` writes the raw bytes to FILE instead of a

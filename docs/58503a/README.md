@@ -63,6 +63,12 @@ The bench unit's flash, read this way, is identical to smartclock's
 `third_party/firmware/images/58503a-3704.bin`.  512 KB takes about
 19 s at 1 MHz.
 
+## Back to running
+
+`bdm reset --run` restarts the firmware without a power cycle, with
+background mode off.  `bdm go` straight after `bdm reset` also starts
+it from the reset vector.
+
 ## To check
 
 - After `bdm go` and a halt with the firmware's map set, the CPU left

@@ -157,6 +157,11 @@ lets DSCLK go, R3 pulls it high, and the CPU takes the edges as bits.
 The first request fails ("ATEMP unread" in `bdm pins`), and raw
 transfers read garbage.  `bdm reset` frames it again.
 
+To leave the target running: `bdm go` straight after `bdm reset`
+starts it from the reset vector; `bdm reset --run` resets it to run
+with background mode off, also from a target out of frame or already
+running.
+
 ## 6. GO and IFETCH against FREEZE
 
 Scope pin 6 (FREEZE) and pin 8 (IFETCH/DSI) at the header, triggered on

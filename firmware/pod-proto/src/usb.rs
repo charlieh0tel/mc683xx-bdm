@@ -21,7 +21,7 @@ pub const PACKET: usize = 64;
 
 /// This protocol's version, in the Hello reply: raised on any change
 /// to a request or reply (docs/usb-protocol.md).
-pub const PROTOCOL_VERSION: u32 = 4;
+pub const PROTOCOL_VERSION: u32 = 5;
 
 /// Bytes a reply's status takes.
 const STATUS_BYTES: usize = 1;
@@ -49,6 +49,7 @@ const READ_MEMORY: u8 = 0x0B;
 const WRITE_MEMORY: u8 = 0x0C;
 const CALL: u8 = 0x0D;
 const HELLO: u8 = 0x0E;
+const RESET_RUN: u8 = 0x0F;
 
 /// Pin level bits in a Pins reply: set for high.
 const FREEZE: u8 = 1 << 0;
@@ -80,6 +81,8 @@ pub enum Request<'a> {
     Pins,
     /// Reset the target into background mode; the reply is ATEMP.
     ResetHalt,
+    /// Reset the target with BKPT high: it runs, background mode off.
+    ResetRun,
     /// Stop the running target in background mode; the reply is ATEMP.
     Halt,
     /// GO: resume at RPC.
@@ -187,6 +190,7 @@ impl<'a> Request<'a> {
             }
             PINS => empty(Self::Pins),
             RESET_HALT => empty(Self::ResetHalt),
+            RESET_RUN => empty(Self::ResetRun),
             HALT => empty(Self::Halt),
             GO => empty(Self::Go),
             SET_CLOCK => Ok(Self::SetClock { dsclk_hz: long(exact::<LONG>(body).ok_or(length)?) }),
@@ -246,6 +250,9 @@ impl<'a> Request<'a> {
             }
             Self::ResetHalt => {
                 out.put(&[RESET_HALT]);
+            }
+            Self::ResetRun => {
+                out.put(&[RESET_RUN]);
             }
             Self::Halt => {
                 out.put(&[HALT]);
@@ -654,6 +661,7 @@ mod tests {
     fn requests_round_trip() {
         round_trip(Request::Pins);
         round_trip(Request::ResetHalt);
+        round_trip(Request::ResetRun);
         round_trip(Request::Halt);
         round_trip(Request::Go);
         round_trip(Request::SetClock { dsclk_hz: 1_000_000 });

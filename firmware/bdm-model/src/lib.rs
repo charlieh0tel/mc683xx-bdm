@@ -215,6 +215,15 @@ impl<const RAM: usize> Target<RAM> {
         self.block = Block::None;
     }
 
+    /// Comes out of a reset running, as with BKPT high at RESET's rise.
+    pub const fn reset_running(&mut self) {
+        self.running = true;
+        self.busy = 0;
+        self.queued = 0;
+        self.collecting = None;
+        self.block = Block::None;
+    }
+
     /// FREEZE: in background mode.
     #[must_use]
     pub const fn frozen(&self) -> bool {

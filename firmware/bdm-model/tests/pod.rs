@@ -150,6 +150,28 @@ fn a_failed_entry_read_fails_one_request() {
 }
 
 #[test]
+fn reset_run_leaves_the_target_running_without_bdm() {
+    let mut pod = pod(true);
+    send(&mut pod, &Request::ResetHalt);
+    assert_eq!(status(&send(&mut pod, &Request::ResetRun)), Ok(&[][..]));
+    let pins = parse_pins(status(&send(&mut pod, &Request::Pins)).unwrap()).unwrap();
+    assert_eq!((pins.freeze, pins.atemp), (false, Atemp::None));
+    // Background mode is off until a ResetHalt.
+    assert_eq!(status(&send(&mut pod, &Request::Halt)), failed(Status::NoFreeze));
+    assert_eq!(parse_atemp(status(&send(&mut pod, &Request::ResetHalt)).unwrap()), Ok(Atemp::Fresh(0)));
+}
+
+#[test]
+fn reset_run_is_not_stopped_by_a_link_out_of_frame() {
+    // Halted before the pod started, its link garbled: no entry read
+    // comes before the reset.
+    let mut pod = pod_on_halted();
+    pod.board_mut().hold_dso_high(true);
+    assert_eq!(status(&send(&mut pod, &Request::ResetRun)), Ok(&[][..]));
+    assert!(!pod.board_mut().target().frozen());
+}
+
+#[test]
 fn memory_round_trips() {
     let mut pod = pod(true);
     send(&mut pod, &Request::ResetHalt);

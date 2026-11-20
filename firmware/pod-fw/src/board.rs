@@ -167,6 +167,18 @@ impl Board for PicoBoard<'_> {
         self.wait_freeze(async |board| board.reset.wait_for_high().await).await
     }
 
+    async fn reset_run(&mut self) {
+        self.link.set_dsi_enabled(false);
+        self.link.set_dsclk(Level::High);
+        self.dsclk_enable.set_high();
+        self.reset_drive.set_high();
+        Timer::after(RESET_PULSE).await;
+        self.reset_drive.set_low();
+        // The target may hold RESET longer; the reply waits for it, within
+        // the halt's bound.
+        let _ = with_timeout(FREEZE_TIMEOUT, self.reset.wait_for_high()).await;
+    }
+
     fn set_clock(&mut self, dsclk_hz: u32) -> u32 {
         let divider = divider(clk_sys_freq(), dsclk_hz);
         self.link.set_divider(divider);

@@ -73,7 +73,11 @@ enum Command {
     /// Stop the target in background mode.
     Halt,
     /// Reset the target into background mode.
-    Reset,
+    Reset {
+        /// Reset it to run instead, background mode off.
+        #[arg(long)]
+        run: bool,
+    },
     /// Resume at RPC.
     Go,
     /// Stack RPC and run from ADDRESS.
@@ -283,7 +287,11 @@ fn execute<T: Transport>(target: &mut PodTarget<T>, command: Command, out: &mut 
             }
         }
         Command::Halt => writeln!(out, "halted: {}", target.halt()?)?,
-        Command::Reset => writeln!(out, "halted: {}", target.reset_halted()?)?,
+        Command::Reset { run: false } => writeln!(out, "halted: {}", target.reset_halted()?)?,
+        Command::Reset { run: true } => {
+            target.reset_running()?;
+            writeln!(out, "running")?;
+        }
         Command::Go => target.go()?,
         Command::Call { address } => target.call(Address(address))?,
         Command::Clock { hz } => writeln!(out, "DSCLK {} Hz", target.pod().set_clock(hz)?)?,

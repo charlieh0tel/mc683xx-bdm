@@ -99,6 +99,14 @@ impl<T: Transport> Pod<T> {
         self.atemp(&Request::ResetHalt)
     }
 
+    /// Resets the target to run, background mode off.
+    ///
+    /// # Errors
+    /// As [`Error`].
+    pub fn reset_run(&mut self) -> Result<(), Error> {
+        self.done(&Request::ResetRun)
+    }
+
     /// Resumes at RPC.
     ///
     /// # Errors

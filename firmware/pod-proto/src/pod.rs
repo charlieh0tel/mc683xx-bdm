@@ -74,6 +74,10 @@ pub trait Board: Link {
     /// FREEZE as [`Board::halt`] does.
     async fn reset_halt(&mut self) -> bool;
 
+    /// Pulses RESET with BKPT high, so the CPU comes out of reset
+    /// running, background mode off, and waits for RESET to rise.
+    async fn reset_run(&mut self);
+
     /// Sets DSCLK's rate, at most `dsclk_hz` where it can; returns the
     /// rate set (docs/usb-protocol.md, `SetClock`).
     fn set_clock(&mut self, dsclk_hz: u32) -> u32;
@@ -125,7 +129,11 @@ impl<B: Board> Pod<B> {
         let Ok(request) = Request::parse(packet) else {
             return encode_status(Status::BadRequest, reply);
         };
-        if let Err(status) = self.read_entry().await {
+        // A reset makes the entry moot, and a link out of frame must not
+        // stop the reset that frames it again.
+        if !matches!(request, Request::ResetHalt | Request::ResetRun)
+            && let Err(status) = self.read_entry().await
+        {
             return encode_status(status, reply);
         }
         let mut responses = [0; MAX_TRANSFER_WORDS];
@@ -157,6 +165,7 @@ impl<B: Board> Pod<B> {
             }
             Request::Pins => self.pins().await.map(Answer::Pins),
             Request::ResetHalt => self.reset_halt().await.map(Answer::Atemp),
+            Request::ResetRun => self.reset_run().await.map(|()| Answer::Done),
             Request::Halt => self.halt().await.map(Answer::Atemp),
             Request::SetClock { dsclk_hz } => Ok(Answer::Value(self.session.link_mut().set_clock(dsclk_hz))),
             Request::Go => self.command(&Command::Go).await.map(|_| Answer::Done),
@@ -230,6 +239,13 @@ impl<B: Board> Pod<B> {
             }
         }
         self.entry_atemp().await
+    }
+
+    /// Resets the CPU to run.
+    async fn reset_run(&mut self) -> Result<(), Status> {
+        self.require_target().await?;
+        self.session.link_mut().reset_run().await;
+        Ok(())
     }
 
     /// Resets the CPU into background mode; returns ATEMP.

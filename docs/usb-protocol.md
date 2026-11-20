@@ -7,7 +7,7 @@ it alone answers as the pod does.  The pod's implementation is
 `firmware/pod-proto/src/usb.rs`; where the two disagree, that is a bug
 in one of them.
 
-Protocol version: **4** (`PROTOCOL_VERSION`), raised on any change to a
+Protocol version: **5** (`PROTOCOL_VERSION`), raised on any change to a
 request or reply.
 
 ## Transport
@@ -66,6 +66,7 @@ would otherwise be BKPT pulses that halt it.
 | 0x0C | WriteMemory | u32 address, u8 size, 1-56 data bytes (6-61 bytes in all) | none | yes |
 | 0x0D | Call | u32 address | none | yes |
 | 0x0E | Hello | none | u32 protocol version | no |
+| 0x0F | ResetRun | none | none | no |
 
 Fields:
 
@@ -100,8 +101,9 @@ Fields:
 
 Semantics:
 
-- Order of checks: the request is parsed (BadRequest); then the
-  ATEMP read below, whose failure is the reply's status (once: the
+- Order of checks: the request is parsed (BadRequest); then, except
+  for ResetHalt and ResetRun, which make the entry moot, the ATEMP
+  read below, whose failure is the reply's status (once: the
   pod keeps kind 3 and does not read again until FREEZE moves, so
   Pins, Transfer and ResetHalt still work); then the
   request's own checks (NoTarget, then NoFreeze); then the command.
@@ -127,6 +129,10 @@ Semantics:
   whatever the target's state.  Both are refused with NoTarget below
   4.5 V VDD, and NoFreeze if FREEZE does not assert within 100 ms
   (then BKPT is released).
+- ResetRun drives BKPT high and DSI off, pulses RESET low for 10 ms
+  and waits up to 100 ms for RESET to rise: the target comes out of
+  reset running, background mode off until the next ResetHalt.
+  Refused with NoTarget below 4.5 V VDD.
 - Halt works only if BDM was enabled at the target's last reset (BKPT
   low as RESET rises, MC68331UM 5.10.2.1), as ResetHalt does.  Without
   it BKPT is a breakpoint exception, vector $0C (MC68331UM 5.10.2.2.1,
