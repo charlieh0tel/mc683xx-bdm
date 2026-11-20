@@ -29,11 +29,19 @@ most of a programming fixture's BDM set:
 |---|---|---|---|---|
 | B5 | VSS | GND | 3, 5 | buzzed |
 | B6 | 54 | IPIPE/DSO | 10 | traced by eye |
-| B7 | 55 | IFETCH/DSI | 8 | traced by eye; pull resistor, rail to confirm |
-| B8 | 56 | BKPT/DSCLK | 4 | traced by eye; pull resistor, same rail as B7 |
+| B7 | 55 | IFETCH/DSI | 8 | traced; 10 kOhm pull-up, rail to confirm |
+| B8 | 56 | BKPT/DSCLK | 4 | traced; 10 kOhm pull-up, same via as B7 |
 | B9 | 58 | FREEZE/QUOT | 6 | traced by eye |
-| B10 | ? | not VDD | - | buzzed; 64 (XFC) or 66 (CLKOUT) if one lead off |
-| B11 | 68 | RESET | 7 | buzzed, to recount: 67 (VSS) or 69 (HALT) if one lead off |
+| B10 | 66 | CLKOUT | - | traced; not VDD (buzzed) |
+| B11 | 68 | RESET | 7 | buzzed, to recount; its trace goes to a via, to the back |
+
+The resistors below the lower edge are 10 kOhm ("103") pull-ups.  A bus
+joining pins 61 (VDDSYN), 63 and 65 (VDD) pulls up pin 57 or 58 (which
+one is not clear from a photo; a pull-up on 57, TSC, would tristate the
+CPU, so 58); the rest pull up 69 (HALT), 70 (BERR), 71-77 (IRQ7-IRQ1,
+tied together) and 78 (MODCLK) to vias, VDD presumably.  Traced from a
+photo of a second board (DEVT9614; the first is DENU9621), taken to
+share the layout.
 
 B1-B4, the same row's left end, run to the GPS output header.  L6, in
 the column of test points at the board's left edge, is +5 V (buzzed):
