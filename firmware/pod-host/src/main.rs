@@ -63,6 +63,9 @@ fn loopback_mismatch(words: &[u16], responses: &[u32]) -> Option<(usize, u16, u3
         .map(|(n, (word, response))| (n, *word, *response))
 }
 
+/// The pod when `--pod` names none: the only one on USB.
+const DEFAULT_POD: &str = "usb";
+
 /// bdm's version: crate version and git commit.
 const VERSION: &str = concat!(env!("CARGO_PKG_VERSION"), " ", env!("GIT_VERSION"));
 
@@ -72,9 +75,10 @@ const VERSION: &str = concat!(env!("CARGO_PKG_VERSION"), " ", env!("GIT_VERSION"
 struct Cli {
     /// The pod: `usb` (the only one connected), `usb:SERIAL` (the one
     /// with that serial number, `bdm list`), or a stand-in on
-    /// `unix:PATH` or `tcp:HOST:PORT` (docs/usb-protocol.md).
-    #[arg(long, default_value = "usb")]
-    pod: String,
+    /// `unix:PATH` or `tcp:HOST:PORT` (docs/usb-protocol.md).  Default
+    /// `usb`.  Not for `list`, which shows every pod.
+    #[arg(long)]
+    pod: Option<String>,
     #[command(subcommand)]
     command: Command,
 }
@@ -276,16 +280,19 @@ fn list(out: &mut impl Write) -> Result<()> {
     Ok(())
 }
 
-fn run(pod: &str, command: Command) -> Result<()> {
+fn run(pod: Option<&str>, command: Command) -> Result<()> {
+    if matches!(command, Command::List) {
+        if let Some(pod) = pod {
+            bail!("list shows every pod; it takes no --pod (got {pod})");
+        }
+        return list(&mut std::io::stdout().lock());
+    }
+    let pod = pod.unwrap_or(DEFAULT_POD);
     match command {
         Command::Bootsel => {
             reboot_to_bootloader(usb_serial(pod, "bootsel")?.as_deref())?;
             writeln!(std::io::stdout(), "bootloader: copy the UF2 onto the RPI-RP2 drive")?;
             return Ok(());
-        }
-        Command::List => {
-            usb_serial(pod, "list")?;
-            return list(&mut std::io::stdout().lock());
         }
         _ => {}
     }
@@ -421,7 +428,7 @@ fn is_broken_pipe(error: &anyhow::Error) -> bool {
 
 fn main() -> ExitCode {
     let cli = Cli::parse();
-    match run(&cli.pod, cli.command) {
+    match run(cli.pod.as_deref(), cli.command) {
         Ok(()) => ExitCode::SUCCESS,
         Err(error) if is_broken_pipe(&error) => ExitCode::SUCCESS,
         Err(error) => {
@@ -512,14 +519,14 @@ mod tests {
 
     #[test]
     fn usb_commands_take_usb_with_or_without_a_serial() {
-        assert_eq!(usb_serial("usb", "list").unwrap(), None);
+        assert_eq!(usb_serial("usb", "bootsel").unwrap(), None);
         assert_eq!(
             usb_serial("usb:E6613852833B2A2F", "bootsel").unwrap().as_deref(),
             Some("E6613852833B2A2F")
         );
         let error = usb_serial("unix:/tmp/pod.sock", "bootsel").unwrap_err();
         assert_eq!(error.to_string(), "bootsel needs the pod on USB, not unix:/tmp/pod.sock");
-        assert!(usb_serial("usb:", "list").is_err());
+        assert!(usb_serial("usb:", "bootsel").is_err());
     }
 
     #[test]

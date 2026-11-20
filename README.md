@@ -58,7 +58,7 @@ cargo run -p pod-host --bin bdm -- --pod unix:/tmp/pod.sock reset
 one, `bdm` lists their serial numbers and stops.  `--pod usb:SERIAL`
 picks one by the serial number `bdm list` shows (the Pico's unique ID,
 as picotool shows it; case ignored), for `bdm bootsel` too.  `bdm list`
-does not open the pods, so it needs no udev rule.
+does not open the pods, so it needs no udev rule, and takes no `--pod`.
 
 gdb on the target: `bdm gdb --scratch ADDRESS` listens on
 127.0.0.1:1234 (`--listen HOST:PORT` for another) for one session;
