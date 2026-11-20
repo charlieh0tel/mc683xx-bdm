@@ -3,6 +3,7 @@
 //! longer than a packet go as several requests.
 
 use mc683xx_target::address::Address;
+use mc683xx_target::function_code::FunctionCode;
 use mc683xx_target::register::Register;
 use mc683xx_target::register::SystemRegister;
 use mc683xx_target::size::Size;
@@ -11,6 +12,7 @@ use pod_proto::usb::Atemp;
 use pod_proto::usb::MAX_MEMORY_BYTES;
 use pod_proto::usb::MAX_TRANSFER_WORDS;
 use pod_proto::usb::PACKET;
+use pod_proto::usb::PROTOCOL_VERSION;
 use pod_proto::usb::ParseError;
 use pod_proto::usb::Pins;
 use pod_proto::usb::ReplyError;
@@ -45,6 +47,16 @@ pub enum Error {
         /// The access size.
         size: Size,
     },
+    /// The pod speaks another protocol version than this host.
+    #[error("the pod speaks protocol {0}, this host {PROTOCOL_VERSION}")]
+    Protocol(u32),
+}
+
+/// The function code `bits` gives, if it fits FC\[2:0\].
+#[must_use]
+pub fn function_code(bits: u32) -> Option<FunctionCode> {
+    let code = FunctionCode::new(bits);
+    (u32::from(code.bits()) == bits).then_some(code)
 }
 
 /// The pod, over a transport.
@@ -70,6 +82,15 @@ impl<T: Transport> Pod<T> {
     /// As [`Error`].
     pub fn hello(&mut self) -> Result<u32, Error> {
         self.value(&Request::Hello)
+    }
+
+    /// Says Hello, and checks the pod speaks this host's protocol.
+    ///
+    /// # Errors
+    /// As [`Error`]; [`Error::Protocol`] for another version.
+    pub fn check_protocol(&mut self) -> Result<(), Error> {
+        let version = self.hello()?;
+        if version == PROTOCOL_VERSION { Ok(()) } else { Err(Error::Protocol(version)) }
     }
 
     /// FREEZE, RESET and DS levels, and VDD.
@@ -286,6 +307,8 @@ fn check_length(size: Size, length: usize) -> Result<(), Error> {
 
 #[cfg(test)]
 mod tests {
+    use mc683xx_target::function_code::FunctionCode;
+    use pod_proto::usb::PROTOCOL_VERSION;
     use pod_proto::usb::ReplyError;
     use pod_proto::usb::Request;
     use pod_proto::usb::Status;
@@ -295,6 +318,7 @@ mod tests {
     use super::Error;
     use super::Register;
     use super::Size;
+    use super::function_code;
     use crate::script::parsed;
     use crate::script::pod;
 
@@ -382,5 +406,23 @@ mod tests {
         let responses = pod.transfer(&[0; 20]).unwrap();
         assert_eq!(responses.len(), 20);
         assert_eq!(pod.into_transport().requests.len(), 2);
+    }
+
+    #[test]
+    fn another_protocol_is_refused() {
+        let reply = |version: u32| -> Vec<u8> { std::iter::once(0).chain(version.to_le_bytes()).collect() };
+        let mut pod = pod(&[&reply(PROTOCOL_VERSION), &reply(PROTOCOL_VERSION + 1)]);
+        pod.check_protocol().unwrap();
+        assert!(
+            matches!(pod.check_protocol(), Err(Error::Protocol(version)) if version == PROTOCOL_VERSION + 1)
+        );
+    }
+
+    #[test]
+    fn function_codes() {
+        assert_eq!(function_code(5), Some(FunctionCode::SUPERVISOR_DATA));
+        assert_eq!(function_code(7), Some(FunctionCode::CPU_SPACE));
+        assert_eq!(function_code(8), None);
+        assert_eq!(function_code(0xD), None);
     }
 }

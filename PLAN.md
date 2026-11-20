@@ -390,8 +390,12 @@ code and no `unsafe`; no USB request, so the protocol is unchanged.
   OS's descriptor cache without opening it.  `StreamTransport`
   on a Unix or TCP socket, each message a length byte and the packet,
   for m683xx-emu's virtual BDM cable (`bdm --pod unix:PATH`).  The
-  protocol is `docs/usb-protocol.md`; this repo owns it.  `bdm` sends
-  Hello first and stops on another protocol version.
+  protocol is `docs/usb-protocol.md`; this repo owns it.  `bdm`
+  sends Hello first and stops on another protocol version
+  (`Pod::check_protocol`).
+- `pod-host`'s `register`: registers by name, `d0`-`a7`, `sp` and the
+  system registers, read and written through any `Cpu32Target`, and
+  the system registers in listing order.
 - `pod-host`'s `pod`: each USB request as a call.  Memory goes as
   56-byte requests and raw transfers as 15-word ones; a chunk never
   splits an access.  Tested against scripted replies.

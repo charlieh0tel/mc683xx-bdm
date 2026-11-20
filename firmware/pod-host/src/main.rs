@@ -17,9 +17,10 @@ use mc683xx_target::address::Address;
 use mc683xx_target::entry::Entry;
 use mc683xx_target::function_code::FunctionCode;
 use mc683xx_target::register::Register;
-use mc683xx_target::register::SystemRegister;
 use mc683xx_target::size::Size;
 use pod_host::pod::Pod;
+use pod_host::register::Named;
+use pod_host::register::SYSTEM_REGISTERS;
 use pod_host::target::PodTarget;
 use pod_host::transport::NO_SERIAL;
 use pod_host::transport::PodAddress;
@@ -183,38 +184,6 @@ impl From<Width> for Size {
     }
 }
 
-/// A register by name.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum Named {
-    Data(Register),
-    System(SystemRegister),
-}
-
-/// System registers in the order `regs` prints them; ATEMP is left
-/// out, as reading it after entry gives only a scratch value.
-const SYSTEM_REGISTERS: [SystemRegister; 9] = [
-    SystemRegister::Rpc,
-    SystemRegister::Pcc,
-    SystemRegister::Sr,
-    SystemRegister::Usp,
-    SystemRegister::Ssp,
-    SystemRegister::Vbr,
-    SystemRegister::Sfc,
-    SystemRegister::Dfc,
-    SystemRegister::Far,
-];
-
-/// A register by name: `d0`-`a7`, `sp` for A7, or a system register.
-fn register(name: &str) -> Result<Named> {
-    if name.eq_ignore_ascii_case("sp") {
-        return Ok(Named::Data(Register::A7));
-    }
-    name.parse()
-        .map(Named::Data)
-        .or_else(|_| name.parse().map(Named::System))
-        .map_err(|_| anyhow::anyhow!("no register {name}"))
-}
-
 fn number(text: &str) -> Result<u32> {
     let hex = text.strip_prefix("0x").or_else(|| text.strip_prefix("0X")).or_else(|| text.strip_prefix('$'));
     match hex {
@@ -233,9 +202,7 @@ fn word(text: &str) -> Result<u16> {
 }
 
 fn function_code(text: &str) -> Result<FunctionCode> {
-    let bits = number(text)?;
-    let code = FunctionCode::new(bits);
-    if u32::from(code.bits()) == bits { Ok(code) } else { bail!("not a function code, 0-7: {text}") }
+    pod_host::pod::function_code(number(text)?).with_context(|| format!("not a function code, 0-7: {text}"))
 }
 
 /// A hex listing of `data`, read from `address`: `DUMP_LINE` bytes a
@@ -303,10 +270,7 @@ fn run(pod: &str, command: Command) -> Result<()> {
         _ => {}
     }
     let mut target = PodTarget::new(Pod::new(connect(pod)?));
-    let version = target.pod().hello()?;
-    if version != PROTOCOL_VERSION {
-        bail!("the pod speaks protocol {version}, this bdm {PROTOCOL_VERSION}");
-    }
+    target.pod().check_protocol()?;
     let done = execute(&mut target, command, &mut std::io::stdout().lock());
     // The next bdm starts knowing nothing: leave the program's SFC and
     // DFC, whether or not the command worked.
@@ -351,17 +315,8 @@ fn execute<T: Transport>(target: &mut PodTarget<T>, command: Command, out: &mut 
                 writeln!(out, "{register:<5} ${:08x}", target.read_system_register(register)?)?;
             }
         }
-        Command::Get { register: name } => {
-            let value = match register(&name)? {
-                Named::Data(r) => target.read_register(r)?,
-                Named::System(r) => target.read_system_register(r)?,
-            };
-            writeln!(out, "${value:08x}")?;
-        }
-        Command::Set { register: name, value } => match register(&name)? {
-            Named::Data(r) => target.write_register(r, value)?,
-            Named::System(r) => target.write_system_register(r, value)?,
-        },
+        Command::Get { register } => writeln!(out, "${:08x}", Named::parse(&register)?.read(target)?)?,
+        Command::Set { register, value } => Named::parse(&register)?.write(target, value)?,
         Command::Dump { address, length, size, fc, output } => {
             let mut data = vec![0; usize::try_from(length)?];
             target.read_memory(Address(address), fc, size.into(), &mut data)?;
@@ -437,16 +392,12 @@ mod tests {
     use std::path::PathBuf;
 
     use super::FunctionCode;
-    use super::Named;
-    use super::Register;
-    use super::SystemRegister;
     use super::function_code;
     use super::hex_listing;
     use super::is_broken_pipe;
     use super::loopback_mismatch;
     use super::loopback_words;
     use super::number;
-    use super::register;
     use super::save_dump;
     use super::usb_serial;
 
@@ -456,20 +407,6 @@ mod tests {
         assert_eq!(number("0xFFFA00").unwrap(), 0x00FF_FA00);
         assert_eq!(number("$ff").unwrap(), 0xFF);
         assert!(number("0xG").is_err());
-    }
-
-    #[test]
-    fn register_names() {
-        assert_eq!(register("d0").unwrap(), Named::Data(Register::D0));
-        assert_eq!(register("A7").unwrap(), Named::Data(Register::A7));
-        assert_eq!(register("SP").unwrap(), Named::Data(Register::A7));
-        assert_eq!(register("sfc").unwrap(), Named::System(SystemRegister::Sfc));
-        assert!(register("d8").is_err());
-        assert!(register("x1").is_err());
-        assert!(register("").is_err());
-        for r in Register::ALL {
-            assert_eq!(register(&r.to_string()).unwrap(), Named::Data(r));
-        }
     }
 
     #[test]
