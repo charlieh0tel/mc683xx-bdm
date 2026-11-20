@@ -420,8 +420,8 @@ code and no `unsafe`; no USB request, so the protocol is unchanged.
   and it runs on unwatched.  Enough for `PodTarget::step`; anything
   else enters background mode by the test's hand.
 - `bdm`: pins, halt, reset (`--run`: ResetRun), resync, bootsel, list, version, go, call, clock, regs, get, set, dump,
-  write, xfer, loopback, through `PodTarget` (bootsel and list
-  excepted).  Halt and reset print the entry
+  write, xfer, loopback, gdb (Host, gdb), through `PodTarget` (bootsel
+  and list excepted).  Halt and reset print the entry
   source.  Dump and write take `--fc`, default 5 (supervisor data).
   Dump with `--output FILE` writes the raw bytes to FILE instead of a
   hex listing.
@@ -483,7 +483,19 @@ code and no `unsafe`; no USB request, so the protocol is unchanged.
   - Breakpoints: BGND ($4AFA) planted through memory writes, so RAM
     only on the pod.
   - Continue: go, then poll `halted()`; Ctrl-C is `halt()`.
-  - Memory: fc 5, with `monitor` fc, reset, init and load.
+  - Memory: fc 5, `monitor fc N` for another; `monitor reset` is
+    `reset_halted`.  Init and load are not monitor commands yet.
+  - `bdm gdb [--listen HOST:PORT] --scratch ADDRESS`: mc683xx-gdb
+    (crates.io, default features off, so no chip or board crates)
+    serving its `bdm::Bdm` over `PodTarget`, one session.  Listens on
+    127.0.0.1:1234 by default (mc683xx's `serve_gdb` default; localhost,
+    since the session controls the target; port 0 picks one, named on
+    standard error).  `--scratch` is required: Bdm always offers gdb a step,
+    and gdb steps over a breakpoint before every continue from it.
+    Detach resumes the target, kill leaves it halted; either prints
+    which.  Tested end to end (`pod-host/tests/gdb.rs`): the `bdm`
+    binary on the model, raw packets on TCP: `?`, `m`, `g`, `s`,
+    `Z0`/`z0` and `c` to the breakpoint, Ctrl-C, `D` and `k`.
   - `step()` is in `Cpu32Target` (mc683xx-target 0.6): from RPC to
     where T1 would trap, before any handler's first instruction, the
     exceptions the instruction raised and an interrupt pending taken

@@ -12,6 +12,10 @@ use anyhow::bail;
 use clap::Parser;
 use clap::Subcommand;
 use clap::ValueEnum;
+use mc683xx_gdb::Ending;
+use mc683xx_gdb::bdm::Bdm;
+use mc683xx_gdb::connection::accept;
+use mc683xx_gdb::serve;
 use mc683xx_target::Cpu32Target;
 use mc683xx_target::address::Address;
 use mc683xx_target::entry::Entry;
@@ -21,6 +25,7 @@ use mc683xx_target::size::Size;
 use pod_host::pod::Pod;
 use pod_host::register::Named;
 use pod_host::register::SYSTEM_REGISTERS;
+use pod_host::step::SCRATCH_BYTES;
 use pod_host::target::PodTarget;
 use pod_host::transport::NO_SERIAL;
 use pod_host::transport::PodAddress;
@@ -158,6 +163,21 @@ enum Command {
     /// Bring a halted target's serial link back into frame, after a pod
     /// restart, without resetting it.
     Resync,
+    /// Serve gdb's remote protocol at LISTEN until gdb detaches (the
+    /// target runs on) or kills (it stays halted): `target remote
+    /// HOST:PORT` in an m68k gdb.  Breakpoints are BGND written into
+    /// RAM; a step traces through an exception table in SCRATCH.
+    Gdb {
+        /// Where to listen, HOST:PORT; port 0 picks one, which standard
+        /// error names.  It gives full control of the target: keep it
+        /// on localhost or a trusted network.
+        #[arg(long, default_value = "127.0.0.1:1234")]
+        listen: String,
+        /// RAM the program does not use, for a step's exception table
+        /// and BGND stub (1026 bytes, even address).
+        #[arg(long, value_parser = number)]
+        scratch: u32,
+    },
     /// Raw serial words, each answered with the 17 bits shifted in.
     /// With the target running, the clocks are BKPT pulses.
     Xfer {
@@ -358,11 +378,35 @@ fn execute<T: Transport>(target: &mut PodTarget<T>, command: Command, out: &mut 
         },
         Command::Bootsel => bail!("bootsel talks to the pod's reset interface, not through a target"),
         Command::List => bail!("list reads USB descriptors, not through a target"),
+        Command::Gdb { listen, scratch } => gdb(target, &listen, Address(scratch), out)?,
         Command::Xfer { words } => {
             for (word, response) in words.iter().zip(target.pod().transfer(&words)?) {
                 writeln!(out, "{word:04x} -> {}:{:04x}", response >> 16, response & 0xFFFF)?;
             }
         }
+    }
+    Ok(())
+}
+
+/// Serves one gdb session at `listen` over `target`, with `scratch` for
+/// its steps.
+fn gdb<T: Transport>(
+    target: &mut PodTarget<T>,
+    listen: &str,
+    scratch: Address,
+    out: &mut impl Write,
+) -> Result<()> {
+    target.set_scratch(Some(scratch));
+    let stream = accept(listen, |at| -> Result<()> {
+        eprintln!("bdm: waiting for gdb on {at} (scratch {scratch}, {SCRATCH_BYTES} bytes)");
+        Ok(())
+    })
+    .with_context(|| format!("listening for gdb on {listen}"))?;
+    let ending = serve(&mut Bdm(target), stream)?;
+    match ending {
+        Ending::Detached => writeln!(out, "gdb detached: running")?,
+        Ending::Killed => writeln!(out, "gdb killed: halted")?,
+        _ => writeln!(out, "gdb ended: {ending:?}")?,
     }
     Ok(())
 }

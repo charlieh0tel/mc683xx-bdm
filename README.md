@@ -60,6 +60,13 @@ picks one by the serial number `bdm list` shows (the Pico's unique ID,
 as picotool shows it; case ignored), for `bdm bootsel` too.  `bdm list`
 does not open the pods, so it needs no udev rule.
 
+gdb on the target: `bdm gdb --scratch ADDRESS` listens on
+127.0.0.1:1234 (`--listen HOST:PORT` for another) for one session;
+then `target remote localhost:1234` in an m68k gdb.  `--scratch` names 1026 bytes of RAM, even, that the
+program does not use: a step's exception table and BGND stub.
+Breakpoints are BGND written into memory, so RAM only.  Detach leaves
+the target running, kill leaves it halted.
+
 Without root on Linux, the pod needs the udev rule
 `packaging/udev/70-mc683xx-pod.rules`: copy it into
 `/etc/udev/rules.d/`, or install the Debian package, which carries it.

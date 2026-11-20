@@ -10,6 +10,7 @@ anyhow = "1.0.104"
 bdm-model = { version = "0.1.0", path = "../bdm-model" }
 clap = { version = "4.6.7", features = ["derive"] }
 embassy-futures = "0.1.2"
+mc683xx-gdb = { version = "0.6.0", default-features = false }
 mc683xx-target = "0.6.0"
 nusb = "0.2.9"
 pod-proto = { version = "0.1.0", path = "../pod-proto" }
@@ -32,7 +33,8 @@ extended-description = """\
 bdm, the host command line for the mc683xx pod, a USB background debug \
 mode (BDM) pod for Motorola/Freescale CPU32 (683xx) microcontrollers \
 built on a Raspberry Pi Pico.  It halts, resets and runs the target and \
-reads and writes its registers and memory.  Includes the pod's udev \
+reads and writes its registers and memory, and serves gdb's remote \
+protocol (bdm gdb).  Includes the pod's udev \
 rule, which gives it to the user at the seat and to group plugdev, and \
 the pod's firmware as a UF2."""
 section = "electronics"

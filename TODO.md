@@ -24,10 +24,11 @@
   at reset (SIMCR $60CF), but a program may clear it (the 58503A's
   does), and then the watchdog runs while the CPU is halted: an init
   script sets it again.
-- gdb: `bdm gdb` serving mc683xx-gdb's BDM adapter over `PodTarget`
-  (PLAN.md, Host, gdb).
-- `PodTarget::step` on silicon: a TRAP, an interrupt, user mode, code
-  in ROM (PLAN.md, Host, gdb).
+- `bdm gdb` on silicon with a real m68k gdb: breakpoints, continue,
+  Ctrl-C, and `PodTarget::step` on a TRAP, an interrupt, user mode,
+  code in ROM (PLAN.md, Host, gdb).
+- `monitor init` and `monitor load` in `bdm gdb`, once `mc683xx-debug`
+  is in (PLAN.md, Host, Loading and init).
 - CALL whose stacking takes a bus error (SP unmapped) reports success:
   `pod-proto`'s CALL expects no reply (`Reply::Exit`), so the bus
   error the CPU answers with (CPU32RM 7.2.8.13) goes unread and the
