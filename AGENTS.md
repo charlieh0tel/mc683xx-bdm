@@ -13,6 +13,8 @@
   with KiCad closed.
 - Bump REV in both title blocks before a release.  `hardware/production/` holds
   what was ordered; do not change it afterwards.
+- `hardware/ee_tooling` is pinned at 318c266, which built rev 0.2: board work
+  is finished.  Do not update it, whatever the ee_tooling section below says.
 
 ## Critical Rules
 
