@@ -111,9 +111,9 @@ The standard CPU32 BDM header, wired from the test points:
 
 From reset, halted in background mode:
 
-1. Set SIMCR (0xFFFA00) bit 14, FRZSW.  At reset the software watchdog
-   is on and, with FRZSW 0, runs while the CPU is halted (MC68331UM,
-   SIMCR).
+1. Check SIMCR (0xFFFA00) bit 14, FRZSW, which stops the software
+   watchdog while the CPU is halted.  An MC68331 on a 58503A reads
+   SIMCR $60CF after a reset entry, FRZSW set (`../58503a/`).
 2. Read 0x000000-0x03FFFF (256 KB).
 
 With VPP at its read level the 28F010s ignore commands, so a stray
@@ -122,7 +122,6 @@ write cannot change them (Intel 28F010 datasheet).  With this repo's
 
 ```
 bdm reset
-bdm dump 0xfffa00 2 --size word       # SIMCR
-bdm write 0xfffa00 HI LO --size word  # SIMCR with FRZSW set
+bdm dump 0xfffa00 2 --size word       # SIMCR, $60CF expected
 bdm dump 0 0x40000 --size long --output oncore-vp.bin
 ```
