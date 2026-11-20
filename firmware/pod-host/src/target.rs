@@ -85,8 +85,7 @@ impl<T: Transport> PodTarget<T> {
     /// # Errors
     /// As [`Error`].
     pub fn call(&mut self, address: Address) -> Result<(), Error> {
-        self.restore_function_codes()?;
-        self.halted = None;
+        self.leave()?;
         self.pod.call(address)
     }
 
@@ -130,17 +129,33 @@ impl<T: Transport> PodTarget<T> {
         self.pod.resync()
     }
 
+    /// Puts back the program's SFC and DFC and forgets the halted
+    /// state, before a command that resumes the target.
+    fn leave(&mut self) -> Result<(), Error> {
+        self.restore_function_codes()?;
+        self.halted = None;
+        Ok(())
+    }
+
+    /// Why the target is halted, asking the pod if this is the first
+    /// look since it stopped; `None` while it runs.
+    fn look(&mut self) -> Result<Option<Entry>, Error> {
+        if let Some(halted) = self.halted {
+            return Ok(Some(halted.entry));
+        }
+        let Some(entry) = entry(self.pod.pins()?.atemp)? else { return Ok(None) };
+        self.halted = Some(Halted::new(entry));
+        Ok(Some(entry))
+    }
+
     /// The halted state, asking the pod for the entry source if this is
     /// the first look since the target stopped.
     ///
     /// # Errors
     /// As [`Error`]; the pod's `NoFreeze` if the target runs.
     fn halted_state(&mut self) -> Result<&mut Halted, Error> {
-        if self.halted.is_none() {
-            let entry = entry(self.pod.pins()?.atemp)?.ok_or(ReplyError::Failed(Status::NoFreeze))?;
-            self.halted = Some(Halted::new(entry));
-        }
-        Ok(self.halted.as_mut().expect("just set"))
+        self.look()?.ok_or(ReplyError::Failed(Status::NoFreeze))?;
+        Ok(self.halted.as_mut().expect("look keeps the halted state"))
     }
 
     /// Keeps the entry a halt or reset reported.
@@ -192,17 +207,11 @@ impl<T: Transport> Cpu32Target for PodTarget<T> {
     }
 
     fn halted(&mut self) -> Result<Option<Entry>, Error> {
-        if let Some(halted) = self.halted {
-            return Ok(Some(halted.entry));
-        }
-        let Some(entry) = entry(self.pod.pins()?.atemp)? else { return Ok(None) };
-        self.halted = Some(Halted::new(entry));
-        Ok(Some(entry))
+        self.look()
     }
 
     fn go(&mut self) -> Result<(), Error> {
-        self.restore_function_codes()?;
-        self.halted = None;
+        self.leave()?;
         self.pod.go()
     }
 
