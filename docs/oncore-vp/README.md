@@ -4,6 +4,12 @@ A GPS receiver built around an MC68331: a BDM target for the pod.
 "To confirm" marks what came from a photo or one buzz-out and still
 needs a check.
 
+| File | What |
+|---|---|
+| `bdm-wiring.html` | the test points labeled on a photo, the wire list to a 10-pin BDM header, and a meter-then-pod test plan ([rendered](https://htmlpreview.github.io/?https://github.com/charlieh0tel/mc683xx-pod/blob/main/docs/oncore-vp/bdm-wiring.html)) |
+| `front-denu9621.jpg` | the CPU, flash side, GPS header and test points (board DENU9621) |
+| `lower-edge-devt9614.jpg` | the CPU's lower edge, its pull-ups and B5-B11, traces visible (board DEVT9614) |
+
 ## Parts
 
 | Part | What | Source |
