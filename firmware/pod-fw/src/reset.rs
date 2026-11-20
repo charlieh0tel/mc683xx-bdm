@@ -3,7 +3,10 @@
 //! USB bootloader, so `picotool -f` and `bdm bootsel` need no BOOTSEL
 //! button.
 
+use embassy_rp::pac::SIO;
 use embassy_rp::rom_data::reset_to_usb_boot;
+use embassy_time::Duration;
+use embassy_time::block_for;
 use embassy_usb::Handler;
 use embassy_usb::control::OutResponse;
 use embassy_usb::control::Recipient;
@@ -18,6 +21,11 @@ pub(crate) const PROTOCOL: u8 = 0x01;
 /// interface-disable mask (0: mass storage and PICOBOOT both).
 const REQUEST_BOOTSEL: u8 = 0x01;
 const DISABLE_MASK: u16 = 0x7F;
+/// GP10, Q3's gate: U1's BKPT/DSCLK output enable (PLAN.md, pin table).
+const DSCLK_ENABLE_GPIO: u32 = 10;
+/// U1's output is off in 10 ns (SCLS378P 5.6); R3 has BKPT high long
+/// before this.
+const DSCLK_RELEASE: Duration = Duration::from_micros(10);
 
 /// The interface's request handler.
 pub(crate) struct ResetInterface {
@@ -38,6 +46,12 @@ impl Handler for ResetInterface {
             && request.recipient == Recipient::Interface
             && request.index == u16::from(u8::from(self.interface));
         if ours && request.request == REQUEST_BOOTSEL {
+            // Turn U1 off first, with DSCLK still high, so R3 holds BKPT
+            // high through the reset: as the chip resets, GP9 (U1's
+            // input) may fall before GP10 turns U1 off, a lone DSCLK edge
+            // to a halted CPU.  The board owns GP10; this is its last use.
+            SIO.gpio_out(0).value_clr().write_value(1 << DSCLK_ENABLE_GPIO);
+            block_for(DSCLK_RELEASE);
             // Does not return: the host sees the pod leave the bus.
             reset_to_usb_boot(0, u32::from(request.value & DISABLE_MASK));
         }

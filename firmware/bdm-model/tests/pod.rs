@@ -192,11 +192,13 @@ fn resync_needs_a_halted_target() {
 }
 
 #[test]
-fn a_pod_started_under_a_halted_cpu_out_of_frame_resyncs_itself() {
+fn a_pod_started_under_a_halted_cpu_out_of_frame_needs_a_resync() {
     let mut pod = pod_on_halted();
     pod.board_mut().put_out_of_frame(9);
-    let pins = parse_pins(status(&send(&mut pod, &Request::Pins)).unwrap()).unwrap();
-    assert_eq!((pins.freeze, pins.atemp), (true, Atemp::Stale(1)));
+    // The entry read fails once, recorded unread; Resync frames the link.
+    assert!(status(&send(&mut pod, &Request::Pins)).is_err());
+    let atemp = parse_atemp(status(&send(&mut pod, &Request::Resync)).unwrap());
+    assert!(matches!(atemp, Ok(Atemp::Stale(_))), "{atemp:?}");
 }
 
 #[test]

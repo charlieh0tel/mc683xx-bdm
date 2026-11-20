@@ -162,13 +162,14 @@ bdm get ssp
 Record RPC and SSP against the reset vectors in the target's ROM at
 address 0 (initial SSP, then initial PC).
 
-A pod restarted (reflashed, replugged) while the target is halted
-leaves the CPU's serial link out of frame: while the Pico boots, U1
-lets DSCLK go, R3 pulls it high, and the CPU takes the edges as bits.
-The pod frames it again itself before its first request (`bdm pins`
-then shows a stale ATEMP), or on `bdm resync`; `bdm reset` also does,
-resetting the target.  A watchdog reset of the pod is such a restart; it
-should be rare (PLAN.md, Firmware, Watchdog).
+A pod restarted (reflashed, replugged) while the target is halted has
+left the 58503A's CPU refusing commands (RSREG ATEMP illegal) until
+`bdm reset`; idle time alone does not.  Suspected: a BKPT glitch as
+the Pico resets, GP9 (U1's input) falling before GP10 turns U1 off.
+`bdm bootsel` turns U1 off before its reboot; a power loss, replug or
+watchdog reset cannot.  After such a restart: `bdm reset` (or
+`bdm resync`, if only the link's framing is off).  A watchdog reset
+of the pod should be rare (PLAN.md, Firmware, Watchdog).
 
 To leave the target running: `bdm go` straight after `bdm reset`
 starts it from the reset vector; `bdm reset --run` resets it to run

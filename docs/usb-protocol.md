@@ -156,8 +156,7 @@ Semantics:
   clocks NOP pairs, and while the second does not read "command
   complete" (CPU32RM 7.2.8.15) adds one lone DSCLK edge, at most 17
   times; Unexpected if it never does.  Then it reads ATEMP and
-  reports it stale.  The pod frames the link this way itself before
-  the ATEMP read of a CPU halted before it started.  A command the CPU
+  reports it stale.  On request only.  A command the CPU
   took out of frame may take the NOPs as operands.  NoTarget below
   4.5 V; NoFreeze if FREEZE is low.
 - Halt works only if BDM was enabled at the target's last reset (BKPT

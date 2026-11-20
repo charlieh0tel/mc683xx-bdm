@@ -290,8 +290,12 @@ pods apart (`bdm --pod usb:SERIAL`).  Requests:
   ATEMP read, so a link out of frame cannot stop them.
 - Resync: NOP pairs, and a lone DSCLK edge after each pair whose second
   NOP does not read "command complete", until one does (at most 17).
-  Run on request, and before the ATEMP read of a CPU halted before the
-  pod started: out of frame, reads can look valid.
+  On request only: on the 58503A a pod restart left the link in frame
+  but the CPU refusing commands, which only a reset cleared, so an
+  automatic resync bought nothing (docs/bring-up.md, step 5).
+- Bootsel turns U1 off (GP10 low, then 10 us) before the boot ROM's
+  reboot, so a resetting Pico cannot glitch BKPT low; this needs
+  embassy-rp's `unstable-pac` for the one register write.
 - ATEMP holds the entry source only until the first command after
   entry, and the CPU can enter on its own (BGND, a breakpoint, a double
   bus fault).  A task watches FREEZE and counts its edges (`freeze.rs`);

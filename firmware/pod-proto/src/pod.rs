@@ -302,15 +302,7 @@ impl<B: Board> Pod<B> {
             return Ok(());
         };
         board.drive_link();
-        // Halted before the pod started: a pod restarted under a halted
-        // CPU puts its link out of frame (docs/bring-up.md, step 5), and
-        // out of frame a read can look valid, so frame it first.
-        let framed = if edges == 0 { self.resync().await } else { Ok(()) };
-        let read = match framed {
-            Ok(()) => self.session.read_system_register(SystemRegister::Atemp).await.map_err(Status::from),
-            Err(status) => Err(status),
-        };
-        match read {
+        match self.session.read_system_register(SystemRegister::Atemp).await.map_err(Status::from) {
             Ok(atemp) => {
                 self.entry.record(edges, take(atemp));
                 Ok(())
