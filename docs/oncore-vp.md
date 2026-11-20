@@ -33,7 +33,7 @@ most of a programming fixture's BDM set:
 | B8 | 56 | BKPT/DSCLK | 4 | traced; 10 kOhm pull-up, same via as B7 |
 | B9 | 58 | FREEZE/QUOT | 6 | traced by eye |
 | B10 | 66 | CLKOUT | - | traced; not VDD (buzzed) |
-| B11 | 68 | RESET | 7 | buzzed, to recount; its trace goes to a via, to the back |
+| B11 | ? | ? | - | unknown; its trace goes to a via, to the back; RESET (68) a candidate |
 
 The resistors below the lower edge are 10 kOhm ("103") pull-ups.  A bus
 joining pins 61 (VDDSYN), 63 and 65 (VDD) pulls up pin 57 or 58 (which
@@ -49,6 +49,7 @@ BDM header pin 9.
 
 The rest of a 10-pin BDM header:
 
+- RESET (pin 7): pin 68, unless B11 turns out to be it.
 - BERR (pin 2): pin 70, no test point.  Tack a wire, or leave it open:
   the pod's pull-down then reports BERR low.
 - DS (pin 1): pin 85 (PE5/DS), optional; the pod only reports it.
