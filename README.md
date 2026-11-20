@@ -47,10 +47,18 @@ make lint                      # clippy on every build, before each commit
 cd firmware
 cargo run -p pod-host --bin bdm -- pins     # or halt, regs, dump 0xfffa00 64, ...
 cargo run -p pod-host --bin bdm -- --pod unix:/path/to/socket regs   # a stand-in pod
+cargo run -p pod-host --bin bdm -- list     # each pod on USB: serial number, bus-ports
+cargo run -p pod-host --bin bdm -- --pod usb:E6613852833B2A2F regs    # one pod of several
 
 cargo run -p pod-host --bin bdm-stand-in -- unix:/tmp/pod.sock &      # a pod on a model CPU32
 cargo run -p pod-host --bin bdm -- --pod unix:/tmp/pod.sock reset
 ```
+
+`--pod usb`, the default, is the only pod connected; with more than
+one, `bdm` lists their serial numbers and stops.  `--pod usb:SERIAL`
+picks one by the serial number `bdm list` shows (the Pico's unique ID,
+as picotool shows it; case ignored), for `bdm bootsel` too.  `bdm list`
+does not open the pods, so it needs no udev rule.
 
 Without root on Linux, the pod needs the udev rule
 `packaging/udev/70-mc683xx-pod.rules`: copy it into

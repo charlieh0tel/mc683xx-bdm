@@ -21,12 +21,15 @@ use mc683xx_target::register::SystemRegister;
 use mc683xx_target::size::Size;
 use pod_host::pod::Pod;
 use pod_host::target::PodTarget;
-use pod_host::transport::StreamTransport;
+use pod_host::transport::NO_SERIAL;
+use pod_host::transport::PodAddress;
 use pod_host::transport::Transport;
-use pod_host::transport::UsbTransport;
+use pod_host::transport::TransportError;
+use pod_host::transport::list_pods;
 use pod_host::transport::reboot_to_bootloader;
 use pod_proto::usb::Atemp;
 use pod_proto::usb::PROTOCOL_VERSION;
+use pod_proto::usb::SERIAL_NUMBER_CHARS;
 
 /// Bytes per hex dump line.
 const DUMP_LINE: usize = 16;
@@ -61,8 +64,9 @@ const VERSION: &str = concat!(env!("CARGO_PKG_VERSION"), " ", env!("GIT_VERSION"
 #[derive(Debug, Parser)]
 #[command(name = "bdm", version = VERSION)]
 struct Cli {
-    /// The pod: `usb`, or a stand-in on `unix:PATH` or `tcp:HOST:PORT`
-    /// (docs/usb-protocol.md).
+    /// The pod: `usb` (the only one connected), `usb:SERIAL` (the one
+    /// with that serial number, `bdm list`), or a stand-in on
+    /// `unix:PATH` or `tcp:HOST:PORT` (docs/usb-protocol.md).
     #[arg(long, default_value = "usb")]
     pod: String,
     #[command(subcommand)]
@@ -145,6 +149,9 @@ enum Command {
     },
     /// Reboot the pod into the RP2040's USB bootloader, for a new UF2.
     Bootsel,
+    /// Each pod on USB: its serial number and where it is plugged in
+    /// (bus-ports), without opening it.
+    List,
     /// bdm's version and the pod firmware's, and their protocol.
     Version,
     /// Bring a halted target's serial link back into frame, after a pod
@@ -256,22 +263,44 @@ fn save_dump(address: u32, data: &[u8], path: &Path, out: &mut impl Write) -> Re
 
 /// The transport `--pod` names.
 fn connect(pod: &str) -> Result<Box<dyn Transport>> {
-    Ok(match pod.split_once(':') {
-        None if pod == "usb" => Box::new(UsbTransport::open()?),
-        Some(("unix", path)) => Box::new(StreamTransport::unix(path)?),
-        Some(("tcp", address)) => Box::new(StreamTransport::tcp(address)?),
-        _ => bail!("--pod is usb, unix:PATH or tcp:HOST:PORT, not {pod}"),
-    })
+    let transport: Box<dyn Transport> = pod.parse::<PodAddress>()?.connect()?;
+    Ok(transport)
+}
+
+/// The serial number `--pod` names, for a command that needs the pod on
+/// USB.
+fn usb_serial(pod: &str, command: &str) -> Result<Option<String>> {
+    match pod.parse()? {
+        PodAddress::Usb(serial) => Ok(serial),
+        _ => bail!("{command} needs the pod on USB, not {pod}"),
+    }
+}
+
+/// One line per pod: serial number, then location.
+fn list(out: &mut impl Write) -> Result<()> {
+    let pods = list_pods()?;
+    if pods.is_empty() {
+        eprintln!("bdm: {}", TransportError::NotFound);
+    }
+    for pod in pods {
+        let serial = pod.serial.as_deref().unwrap_or(NO_SERIAL);
+        writeln!(out, "{serial:<SERIAL_NUMBER_CHARS$}  {}", pod.location)?;
+    }
+    Ok(())
 }
 
 fn run(pod: &str, command: Command) -> Result<()> {
-    if matches!(command, Command::Bootsel) {
-        if pod != "usb" {
-            bail!("bootsel needs the pod on USB, not {pod}");
+    match command {
+        Command::Bootsel => {
+            reboot_to_bootloader(usb_serial(pod, "bootsel")?.as_deref())?;
+            writeln!(std::io::stdout(), "bootloader: copy the UF2 onto the RPI-RP2 drive")?;
+            return Ok(());
         }
-        reboot_to_bootloader()?;
-        writeln!(std::io::stdout(), "bootloader: copy the UF2 onto the RPI-RP2 drive")?;
-        return Ok(());
+        Command::List => {
+            usb_serial(pod, "list")?;
+            return list(&mut std::io::stdout().lock());
+        }
+        _ => {}
     }
     let mut target = PodTarget::new(Pod::new(connect(pod)?));
     let version = target.pod().hello()?;
@@ -373,6 +402,7 @@ fn execute<T: Transport>(target: &mut PodTarget<T>, command: Command, out: &mut 
             other => bail!("resync: unexpected ATEMP {other:?}"),
         },
         Command::Bootsel => bail!("bootsel talks to the pod's reset interface, not through a target"),
+        Command::List => bail!("list reads USB descriptors, not through a target"),
         Command::Xfer { words } => {
             for (word, response) in words.iter().zip(target.pod().transfer(&words)?) {
                 writeln!(out, "{word:04x} -> {}:{:04x}", response >> 16, response & 0xFFFF)?;
@@ -418,6 +448,7 @@ mod tests {
     use super::number;
     use super::register;
     use super::save_dump;
+    use super::usb_serial;
 
     #[test]
     fn numbers() {
@@ -496,6 +527,18 @@ mod tests {
         let path = temporary_path("missing").join("dump.bin");
         let error = save_dump(0, &[0], &path, &mut Vec::new()).unwrap_err();
         assert!(format!("{error:#}").contains(&path.display().to_string()));
+    }
+
+    #[test]
+    fn usb_commands_take_usb_with_or_without_a_serial() {
+        assert_eq!(usb_serial("usb", "list").unwrap(), None);
+        assert_eq!(
+            usb_serial("usb:E6613852833B2A2F", "bootsel").unwrap().as_deref(),
+            Some("E6613852833B2A2F")
+        );
+        let error = usb_serial("unix:/tmp/pod.sock", "bootsel").unwrap_err();
+        assert_eq!(error.to_string(), "bootsel needs the pod on USB, not unix:/tmp/pod.sock");
+        assert!(usb_serial("usb:", "list").is_err());
     }
 
     #[test]

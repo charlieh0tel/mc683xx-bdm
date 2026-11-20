@@ -381,7 +381,13 @@ code and no `unsafe`; no USB request, so the protocol is unchanged.
 
 - `pod-host`'s `transport`: a `Transport` trait, one request packet
   out and one reply back; `UsbTransport` over `nusb`, blocking, 1 s
-  timeout, the first device with the pod's VID:PID; `StreamTransport`
+  timeout, the device with the pod's VID:PID and the serial number
+  asked for (case ignored), or with none asked for the only one: more
+  than one is an error listing their serial numbers, never a guess.
+  `PodAddress` is `--pod`'s text (`usb`, `usb:SERIAL`, `unix:PATH`,
+  `tcp:HOST:PORT`) and connects, for `bdm` and other callers alike;
+  `list_pods` reads each pod's serial number and bus-ports from the
+  OS's descriptor cache without opening it.  `StreamTransport`
   on a Unix or TCP socket, each message a length byte and the packet,
   for m683xx-emu's virtual BDM cable (`bdm --pod unix:PATH`).  The
   protocol is `docs/usb-protocol.md`; this repo owns it.  `bdm` sends
@@ -403,8 +409,9 @@ code and no `unsafe`; no USB request, so the protocol is unchanged.
   5 V; a halt or reset enters with a breakpoint, and a reset keeps
   registers and memory.  Not the emulator: no instructions run, so a
   test enters background mode itself.
-- `bdm`: pins, halt, reset (`--run`: ResetRun), resync, bootsel, version, go, call, clock, regs, get, set, dump,
-  write, xfer, loopback, through `PodTarget`.  Halt and reset print the entry
+- `bdm`: pins, halt, reset (`--run`: ResetRun), resync, bootsel, list, version, go, call, clock, regs, get, set, dump,
+  write, xfer, loopback, through `PodTarget` (bootsel and list
+  excepted).  Halt and reset print the entry
   source.  Dump and write take `--fc`, default 5 (supervisor data).
   Dump with `--output FILE` writes the raw bytes to FILE instead of a
   hex listing.

@@ -48,3 +48,7 @@
     BDM.
   - The 58503A's halt-monitor reset (RSR $10) after GO and a halt
     (docs/58503a/README.md).
+  - USB serial number: `bdm list` and `lsusb -v` against `picotool
+    info -d` on a Pico and a Pico 2 (byte order of the RP2350's chip
+    ID); two pods at once, `--pod usb:SERIAL` and `bdm bootsel` on
+    each.
