@@ -9,6 +9,7 @@ mod board;
 mod freeze;
 mod link;
 mod reset;
+mod serial;
 mod watchdog;
 
 #[cfg(feature = "rtt")]
@@ -110,6 +111,7 @@ async fn main(_spawner: Spawner) {
     let mut config = embassy_usb::Config::new(VID, PID);
     config.manufacturer = Some("mc683xx-pod");
     config.product = Some("CPU32 BDM pod");
+    config.serial_number = serial::serial_number(p.FLASH);
     config.max_power = MAX_POWER_MA;
     config.max_packet_size_0 = 64;
     let mut builder = Builder::new(

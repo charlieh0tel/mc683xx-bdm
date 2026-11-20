@@ -268,7 +268,12 @@ packets, one request per packet and one reply per request
 `pod`, over a `Board` trait: the firmware's board (`board.rs`) is the
 Pico's pins, ADC, PIO link and timeouts, so the request rules run in
 host tests too.  VID:PID 1209:0001, pid.codes' test pair, until
-the pod has its own.  Requests:
+the pod has its own.  Serial number string: the chip's unique ID in
+uppercase hex, 16 characters, read once at boot (`serial.rs`): the
+RP2040's flash unique ID (embassy-rp's `blocking_unique_id`), the
+RP2350's OTP chip ID; pico-sdk's `pico_unique_board_id` convention, so
+picotool and `lsusb -v` show the same string.  It is what tells two
+pods apart (`bdm --pod usb:SERIAL`).  Requests:
 
 - Transfer: up to 15 raw words, each answered with the 17 bits shifted
   in, for bring-up and commands the pod does not sequence.  Not

@@ -19,6 +19,24 @@ pub const PID: u16 = 0x0001;
 /// A full-speed bulk packet.
 pub const PACKET: usize = 64;
 
+/// Bytes in the chip's unique ID: the RP2040's flash unique ID, the
+/// RP2350's OTP chip ID (pico-sdk's `pico_unique_board_id`).
+pub const UNIQUE_ID_BYTES: usize = 8;
+/// Characters in the pod's USB serial number: its unique ID in hex.
+pub const SERIAL_NUMBER_CHARS: usize = 2 * UNIQUE_ID_BYTES;
+
+/// The pod's USB serial number, written into `text`: `id` in uppercase
+/// hex, first byte first, as pico-sdk's
+/// `pico_get_unique_board_id_string` and picotool show it.
+pub fn serial_number<'a>(id: &[u8; UNIQUE_ID_BYTES], text: &'a mut [u8; SERIAL_NUMBER_CHARS]) -> &'a str {
+    const DIGITS: &[u8; 16] = b"0123456789ABCDEF";
+    for ([high, low], byte) in text.as_chunks_mut::<2>().0.iter_mut().zip(id) {
+        *high = DIGITS[usize::from(byte >> 4)];
+        *low = DIGITS[usize::from(byte & 0x0F)];
+    }
+    core::str::from_utf8(text).unwrap_or_default()
+}
+
 /// This protocol's version, in the Hello reply: raised on any change
 /// to a request or reply (docs/usb-protocol.md).
 pub const PROTOCOL_VERSION: u32 = 7;
@@ -649,9 +667,11 @@ mod tests {
     use super::Register;
     use super::ReplyError;
     use super::Request;
+    use super::SERIAL_NUMBER_CHARS;
     use super::Size;
     use super::Status;
     use super::SystemRegister;
+    use super::UNIQUE_ID_BYTES;
     use super::byte_count;
     use super::encode_atemp;
     use super::encode_data;
@@ -665,6 +685,7 @@ mod tests {
     use super::parse_reply;
     use super::parse_transfer_reply;
     use super::parse_value;
+    use super::serial_number;
 
     fn round_trip(request: Request<'_>) {
         let mut packet = [0; PACKET];
@@ -836,5 +857,16 @@ mod tests {
         }
         assert_eq!(parse_reply(&[0xEE]), Err(ReplyError::Malformed));
         assert_eq!(parse_reply(&[]), Err(ReplyError::Malformed));
+    }
+
+    #[test]
+    fn serial_numbers_are_uppercase_hex_first_byte_first() {
+        let mut text = [0; SERIAL_NUMBER_CHARS];
+        assert_eq!(
+            serial_number(&[0xE6, 0x61, 0x38, 0x52, 0x83, 0x3B, 0x2A, 0x2F], &mut text),
+            "E6613852833B2A2F"
+        );
+        assert_eq!(serial_number(&[0x00; UNIQUE_ID_BYTES], &mut text), "0000000000000000");
+        assert_eq!(serial_number(&[0xFF; UNIQUE_ID_BYTES], &mut text), "FFFFFFFFFFFFFFFF");
     }
 }

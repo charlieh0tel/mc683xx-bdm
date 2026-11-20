@@ -15,6 +15,12 @@ request or reply.
 USB:
 
 - VID:PID 1209:0001 (pid.codes' test pair, until the pod has its own).
+- Serial number string (iSerialNumber): the chip's unique ID, 8
+  bytes, as 16 uppercase hex digits, first byte first (pico-sdk's
+  `pico_get_unique_board_id_string`): the RP2040's flash unique ID
+  (SPI command 0x4B), the RP2350's OTP chip ID (rows 0-3, most
+  significant byte first).  Example: `E6613852833B2A2F`.  A pod whose
+  ID cannot be read has no serial number string.
 - Vendor class (0xFF), interface 0, one bulk OUT and one bulk IN
   endpoint, 64-byte packets (full speed).
 - Interface 1: picotool's reset interface (vendor class, subclass 0,
