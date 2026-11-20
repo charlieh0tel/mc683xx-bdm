@@ -412,8 +412,13 @@ code and no `unsafe`; no USB request, so the protocol is unchanged.
   `bdm` and `PodTarget` run end to end against it with no hardware
   (`pod-host/tests/stand_in.rs`).  The model's FREEZE is its state, VDD
   5 V; a halt or reset enters with a breakpoint, and a reset keeps
-  registers and memory.  Not the emulator: no instructions run, so a
-  test enters background mode itself.
+  registers and memory.  Not the emulator: once resumed the model runs
+  only NOP, MOVEQ, BRA.S, TRAP #n, ILLEGAL and BGND from its RAM, with
+  T1/T0 trace, exception frames $0 and $2 through VBR, a requested
+  interrupt, and A7 as SSP or USP by SR's S (`bdm-model`'s `program`);
+  any other instruction, an access outside RAM or 1000 instructions
+  and it runs on unwatched.  Enough for `PodTarget::step`; anything
+  else enters background mode by the test's hand.
 - `bdm`: pins, halt, reset (`--run`: ResetRun), resync, bootsel, list, version, go, call, clock, regs, get, set, dump,
   write, xfer, loopback, through `PodTarget` (bootsel and list
   excepted).  Halt and reset print the entry
@@ -479,15 +484,38 @@ code and no `unsafe`; no USB request, so the protocol is unchanged.
     only on the pod.
   - Continue: go, then poll `halted()`; Ctrl-C is `halt()`.
   - Memory: fc 5, with `monitor` fc, reset, init and load.
-  - `step()` joins `Cpu32Target`.  `PodTarget::step` sets SR's T1 and
-    GOs, with the trace vector on a BGND stub in scratch RAM.  It then
-    unwinds the format $2 frame and restores the vector, or VBR when
-    the table had to be copied to RAM because it is in ROM (CPU32RM
-    6.3.8).  So step works on code in ROM.  An illegal or privileged
-    instruction is not traced: the step times out and halts, and
-    reports where it stopped.
-  - Its test needs a CPU that runs instructions: the integration test
-    against `mc683xx-run --bdm`, not `bdm-stand-in`.
+  - `step()` is in `Cpu32Target` (mc683xx-target 0.6): from RPC to
+    where T1 would trap, before any handler's first instruction, the
+    exceptions the instruction raised and an interrupt pending taken
+    (its doc comment has the contract).  `PodTarget::step` (`step.rs`)
+    meets it by pointing VBR, for the step, at a table in scratch RAM
+    (`PodTarget::set_scratch`, 1026 bytes the program does not use) whose every
+    vector is one BGND stub after it, setting T1 (T0 clear) and GOing;
+    so an exception, the trace among them, lands at the stub, and the
+    step works on code in ROM.  The table is written on the first step
+    after a reset, GO or CALL.  At the stub (RPC past it) it reads the
+    frames from A7 down to the first not returning to the stub, then
+    unwinds: the step's trace frame removed, the frame above it (an
+    interrupt's) given its SR and PC; the program's trace bits back in
+    the frame stacked from the program; every PC still the stub made
+    the program's vector for the exception below it; RPC the program's
+    handler for the last one, or the traced PC.  With the program's own
+    T1 set the trace frame is its own and is kept.  Then VBR back.
+    Stopped elsewhere (a stepped BGND, a double bus fault): VBR and
+    SR's trace bits back, and the entry reported.  Not at the stub in
+    100 ms: halted, and an error with RPC.  The program's T0 is not
+    honored (its change-of-flow trace is lost), and what the contract
+    calls implementation-defined (a VBR read or MOVE from SR in the
+    step sees the pod's) is the pod's.
+  - Every vector the stub, not the trace vector alone in the program's
+    table (copied to RAM when in ROM): the contract stops before every
+    handler, which only a table of the pod's own sees (decided
+    2026-11-20, from mc683xx PLAN.md's `Cpu32Target` row).
+  - Tested against `bdm-stand-in`'s model (`pod-host/tests/stand_in.rs`):
+    one instruction, user mode, TRAP, an interrupt pending, BGND, no
+    stop, no scratch; the unwinding itself on frames
+    (`step.rs`'s tests), an interrupt above the trace among them.
+    On silicon not yet.
 
 ---
 

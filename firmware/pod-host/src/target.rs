@@ -1,7 +1,12 @@
 //! [`Cpu32Target`] over the pod: the trait's halts, registers and
 //! memory, with what it needs kept between requests (the entry source,
-//! the program's SFC and DFC).  The pod reads ATEMP first after each
-//! entry and reports it (`pod_proto::entry`); this never reads ATEMP.
+//! the program's SFC and DFC), and its step by T1 trace through an
+//! exception table in scratch RAM (`step`).  The pod reads ATEMP first
+//! after each entry and reports it (`pod_proto::entry`); this never
+//! reads ATEMP.
+
+use std::time::Duration;
+use std::time::Instant;
 
 use mc683xx_target::Cpu32Target;
 use mc683xx_target::address::Address;
@@ -16,7 +21,28 @@ use pod_proto::usb::Status;
 
 use crate::pod::Error;
 use crate::pod::Pod;
+use crate::step::FRAME_HEAD;
+use crate::step::Frame;
+use crate::step::MAX_FRAMES;
+use crate::step::SR_T1;
+use crate::step::SR_TRACE;
+use crate::step::StepError;
+use crate::step::after_stub;
+use crate::step::frame_bytes;
+use crate::step::scratch_image;
+use crate::step::stub;
+use crate::step::unwind;
+use crate::step::vector_address;
 use crate::transport::Transport;
+
+/// How long a step may run before it is taken as not stopping: many
+/// times one instruction's and its exceptions', and a few USB round
+/// trips.
+const STEP_TIMEOUT: Duration = Duration::from_millis(100);
+
+/// The supervisor data space, where the step's table, stub and frames
+/// are read and written, as the CPU stacks and fetches vectors.
+const SUPERVISOR_DATA: FunctionCode = FunctionCode::SUPERVISOR_DATA;
 
 /// One of SFC and DFC: the program's value, and what the CPU holds now.
 /// Both `None` until read or written; they differ only after a memory
@@ -63,12 +89,26 @@ pub struct PodTarget<T> {
     pod: Pod<T>,
     /// `Some` while the target is known to be halted.
     halted: Option<Halted>,
+    /// Where a step's exception table and stub go
+    /// ([`step::SCRATCH_BYTES`](crate::step::SCRATCH_BYTES)).
+    scratch: Option<Address>,
+    /// The table and stub are in scratch RAM: written since the
+    /// program last ran, other than in a step, or was reset.
+    scratch_written: bool,
 }
 
 impl<T: Transport> PodTarget<T> {
     /// The target behind `pod`.
     pub const fn new(pod: Pod<T>) -> Self {
-        Self { pod, halted: None }
+        Self { pod, halted: None, scratch: None, scratch_written: false }
+    }
+
+    /// Gives a step `scratch`, [`step::SCRATCH_BYTES`](crate::step::SCRATCH_BYTES)
+    /// of RAM the program does not use, for its exception table and
+    /// stub; `None` and [`Cpu32Target::step`] fails.
+    pub const fn set_scratch(&mut self, scratch: Option<Address>) {
+        self.scratch = scratch;
+        self.scratch_written = false;
     }
 
     /// The pod, for the requests the trait does not carry (pins, clock,
@@ -86,6 +126,7 @@ impl<T: Transport> PodTarget<T> {
     /// As [`Error`].
     pub fn call(&mut self, address: Address) -> Result<(), Error> {
         self.leave()?;
+        self.scratch_written = false;
         self.pod.call(address)
     }
 
@@ -116,6 +157,7 @@ impl<T: Transport> PodTarget<T> {
     /// As [`Error`].
     pub fn reset_running(&mut self) -> Result<(), Error> {
         self.halted = None;
+        self.scratch_written = false;
         self.pod.reset_run()
     }
 
@@ -126,6 +168,7 @@ impl<T: Transport> PodTarget<T> {
     /// As [`Error`].
     pub fn resync(&mut self) -> Result<Atemp, Error> {
         self.halted = None;
+        self.scratch_written = false;
         self.pod.resync()
     }
 
@@ -165,6 +208,69 @@ impl<T: Transport> PodTarget<T> {
         Ok(entry)
     }
 
+    /// Waits for a step's GO to end in background mode; `None` if it
+    /// did not within [`STEP_TIMEOUT`] and was halted.
+    fn stop_stepping(&mut self) -> Result<Option<Entry>, Error> {
+        let deadline = Instant::now() + STEP_TIMEOUT;
+        while Instant::now() < deadline {
+            if let Some(entry) = self.look()? {
+                return Ok(Some(entry));
+            }
+        }
+        self.halt()?;
+        Ok(None)
+    }
+
+    /// After a step that did not reach the stub: the program's VBR, and
+    /// its trace bits in SR.
+    fn untrace(&mut self, program_sr: u32, program_vbr: u32) -> Result<(), Error> {
+        let sr = self.read_system_register(SystemRegister::Sr)?;
+        self.write_system_register(SystemRegister::Sr, (sr & !SR_TRACE) | (program_sr & SR_TRACE))?;
+        self.write_system_register(SystemRegister::Vbr, program_vbr)
+    }
+
+    /// After a step that reached the stub: reads the frames stacked on
+    /// the way, unwinds them into the program's table's state, and
+    /// writes that back with the program's VBR.
+    fn unwind(&mut self, stub: Address, program_sr: u16, program_vbr: u32) -> Result<(), Error> {
+        let sp = self.read_register(Register::A7)?;
+        let sr = self.read_system_register(SystemRegister::Sr)? as u16;
+        let mut chain = vec![Frame::cpu(sr, stub.0)];
+        let mut at = Address(sp);
+        while chain.last().is_some_and(|frame| frame.pc == stub.0) {
+            if chain.len() > MAX_FRAMES {
+                return Err(StepError::TooManyFrames.into());
+            }
+            let mut head = [0; FRAME_HEAD];
+            self.read_memory(at, SUPERVISOR_DATA, Size::Word, &mut head)?;
+            let bytes = frame_bytes(&head, at)?;
+            let mut rest = vec![0; bytes - FRAME_HEAD];
+            if !rest.is_empty() {
+                self.read_memory(at.offset(FRAME_HEAD as u32), SUPERVISOR_DATA, Size::Word, &mut rest)?;
+            }
+            chain.push(Frame::from_head(&head, rest));
+            at = at.offset(bytes as u32);
+        }
+        let bottom = at;
+        let chain = unwind(chain, stub, program_sr, |vector| {
+            let mut handler = [0; 4];
+            let address = vector_address(Address(program_vbr), vector);
+            self.read_memory(address, SUPERVISOR_DATA, Size::Word, &mut handler)?;
+            Ok::<_, Error>(u32::from_be_bytes(handler))
+        })?;
+        let (cpu, frames) = chain.split_first().expect("the chain starts with the CPU");
+        let stacked: Vec<u8> = frames.iter().flat_map(Frame::bytes).collect();
+        let sp = Address(bottom.0.wrapping_sub(stacked.len() as u32));
+        if !stacked.is_empty() {
+            self.write_memory(sp, SUPERVISOR_DATA, Size::Word, &stacked)?;
+        }
+        // A7 while S is set, so SSP; an SR clearing S then makes USP A7
+        self.write_register(Register::A7, sp.0)?;
+        self.write_system_register(SystemRegister::Sr, u32::from(cpu.sr))?;
+        self.write_system_register(SystemRegister::Rpc, cpu.pc)?;
+        self.write_system_register(SystemRegister::Vbr, program_vbr)
+    }
+
     /// Sets SFC or DFC to `function_code` for a memory call, reading the
     /// program's value first so it can be restored.
     fn select(&mut self, register: SystemRegister, function_code: FunctionCode) -> Result<(), Error> {
@@ -194,6 +300,7 @@ impl<T: Transport> Cpu32Target for PodTarget<T> {
 
     fn reset_halted(&mut self) -> Result<Entry, Error> {
         self.halted = None;
+        self.scratch_written = false;
         let atemp = self.pod.reset_halt()?;
         self.halted_at(atemp)
     }
@@ -212,13 +319,51 @@ impl<T: Transport> Cpu32Target for PodTarget<T> {
 
     fn go(&mut self) -> Result<(), Error> {
         self.leave()?;
+        self.scratch_written = false;
         self.pod.go()
     }
 
-    /// Not yet: T1 tracing through a stub in scratch RAM (PLAN.md,
-    /// Host, gdb).
+    /// T1 trace with VBR pointing at a table in scratch RAM whose every
+    /// vector is a BGND stub (PLAN.md, Host, gdb).  At the stub the
+    /// frames stacked on the way are unwound (`step::unwind`) and VBR
+    /// put back.  A step that stops elsewhere (a BGND stepped, a double
+    /// bus fault) gets VBR and the program's trace bits back.  The
+    /// program's T0 is not honored: its trace on a change of flow is
+    /// not taken.
+    ///
+    /// # Errors
+    /// [`StepError`]: no scratch RAM, a step that did not stop (it is
+    /// then halted), or frames not as a step stacks them; or as
+    /// [`Error`].
     fn step(&mut self) -> Result<Entry, Error> {
-        Err(Error::Unsupported("step"))
+        let scratch = self.scratch.ok_or(StepError::NoScratch)?;
+        if scratch.is_odd() {
+            return Err(StepError::OddScratch(scratch).into());
+        }
+        self.halted_state()?;
+        let program_sr = self.read_system_register(SystemRegister::Sr)?;
+        let program_vbr = self.read_system_register(SystemRegister::Vbr)?;
+        if !self.scratch_written {
+            self.write_memory(scratch, SUPERVISOR_DATA, Size::Word, &scratch_image(scratch))?;
+            self.scratch_written = true;
+        }
+        self.write_system_register(SystemRegister::Vbr, scratch.0)?;
+        self.write_system_register(SystemRegister::Sr, (program_sr & !SR_TRACE) | SR_T1)?;
+        self.leave()?;
+        self.pod.go()?;
+        let Some(entry) = self.stop_stepping()? else {
+            self.untrace(program_sr, program_vbr)?;
+            let pc = self.read_system_register(SystemRegister::Rpc)?;
+            return Err(StepError::NotStopped(Address(pc)).into());
+        };
+        let at_stub = entry == Entry::Background
+            && self.read_system_register(SystemRegister::Rpc)? == after_stub(scratch).0;
+        if at_stub {
+            self.unwind(stub(scratch), program_sr as u16, program_vbr)?;
+            return Ok(Entry::Breakpoint);
+        }
+        self.untrace(program_sr, program_vbr)?;
+        Ok(entry)
     }
 
     fn read_register(&mut self, register: Register) -> Result<u32, Error> {

@@ -75,7 +75,7 @@ impl From<Error> for PyErr {
                 pod::Error::Reply(ReplyError::Failed(Status::BadRequest) | ReplyError::Malformed)
                 | pod::Error::Protocol(_),
             ) => ProtocolError::new_err(text),
-            Error::Pod(pod::Error::Reply(ReplyError::Failed(_)) | pod::Error::Unsupported(_)) => {
+            Error::Pod(pod::Error::Reply(ReplyError::Failed(_)) | pod::Error::Step(_)) => {
                 TargetError::new_err(text)
             }
             Error::Pod(pod::Error::Request(_) | pod::Error::Length { .. })

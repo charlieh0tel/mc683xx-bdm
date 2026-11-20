@@ -1,6 +1,8 @@
 //! A pod's board around a model [`Target`]: what `pod_proto::pod` needs
 //! to answer requests with no hardware.  FREEZE is the model's state,
 //! its edges counted as the model leaves and enters background mode;
+//! a resumed model runs its program at once (`program`), so a BGND it
+//! reaches has FREEZE back up before the pod's next request;
 //! VDD is fixed; a halt or reset puts the model in background mode with
 //! a breakpoint entry.  A reset keeps registers and memory: the model
 //! has no reset vectors to fetch.
@@ -84,6 +86,10 @@ impl<const RAM: usize> ModelBoard<RAM> {
         let bits = self.target.exchange(word, exit);
         if was_frozen && !self.target.frozen() {
             self.edges = self.edges.wrapping_add(1);
+            self.target.run();
+            if self.target.frozen() {
+                self.edges = self.edges.wrapping_add(1);
+            }
         }
         if self.dso_high { DSO_HIGH } else { bits }
     }

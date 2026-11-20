@@ -8,5 +8,6 @@ pub mod register;
 #[cfg(test)]
 mod script;
 pub mod stand_in;
+pub mod step;
 pub mod target;
 pub mod transport;

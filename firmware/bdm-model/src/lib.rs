@@ -12,10 +12,16 @@
 //! Opcodes are decoded here from CPU32RM's bit fields, not with
 //! `pod_proto::bdm`, so that an encoding mistake cannot hide on both
 //! sides.
+//!
+//! Once resumed it runs the few instructions `program` models, from
+//! its RAM, until a BGND puts it back in background mode or it meets
+//! one it does not model: enough to step by T1 trace (CPU32RM 6.2.10)
+//! through a stub, as a pod does.
 
 #![no_std]
 
 pub mod board;
+mod program;
 
 use core::convert::Infallible;
 use core::ops::Range;
@@ -43,6 +49,10 @@ const REGISTER_MASK: u16 = 0xFFF0;
 const SIZED_MASK: u16 = 0xFF3F;
 const SIZE_SHIFT: u16 = 6;
 const LOW_NIBBLE: u16 = 0x000F;
+
+/// SR's supervisor bit (CPU32RM 2.3.3): A7 is SSP while it is set,
+/// USP while it is clear.
+const SR_S: u32 = 0x2000;
 
 /// Bytes in a long, the stack step for CALL's return address.
 const LONG_BYTES: u32 = 4;
@@ -151,10 +161,15 @@ enum Block {
 /// address ends in a bus error.
 #[derive(Debug)]
 pub struct Target<const RAM: usize> {
-    /// D0-D7, then A0-A7, in register-code order.
+    /// D0-D7, then A0-A7, in register-code order.  A7 is the active
+    /// stack pointer, SSP or USP as SR's S bit says.
     registers: [u32; 16],
-    /// By select code; codes with no register stay 0.
+    /// By select code; codes with no register stay 0.  Of SSP and
+    /// USP, the one A7 is not keeps its value here: USP while S is
+    /// set, SSP while it is clear.
     system: [u32; 16],
+    /// An interrupt requested and not yet taken: its level and vector.
+    interrupt: Option<(u8, u8)>,
     ram: [u8; RAM],
     ram_base: u32,
     /// Exchanges each memory access answers "not ready" before its
@@ -188,6 +203,7 @@ impl<const RAM: usize> Target<RAM> {
         Self {
             registers: [0; 16],
             system: [0; 16],
+            interrupt: None,
             ram: [0; RAM],
             ram_base: ram_base.0,
             memory_busy: 0,
@@ -253,15 +269,53 @@ impl<const RAM: usize> Target<RAM> {
         self.registers[register.code() as usize] = value;
     }
 
-    /// A system register.
+    /// A system register.  SSP or USP, whichever is active, is A7.
     #[must_use]
     pub const fn system_register(&self, register: SystemRegister) -> u32 {
+        if self.is_active_stack(register) {
+            return self.register(Register::A7);
+        }
         self.system[register.code() as usize]
     }
 
-    /// Sets a system register.
+    /// Sets a system register.  SSP or USP, whichever is active, is A7;
+    /// an SR that changes S swaps A7 with the other stack pointer.
     pub const fn set_system_register(&mut self, register: SystemRegister, value: u32) {
+        if self.is_active_stack(register) {
+            self.set_register(Register::A7, value);
+            return;
+        }
+        if matches!(register, SystemRegister::Sr) && (value ^ self.sr()) & SR_S != 0 {
+            let (from, to) = if value & SR_S != 0 {
+                (SystemRegister::Usp, SystemRegister::Ssp)
+            } else {
+                (SystemRegister::Ssp, SystemRegister::Usp)
+            };
+            self.system[from.code() as usize] = self.register(Register::A7);
+            self.set_register(Register::A7, self.system[to.code() as usize]);
+        }
         self.system[register.code() as usize] = value;
+    }
+
+    /// SR.
+    const fn sr(&self) -> u32 {
+        self.system[SystemRegister::Sr.code() as usize]
+    }
+
+    /// Whether `register` is the stack pointer A7 is now.
+    const fn is_active_stack(&self, register: SystemRegister) -> bool {
+        match register {
+            SystemRegister::Ssp => self.sr() & SR_S != 0,
+            SystemRegister::Usp => self.sr() & SR_S == 0,
+            _ => false,
+        }
+    }
+
+    /// Requests an interrupt at `level` (1-7) with `vector`, taken at
+    /// the next instruction boundary SR's mask allows, as a device's
+    /// vectored interrupt (CPU32RM 6.2.12).  Level 7 is not masked.
+    pub const fn request_interrupt(&mut self, level: u8, vector: u8) {
+        self.interrupt = Some((level, vector));
     }
 
     /// The model's RAM.

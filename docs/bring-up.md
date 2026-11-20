@@ -11,7 +11,8 @@ that records it.
 ## Before the hardware
 
 The host side runs now against a stand-in pod on a model CPU32, which
-answers as the pod does but runs no instructions:
+answers as the pod does and runs only NOP, MOVEQ, BRA.S, TRAP, ILLEGAL
+and BGND from its RAM (`bdm-model`'s `program`):
 
 ```
 cargo run -p pod-host --bin bdm-stand-in -- unix:/tmp/pod.sock &

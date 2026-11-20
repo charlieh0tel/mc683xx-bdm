@@ -24,6 +24,7 @@ use pod_proto::usb::parse_reply;
 use pod_proto::usb::parse_transfer_reply;
 use pod_proto::usb::parse_value;
 
+use crate::step::StepError;
 use crate::transport::Transport;
 use crate::transport::TransportError;
 
@@ -50,9 +51,9 @@ pub enum Error {
     /// The pod speaks another protocol version than this host.
     #[error("the pod speaks protocol {0}, this host {PROTOCOL_VERSION}")]
     Protocol(u32),
-    /// A call the pod cannot make yet.
-    #[error("{0} is not supported yet")]
-    Unsupported(&'static str),
+    /// A step could not be made, or did not end at its stub.
+    #[error("step: {0}")]
+    Step(#[from] StepError),
 }
 
 /// The function code `bits` gives, if it fits FC\[2:0\].

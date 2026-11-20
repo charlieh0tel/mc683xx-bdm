@@ -230,3 +230,19 @@ fn clocking_a_running_cpu_is_caught() {
     block_on(session.link_mut().transfer(0x0000)).unwrap();
     assert_eq!(session.link_mut().violations().0, Some(Violation::ClockedWhileRunning(0x0000)));
 }
+
+#[test]
+fn a7_is_the_stack_pointer_sr_selects() {
+    let supervisor = 0x2000;
+    let (ssp, usp) = (RAM_BASE + 0x80, RAM_BASE + 0x40);
+    let mut target = Model::new(Address(RAM_BASE));
+    target.set_system_register(SystemRegister::Sr, supervisor);
+    target.set_register(Register::A7, ssp);
+    target.set_system_register(SystemRegister::Usp, usp);
+    assert_eq!(target.system_register(SystemRegister::Ssp), ssp);
+    target.set_system_register(SystemRegister::Sr, 0);
+    assert_eq!(target.register(Register::A7), usp);
+    assert_eq!(target.system_register(SystemRegister::Ssp), ssp);
+    target.set_system_register(SystemRegister::Sr, supervisor);
+    assert_eq!(target.register(Register::A7), ssp);
+}
