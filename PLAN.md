@@ -421,8 +421,7 @@ code and no `unsafe`; no USB request, so the protocol is unchanged.
 
 How to run each item and what to expect: `docs/bring-up.md`.
 
-- [ ] Schematic, breadboard first (Pico + 74AHCT1G125s + 74LVC1G17s +
-      BSS138BKs), then the carrier
+- [x] Schematic and the rev 0.2 carrier, without a breadboard
 - [ ] PIO loopback (`bdm loopback`, GP3 to GP2): scope DSCLK/DSI,
       verify 17-bit framing and idle-high.  Data checked on an
       RP2040-Zero, unscoped: 36000 words ok at 1 MHz (1.745 s) and

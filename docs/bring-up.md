@@ -228,9 +228,10 @@ bdm write RAM 1 2 3 4
 bdm dump RAM 4 --size byte                 # 01 02 03 04
 ```
 
-Set SIMCR FRZSW, or disable the watchdog in SYPCR, first: with FRZSW 0,
-the reset value, the watchdog runs while the CPU is halted and resets
-it.
+FRZSW is set at reset (SIMCR $60CF on an MC68331), so the watchdog
+stops while the CPU is halted.  A program may clear it (the 58503A's
+writes SIMCR $014A): after GO and a halt, set FRZSW again, or the
+watchdog resets the CPU.
 
 ## 11. A self-entry: BGND
 
