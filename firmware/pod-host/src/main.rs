@@ -1,5 +1,8 @@
 //! `bdm`: the pod from the command line.
 
+use std::io::Write;
+use std::path::Path;
+use std::path::PathBuf;
 use std::process::ExitCode;
 
 use anyhow::Context;
@@ -93,7 +96,7 @@ enum Command {
         #[arg(value_parser = number)]
         value: u32,
     },
-    /// Hex dump LENGTH bytes from ADDRESS.
+    /// Hex dump LENGTH bytes from ADDRESS, or save them raw to a file.
     Dump {
         #[arg(value_parser = number)]
         address: u32,
@@ -105,6 +108,10 @@ enum Command {
         /// supervisor program, 1 and 2 user, 7 CPU space.
         #[arg(long, value_parser = function_code, default_value = "5")]
         fc: FunctionCode,
+        /// Write the bytes read to FILE, created or truncated, instead
+        /// of the hex listing.
+        #[arg(long, value_name = "FILE")]
+        output: Option<PathBuf>,
     },
     /// Write BYTES at ADDRESS.
     Write {
@@ -208,6 +215,29 @@ fn function_code(text: &str) -> Result<FunctionCode> {
     if u32::from(code.bits()) == bits { Ok(code) } else { bail!("not a function code, 0-7: {text}") }
 }
 
+/// A hex listing of `data`, read from `address`: `DUMP_LINE` bytes a
+/// line, with their ASCII.
+fn hex_listing(address: u32, data: &[u8], out: &mut impl Write) -> Result<()> {
+    for (n, line) in data.chunks(DUMP_LINE).enumerate() {
+        let at = address.wrapping_add(u32::try_from(n * DUMP_LINE)?);
+        let hex: Vec<String> = line.iter().map(|b| format!("{b:02x}")).collect();
+        let text: String = line
+            .iter()
+            .map(|b| if b.is_ascii_graphic() || *b == b' ' { char::from(*b) } else { '.' })
+            .collect();
+        writeln!(out, "{at:08x}  {:<47}  {text}", hex.join(" "))?;
+    }
+    Ok(())
+}
+
+/// Writes `data`, read from `address`, raw to `path`, and one summary
+/// line to `out`.
+fn save_dump(address: u32, data: &[u8], path: &Path, out: &mut impl Write) -> Result<()> {
+    std::fs::write(path, data).with_context(|| format!("writing {}", path.display()))?;
+    writeln!(out, "dump: {} bytes from ${address:08x} to {}", data.len(), path.display())?;
+    Ok(())
+}
+
 /// The transport `--pod` names.
 fn connect(pod: &str) -> Result<Box<dyn Transport>> {
     Ok(match pod.split_once(':') {
@@ -272,17 +302,13 @@ fn execute<T: Transport>(target: &mut PodTarget<T>, command: Command) -> Result<
             Named::Data(r) => target.write_register(r, value)?,
             Named::System(r) => target.write_system_register(r, value)?,
         },
-        Command::Dump { address, length, size, fc } => {
+        Command::Dump { address, length, size, fc, output } => {
             let mut data = vec![0; usize::try_from(length)?];
             target.read_memory(Address(address), fc, size.into(), &mut data)?;
-            for (n, line) in data.chunks(DUMP_LINE).enumerate() {
-                let at = address.wrapping_add(u32::try_from(n * DUMP_LINE)?);
-                let hex: Vec<String> = line.iter().map(|b| format!("{b:02x}")).collect();
-                let text: String = line
-                    .iter()
-                    .map(|b| if b.is_ascii_graphic() || *b == b' ' { char::from(*b) } else { '.' })
-                    .collect();
-                println!("{at:08x}  {:<47}  {text}", hex.join(" "));
+            let stdout = &mut std::io::stdout().lock();
+            match output {
+                None => hex_listing(address, &data, stdout)?,
+                Some(path) => save_dump(address, &data, &path, stdout)?,
             }
         }
         Command::Write { address, bytes, size, fc } => {
@@ -329,15 +355,19 @@ fn main() -> ExitCode {
 
 #[cfg(test)]
 mod tests {
+    use std::path::PathBuf;
+
     use super::FunctionCode;
     use super::Named;
     use super::Register;
     use super::SystemRegister;
     use super::function_code;
+    use super::hex_listing;
     use super::loopback_mismatch;
     use super::loopback_words;
     use super::number;
     use super::register;
+    use super::save_dump;
 
     #[test]
     fn numbers() {
@@ -375,6 +405,47 @@ mod tests {
         let words = [0x1234, 0x5678, 0x9ABC];
         assert_eq!(loopback_mismatch(&words, &[0x1234, 0x5678, 0x9ABC]), None);
         assert_eq!(loopback_mismatch(&words, &[0x1234, 0x1_5678, 0x0000]), Some((1, 0x5678, 0x1_5678)));
+    }
+
+    #[test]
+    fn hex_listing_format() {
+        let data: Vec<u8> = (0x1E..0x31).collect();
+        let mut out = Vec::new();
+        hex_listing(0x00FF_FA00, &data, &mut out).unwrap();
+        assert_eq!(
+            String::from_utf8(out).unwrap(),
+            "00fffa00  1e 1f 20 21 22 23 24 25 26 27 28 29 2a 2b 2c 2d  .. !\"#$%&'()*+,-\n\
+             00fffa10  2e 2f 30                                         ./0\n"
+        );
+    }
+
+    /// A file under the temporary directory, unique to this test run.
+    fn temporary_path(name: &str) -> PathBuf {
+        std::env::temp_dir().join(format!("bdm-test-{}-{name}", std::process::id()))
+    }
+
+    #[test]
+    fn save_dump_writes_raw_bytes_and_a_summary() {
+        let path = temporary_path("dump.bin");
+        std::fs::write(&path, [0xAA; 64]).unwrap();
+        let data = [0x00, 0x01, 0xFE, 0xFF];
+        let mut out = Vec::new();
+        let saved = save_dump(0x40, &data, &path, &mut out);
+        let written = std::fs::read(&path);
+        std::fs::remove_file(&path).unwrap();
+        saved.unwrap();
+        assert_eq!(written.unwrap(), data);
+        assert_eq!(
+            String::from_utf8(out).unwrap(),
+            format!("dump: 4 bytes from $00000040 to {}\n", path.display())
+        );
+    }
+
+    #[test]
+    fn save_dump_names_the_file_it_could_not_write() {
+        let path = temporary_path("missing").join("dump.bin");
+        let error = save_dump(0, &[0], &path, &mut Vec::new()).unwrap_err();
+        assert!(format!("{error:#}").contains(&path.display().to_string()));
     }
 
     #[test]

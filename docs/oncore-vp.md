@@ -51,7 +51,7 @@ Pin numbers: MC68331UM Figure 3-2.
 bdm reset
 bdm dump 0xfffa00 2 --size word       # SIMCR
 bdm write 0xfffa00 HI LO --size word  # SIMCR with bit 14, FRZSW, set
-bdm dump 0 0x40000 --size long        # the 256 KB boot ROM
+bdm dump 0 0x40000 --size long --output oncore-vp.bin  # the 256 KB boot ROM
 ```
 
 FRZSW first: at reset the software watchdog is on and, with FRZSW 0,

@@ -358,6 +358,8 @@ code and no `unsafe`; no USB request, so the protocol is unchanged.
 - `bdm`: pins, halt, reset, go, call, clock, regs, get, set, dump,
   write, xfer, loopback, through `PodTarget`.  Halt and reset print the entry
   source.  Dump and write take `--fc`, default 5 (supervisor data).
+  Dump with `--output FILE` writes the raw bytes to FILE instead of a
+  hex listing.
   Each run restores SFC and DFC before it exits, since the next run
   knows nothing of it.
 - Linux needs a udev rule for access without root (README.md).

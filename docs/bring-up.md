@@ -238,7 +238,7 @@ Semantics).  `fresh` and 1 confirm that path.
 ## 12. Throughput
 
 ```
-time bdm dump RAM 4096 --size long
+time bdm dump RAM 4096 --size long --output /dev/null
 ```
 
 Record bytes per second.  Raise `bdm clock` until DUMPs fail (wrong
