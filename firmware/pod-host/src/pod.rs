@@ -99,6 +99,15 @@ impl<T: Transport> Pod<T> {
         self.atemp(&Request::ResetHalt)
     }
 
+    /// Brings a halted target's serial link back into frame; returns
+    /// ATEMP, stale.
+    ///
+    /// # Errors
+    /// As [`Error`].
+    pub fn resync(&mut self) -> Result<Atemp, Error> {
+        self.atemp(&Request::Resync)
+    }
+
     /// Resets the target to run, background mode off.
     ///
     /// # Errors

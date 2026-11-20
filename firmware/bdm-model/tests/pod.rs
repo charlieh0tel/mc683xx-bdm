@@ -172,6 +172,34 @@ fn reset_run_is_not_stopped_by_a_link_out_of_frame() {
 }
 
 #[test]
+fn resync_brings_the_link_into_frame() {
+    for skew in [0, 1, 5, 16] {
+        let mut pod = pod(true);
+        send(&mut pod, &Request::ResetHalt);
+        pod.board_mut().put_out_of_frame(skew);
+        let atemp = parse_atemp(status(&send(&mut pod, &Request::Resync)).unwrap());
+        assert!(matches!(atemp, Ok(Atemp::Stale(_))), "skew {skew}: {atemp:?}");
+        send(&mut pod, &Request::WriteRegister(Register::D2, 0x1234_5678));
+        let value = parse_value(status(&send(&mut pod, &Request::ReadRegister(Register::D2))).unwrap());
+        assert_eq!(value, Ok(0x1234_5678), "skew {skew}");
+    }
+}
+
+#[test]
+fn resync_needs_a_halted_target() {
+    let mut pod = pod(true);
+    assert_eq!(status(&send(&mut pod, &Request::Resync)), failed(Status::NoFreeze));
+}
+
+#[test]
+fn a_pod_started_under_a_halted_cpu_out_of_frame_resyncs_itself() {
+    let mut pod = pod_on_halted();
+    pod.board_mut().put_out_of_frame(9);
+    let pins = parse_pins(status(&send(&mut pod, &Request::Pins)).unwrap()).unwrap();
+    assert_eq!((pins.freeze, pins.atemp), (true, Atemp::Stale(1)));
+}
+
+#[test]
 fn memory_round_trips() {
     let mut pod = pod(true);
     send(&mut pod, &Request::ResetHalt);

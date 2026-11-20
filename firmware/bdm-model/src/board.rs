@@ -8,6 +8,7 @@
 use core::convert::Infallible;
 
 use mc683xx_target::entry::Entry;
+use pod_proto::bdm::NOP;
 use pod_proto::dsclk::MAX_HZ;
 use pod_proto::pod::Board;
 use pod_proto::pod::VddError;
@@ -20,6 +21,8 @@ const VDD_MV: u16 = 5000;
 
 /// A response with DSO high for all 17 bits.
 const DSO_HIGH: u32 = 0x1_FFFF;
+/// Bits in a serial word.
+const WORD_BITS: u32 = 17;
 
 /// A model target behind a pod's board.
 #[derive(Debug)]
@@ -33,13 +36,16 @@ pub struct ModelBoard<const RAM: usize> {
     /// DSO held high, so every response reads as "illegal", as with
     /// the link out of frame.
     dso_high: bool,
+    /// Bits the CPU's serial frame is ahead of the pod's, 0 in frame:
+    /// an idle CPU's "command complete" then reads rotated.
+    skew: u32,
 }
 
 impl<const RAM: usize> ModelBoard<RAM> {
     /// A board around `target`, its BDM enabled or not.
     #[must_use]
     pub const fn new(target: Target<RAM>, bdm_enabled: bool) -> Self {
-        Self { target, edges: 0, bdm_enabled, dso_high: false }
+        Self { target, edges: 0, bdm_enabled, dso_high: false, skew: 0 }
     }
 
     /// The model, for what a test checks or sets.
@@ -50,6 +56,13 @@ impl<const RAM: usize> ModelBoard<RAM> {
     /// Holds DSO high, or lets it go: the model still takes each word.
     pub const fn hold_dso_high(&mut self, high: bool) {
         self.dso_high = high;
+    }
+
+    /// Puts the CPU's serial frame `bits` ahead of the pod's, as lone
+    /// DSCLK edges do.  Out of frame the model answers a NOP as an idle
+    /// CPU would and anything else "illegal".
+    pub const fn put_out_of_frame(&mut self, bits: u32) {
+        self.skew = bits % WORD_BITS;
     }
 
     /// The running CPU enters background mode on its own (BGND, a
@@ -64,6 +77,9 @@ impl<const RAM: usize> ModelBoard<RAM> {
     /// Exchanges a word, counting FREEZE's fall if it ends background
     /// mode.
     fn exchange(&mut self, word: u16, exit: bool) -> u32 {
+        if self.skew != 0 {
+            return if word == NOP { DSO_HIGH & !(1 << (self.skew - 1)) } else { DSO_HIGH };
+        }
         let was_frozen = self.target.frozen();
         let bits = self.target.exchange(word, exit);
         if was_frozen && !self.target.frozen() {
@@ -135,6 +151,10 @@ impl<const RAM: usize> Board for ModelBoard<RAM> {
         }
         self.bdm_enabled = false;
         self.target.reset_running();
+    }
+
+    async fn clock_bit(&mut self) {
+        self.skew = (self.skew + 1) % WORD_BITS;
     }
 
     fn set_clock(&mut self, dsclk_hz: u32) -> u32 {

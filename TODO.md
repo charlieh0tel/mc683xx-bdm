@@ -14,8 +14,6 @@
   deb-workflows' `rust-build-deb`, once it can build a workspace below
   the repository's root (`firmware/`).
 - DSCLK above 4 MHz, once the throughput test measures the margin.
-- Resynchronize a halted CPU's serial link without a reset, after a
-  pod restart has put it out of frame (docs/bring-up.md, step 5).
 - A `Link` adapter onto m683xx-emu's BDM serial exchange once it
   lands; then delete `bdm-model`.
 - `bdm load` and `bdm init` over m683xx-emu's `mc683xx-debug` once it

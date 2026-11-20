@@ -120,6 +120,16 @@ impl<T: Transport> PodTarget<T> {
         self.pod.reset_run()
     }
 
+    /// Brings the halted target's serial link back into frame;
+    /// forgets the halted state, whose entry source is now unknown.
+    ///
+    /// # Errors
+    /// As [`Error`].
+    pub fn resync(&mut self) -> Result<Atemp, Error> {
+        self.halted = None;
+        self.pod.resync()
+    }
+
     /// The halted state, asking the pod for the entry source if this is
     /// the first look since the target stopped.
     ///

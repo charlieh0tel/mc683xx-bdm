@@ -155,8 +155,9 @@ address 0 (initial SSP, then initial PC).
 A pod restarted (reflashed, replugged) while the target is halted
 leaves the CPU's serial link out of frame: while the Pico boots, U1
 lets DSCLK go, R3 pulls it high, and the CPU takes the edges as bits.
-The first request fails ("ATEMP unread" in `bdm pins`), and raw
-transfers read garbage.  `bdm reset` frames it again.
+The pod frames it again itself before its first request (`bdm pins`
+then shows a stale ATEMP), or on `bdm resync`; `bdm reset` also does,
+resetting the target.
 
 To leave the target running: `bdm go` straight after `bdm reset`
 starts it from the reset vector; `bdm reset --run` resets it to run

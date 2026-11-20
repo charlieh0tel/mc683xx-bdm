@@ -7,7 +7,7 @@ it alone answers as the pod does.  The pod's implementation is
 `firmware/pod-proto/src/usb.rs`; where the two disagree, that is a bug
 in one of them.
 
-Protocol version: **5** (`PROTOCOL_VERSION`), raised on any change to a
+Protocol version: **6** (`PROTOCOL_VERSION`), raised on any change to a
 request or reply.
 
 ## Transport
@@ -73,6 +73,7 @@ would otherwise be BKPT pulses that halt it.
 | 0x0D | Call | u32 address | none | yes |
 | 0x0E | Hello | none | u32 protocol version | no |
 | 0x0F | ResetRun | none | none | no |
+| 0x10 | Resync | none | ATEMP field, kind 2 | yes |
 
 Fields:
 
@@ -108,8 +109,7 @@ Fields:
 Semantics:
 
 - Order of checks: the request is parsed (BadRequest); then, except
-  for ResetHalt and ResetRun, which make the entry moot, the ATEMP
-  read below, whose failure is the reply's status (once: the
+  for ResetHalt, ResetRun and Resync, the ATEMP read below, whose failure is the reply's status (once: the
   pod keeps kind 3 and does not read again until FREEZE moves, so
   Pins, Transfer and ResetHalt still work); then the
   request's own checks (NoTarget, then NoFreeze); then the command.
@@ -139,6 +139,15 @@ Semantics:
   and waits up to 100 ms for RESET to rise: the target comes out of
   reset running, background mode off until the next ResetHalt.
   Refused with NoTarget below 4.5 V VDD.
+- Resync brings a halted CPU's serial link back into frame, as after a
+  pod restart under it (lone DSCLK edges while the Pico boots): it
+  clocks NOP pairs, and while the second does not read "command
+  complete" (CPU32RM 7.2.8.15) adds one lone DSCLK edge, at most 17
+  times; Unexpected if it never does.  Then it reads ATEMP and
+  reports it stale.  The pod frames the link this way itself before
+  the ATEMP read of a CPU halted before it started.  A command the CPU
+  took out of frame may take the NOPs as operands.  NoTarget below
+  4.5 V; NoFreeze if FREEZE is low.
 - Halt works only if BDM was enabled at the target's last reset (BKPT
   low as RESET rises, MC68331UM 5.10.2.1), as ResetHalt does.  Without
   it BKPT is a breakpoint exception, vector $0C (MC68331UM 5.10.2.2.1,

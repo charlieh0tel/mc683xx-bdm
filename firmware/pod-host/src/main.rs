@@ -142,6 +142,9 @@ enum Command {
     },
     /// Reboot the pod into the RP2040's USB bootloader, for a new UF2.
     Bootsel,
+    /// Bring a halted target's serial link back into frame, after a pod
+    /// restart, without resetting it.
+    Resync,
     /// Raw serial words, each answered with the 17 bits shifted in.
     /// With the target running, the clocks are BKPT pulses.
     Xfer {
@@ -355,6 +358,10 @@ fn execute<T: Transport>(target: &mut PodTarget<T>, command: Command, out: &mut 
             let total = words.len() * usize::try_from(rounds)?;
             writeln!(out, "loopback: {total} words ok in {:.3} s", started.elapsed().as_secs_f64())?;
         }
+        Command::Resync => match target.resync()? {
+            Atemp::Stale(atemp) => writeln!(out, "in frame; ATEMP ${atemp:08x} (stale)")?,
+            other => bail!("resync: unexpected ATEMP {other:?}"),
+        },
         Command::Bootsel => bail!("bootsel talks to the pod's reset interface, not through a target"),
         Command::Xfer { words } => {
             for (word, response) in words.iter().zip(target.pod().transfer(&words)?) {

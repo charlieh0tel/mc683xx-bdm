@@ -6,7 +6,10 @@
 
 use mc683xx_target::register::SystemRegister;
 
+use crate::bdm::COMPLETE;
 use crate::bdm::Command;
+use crate::bdm::NOP;
+use crate::bdm::Response;
 use crate::entry::EntryWatch;
 use crate::session::Link;
 use crate::session::Session;
@@ -28,6 +31,9 @@ use crate::usb::encode_value;
 /// NOPs clocked while the target answers "not ready", about 17 ms at
 /// 1 MHz: far longer than any access on the 68331's bus.
 pub const NOT_READY_RETRIES: u32 = 1000;
+
+/// Bits in a serial word: a resync tries at most this many frames.
+const WORD_BITS: usize = 17;
 /// Below this target VDD the pod refuses to halt or reset: the 68331
 /// runs from 5.0 V +-10% (MC68331UM Table A-7's conditions).
 pub const VDD_PRESENT_MV: u16 = 4500;
@@ -77,6 +83,11 @@ pub trait Board: Link {
     /// Pulses RESET with BKPT high, so the CPU comes out of reset
     /// running, background mode off, and waits for RESET to rise.
     async fn reset_run(&mut self);
+
+    /// One DSCLK rising edge outside a word, DSI as the last word left
+    /// it: the CPU takes it as a bit, moving its frame on by one.  For
+    /// resynchronizing only.
+    async fn clock_bit(&mut self);
 
     /// Sets DSCLK's rate, at most `dsclk_hz` where it can; returns the
     /// rate set (docs/usb-protocol.md, `SetClock`).
@@ -131,7 +142,7 @@ impl<B: Board> Pod<B> {
         };
         // A reset makes the entry moot, and a link out of frame must not
         // stop the reset that frames it again.
-        if !matches!(request, Request::ResetHalt | Request::ResetRun)
+        if !matches!(request, Request::ResetHalt | Request::ResetRun | Request::Resync)
             && let Err(status) = self.read_entry().await
         {
             return encode_status(status, reply);
@@ -166,6 +177,7 @@ impl<B: Board> Pod<B> {
             Request::Pins => self.pins().await.map(Answer::Pins),
             Request::ResetHalt => self.reset_halt().await.map(Answer::Atemp),
             Request::ResetRun => self.reset_run().await.map(|()| Answer::Done),
+            Request::Resync => self.resync_request().await.map(Answer::Atemp),
             Request::Halt => self.halt().await.map(Answer::Atemp),
             Request::SetClock { dsclk_hz } => Ok(Answer::Value(self.session.link_mut().set_clock(dsclk_hz))),
             Request::Go => self.command(&Command::Go).await.map(|_| Answer::Done),
@@ -282,17 +294,68 @@ impl<B: Board> Pod<B> {
             return Ok(());
         };
         board.drive_link();
-        match self.session.read_system_register(SystemRegister::Atemp).await {
+        // Halted before the pod started: a pod restarted under a halted
+        // CPU puts its link out of frame (docs/bring-up.md, step 5), and
+        // out of frame a read can look valid, so frame it first.
+        let framed = if edges == 0 { self.resync().await } else { Ok(()) };
+        let read = match framed {
+            Ok(()) => self.session.read_system_register(SystemRegister::Atemp).await.map_err(Status::from),
+            Err(status) => Err(status),
+        };
+        match read {
             Ok(atemp) => {
                 self.entry.record(edges, take(atemp));
                 Ok(())
             }
             // Recorded, so the failure fails this request alone and not
             // every request until FREEZE moves.
+            Err(status) => {
+                self.entry.record(edges, Atemp::Unread);
+                Err(status)
+            }
+        }
+    }
+
+    /// Resync on request: the CPU must be halted; ATEMP is read after,
+    /// stale, since whatever the CPU took out of frame came first.
+    async fn resync_request(&mut self) -> Result<Atemp, Status> {
+        self.require_target().await?;
+        if !self.session.link_mut().frozen() {
+            return Err(Status::NoFreeze);
+        }
+        self.session.link_mut().drive_link();
+        self.resync().await?;
+        let edges = self.session.link_mut().freeze_edges();
+        match self.session.read_system_register(SystemRegister::Atemp).await {
+            Ok(value) => {
+                self.entry.record(edges, Atemp::Stale(value));
+                Ok(Atemp::Stale(value))
+            }
             Err(error) => {
                 self.entry.record(edges, Atemp::Unread);
                 Err(error.into())
             }
         }
+    }
+
+    /// Brings a halted CPU's serial link into frame.  An idle CPU answers
+    /// each NOP "command complete" (CPU32RM 7.2.8.15), a clear status
+    /// bit and 16 set; out of frame, the clear bit lands elsewhere in the
+    /// word.  Each lone DSCLK edge moves the CPU's frame on a bit, so
+    /// within a word's bits of them a NOP reads "command complete".
+    /// A command the CPU took out of frame may take the NOPs' zeros as
+    /// operands.
+    async fn resync(&mut self) -> Result<(), Status> {
+        let board = self.session.link_mut();
+        for _ in 0..WORD_BITS {
+            // The first NOP ends whatever the CPU was answering.
+            board.transfer(NOP).await.map_err(|_| Status::Unexpected)?;
+            let answer = board.transfer(NOP).await.map_err(|_| Status::Unexpected)?;
+            if Response::decode(answer) == Response::Data(COMPLETE) {
+                return Ok(());
+            }
+            board.clock_bit().await;
+        }
+        Err(Status::Unexpected)
     }
 }

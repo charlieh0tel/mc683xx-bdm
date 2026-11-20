@@ -27,6 +27,9 @@ const FREEZE_TIMEOUT: Duration = Duration::from_millis(100);
 /// RESET held low by the pod: long against the SIM's reset timing
 /// (SIMRM), short against a person.
 const RESET_PULSE: Duration = Duration::from_millis(10);
+/// Each phase of a lone DSCLK edge: long against the CPU's 2-clock
+/// minimum at any system clock (MC68331UM Table A-7).
+const EDGE_PHASE: Duration = Duration::from_micros(10);
 /// The ADC: 12 bits against the Pico's 3.3 V reference.
 const ADC_FULL_SCALE: u32 = 1 << 12;
 const ADC_REFERENCE_MV: u32 = 3300;
@@ -177,6 +180,13 @@ impl Board for PicoBoard<'_> {
         // The target may hold RESET longer; the reply waits for it, within
         // the halt's bound.
         let _ = with_timeout(FREEZE_TIMEOUT, self.reset.wait_for_high()).await;
+    }
+
+    async fn clock_bit(&mut self) {
+        self.link.set_dsclk(Level::Low);
+        Timer::after(EDGE_PHASE).await;
+        self.link.set_dsclk(Level::High);
+        Timer::after(EDGE_PHASE).await;
     }
 
     fn set_clock(&mut self, dsclk_hz: u32) -> u32 {
