@@ -8,6 +8,7 @@
 mod board;
 mod freeze;
 mod link;
+mod reset;
 
 #[cfg(feature = "rtt")]
 use defmt_rtt as _;
@@ -49,6 +50,7 @@ use crate::board::Lines;
 use crate::board::PicoBoard;
 use crate::link::LinkPins;
 use crate::link::PioLink;
+use crate::reset::ResetInterface;
 
 #[cfg(all(feature = "rp2040", feature = "rp235xa"))]
 compile_error!("choose one chip feature, not both");
@@ -123,6 +125,15 @@ async fn main(_spawner: Spawner) {
     let mut from_host = alt.endpoint_bulk_out(None, packet);
     let mut to_host = alt.endpoint_bulk_in(None, packet);
     drop(function);
+    // After the pod's interface, so that stays interface 0.
+    static RESET: ConstStaticCell<ResetInterface> = ConstStaticCell::new(ResetInterface::new());
+    let reset = RESET.take();
+    let mut function = builder.function(VENDOR_CLASS, reset::SUBCLASS, reset::PROTOCOL);
+    let mut interface = function.interface();
+    reset.interface = interface.interface_number();
+    interface.alt_setting(VENDOR_CLASS, reset::SUBCLASS, reset::PROTOCOL, None);
+    drop(function);
+    builder.handler(reset);
     let mut usb = builder.build();
 
     #[cfg(feature = "rtt")]

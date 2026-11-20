@@ -358,7 +358,7 @@ code and no `unsafe`; no USB request, so the protocol is unchanged.
   5 V; a halt or reset enters with a breakpoint, and a reset keeps
   registers and memory.  Not the emulator: no instructions run, so a
   test enters background mode itself.
-- `bdm`: pins, halt, reset (`--run`: ResetRun), go, call, clock, regs, get, set, dump,
+- `bdm`: pins, halt, reset (`--run`: ResetRun), bootsel, go, call, clock, regs, get, set, dump,
   write, xfer, loopback, through `PodTarget`.  Halt and reset print the entry
   source.  Dump and write take `--fc`, default 5 (supervisor data).
   Dump with `--output FILE` writes the raw bytes to FILE instead of a
@@ -369,9 +369,14 @@ code and no `unsafe`; no USB request, so the protocol is unchanged.
   (`packaging/udev/70-mc683xx-pod.rules`, README.md): uaccess for the
   user at the seat, and group plugdev, mode 0660, for a login over
   ssh, which uaccess does not reach.
-- Debian package `mc683xx-bdm` (`make deb`): `bdm` and the udev rule,
-  built by cargo-deb as deb-workflows' `rust-build-deb` builds it.
+- Debian package `mc683xx-bdm` (`make deb`): `bdm`, the udev rule and
+  the RP2040 UF2, built by cargo-deb as deb-workflows' `rust-build-deb` builds it.
   `bdm-stand-in` is a test aid and does not ship.
+- Bootloader knock: picotool's reset interface (interface 1), not a
+  pod request, so `picotool -f` works too and a pod whose protocol
+  differs from `bdm`'s can still be reflashed.  `bdm bootsel` sends it
+  and waits for the boot ROM's device; copying the UF2 is left to the
+  user (or picotool).
 - `mc683xx-target` (m683xx-emu, no_std, MIT OR Apache-2.0) holds
   `Cpu32Target` and the types every crate here uses: Address, Size,
   Register, SystemRegister, FunctionCode, Entry.  Memory calls name

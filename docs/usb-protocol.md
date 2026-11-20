@@ -17,6 +17,12 @@ USB:
 - VID:PID 1209:0001 (pid.codes' test pair, until the pod has its own).
 - Vendor class (0xFF), interface 0, one bulk OUT and one bulk IN
   endpoint, 64-byte packets (full speed).
+- Interface 1: picotool's reset interface (vendor class, subclass 0,
+  protocol 1, no endpoints; pico-sdk `reset_interface.h`).  A class or
+  vendor control OUT request 1 to it, wIndex its number, reboots the
+  RP2040 into its USB bootloader; wValue's low 7 bits are the boot
+  ROM's interface-disable mask.  `bdm bootsel` and `picotool -f` send
+  it.
 - One request per OUT packet, one reply per IN packet.  An OUT
   packet longer than 64 bytes is answered BadRequest.
 

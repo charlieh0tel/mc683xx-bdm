@@ -63,7 +63,9 @@ shared test pair, so the rule also matches anything else using it.
 
 ### Debian package
 
-`make deb` builds `mc683xx-bdm`, `bdm` and the udev rule, with
+`make deb` builds `mc683xx-bdm`: `bdm`, the udev rule and the pod's
+firmware (`/usr/share/mc683xx-bdm/pod-fw-rp2040.uf2`, needs picotool
+to build), with
 cargo-deb 3.8.0 (deb-workflows' `rust-build-deb` pin):
 `firmware/target/debian/mc683xx-bdm_VERSION-1_ARCH.deb`.  Metadata:
 `[package.metadata.deb]` in `firmware/pod-host/Cargo.toml`; changelog:

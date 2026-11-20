@@ -33,7 +33,8 @@ bdm, the host command line for the mc683xx pod, a USB background debug \
 mode (BDM) pod for Motorola/Freescale CPU32 (683xx) microcontrollers \
 built on a Raspberry Pi Pico.  It halts, resets and runs the target and \
 reads and writes its registers and memory.  Includes the pod's udev \
-rule, which gives it to the user at the seat and to group plugdev."""
+rule, which gives it to the user at the seat and to group plugdev, and \
+the pod's firmware as a UF2."""
 section = "electronics"
 priority = "optional"
 depends = "$auto"
@@ -41,5 +42,6 @@ assets = [
     ["target/release/bdm", "usr/bin/", "755"],
     ["../../packaging/udev/70-mc683xx-pod.rules", "usr/lib/udev/rules.d/70-mc683xx-pod.rules", "644"],
     ["../../README.md", "usr/share/doc/mc683xx-bdm/README.md", "644"],
+    ["../pod-fw/target/pod-fw-rp2040.uf2", "usr/share/mc683xx-bdm/", "644"],
 ]
 changelog = "../../packaging/debian/changelog"

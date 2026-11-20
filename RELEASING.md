@@ -9,15 +9,11 @@ Released together: the pod and `bdm` refuse each other unless their
    `packaging/debian/changelog` entry.  Raise `PROTOCOL_VERSION` and
    `docs/usb-protocol.md` if the wire changed.
 2. `make lint`, `cd firmware && cargo test`.
-3. Build:
-   ```
-   cd firmware/pod-fw && cargo build --release --no-default-features -F rp2040
-   picotool uf2 convert -t elf target/thumbv6m-none-eabi/release/pod-fw pod-fw.uf2
-   cd ../.. && make deb
-   ```
+3. `make deb`: the UF2 (`firmware/pod-fw/target/pod-fw-rp2040.uf2`)
+   and the package, which ships it.
 4. Report flash, RAM and stack peak (AGENTS.md, Stack and RAM).
 5. On a target: `docs/bring-up.md` steps 5-12.
-6. Tag `vX.Y.Z`; `gh release create vX.Y.Z` with `pod-fw.uf2` and
+6. Tag `vX.Y.Z`; `gh release create vX.Y.Z` with the UF2 and
    `firmware/target/debian/mc683xx-bdm_X.Y.Z-1_amd64.deb`.
 
 No release workflow yet (TODO.md).

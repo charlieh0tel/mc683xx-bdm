@@ -1,12 +1,19 @@
 # Repository chores.  The firmware and host build with cargo in
 # firmware/; the hardware release is ee_tooling's jlcpcb-release.
 
-.PHONY: deb hooks lint
+.PHONY: deb hooks lint uf2
 
-# The bdm Debian package, as rust-build-deb (deb-workflows) builds it:
-# firmware/target/debian/mc683xx-bdm_*.deb.
-deb:
+# The pod's firmware as a UF2 (RP2040, the Pico), which the package ships.
+UF2 := firmware/pod-fw/target/pod-fw-rp2040.uf2
+
+# The bdm Debian package, as rust-build-deb (deb-workflows) builds it,
+# with the UF2: firmware/target/debian/mc683xx-bdm_*.deb.
+deb: uf2
 	cd firmware && cargo deb -p pod-host
+
+uf2:
+	cd firmware/pod-fw && cargo build --release --no-default-features -F rp2040
+	picotool uf2 convert -t elf firmware/pod-fw/target/thumbv6m-none-eabi/release/pod-fw $(UF2)
 
 # Use the repository's git hooks (.githooks/), once per clone.
 hooks:

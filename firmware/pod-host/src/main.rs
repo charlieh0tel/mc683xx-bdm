@@ -24,6 +24,7 @@ use pod_host::target::PodTarget;
 use pod_host::transport::StreamTransport;
 use pod_host::transport::Transport;
 use pod_host::transport::UsbTransport;
+use pod_host::transport::reboot_to_bootloader;
 use pod_proto::usb::Atemp;
 use pod_proto::usb::PROTOCOL_VERSION;
 
@@ -139,6 +140,8 @@ enum Command {
         #[arg(long, default_value_t = 1)]
         rounds: u32,
     },
+    /// Reboot the pod into the RP2040's USB bootloader, for a new UF2.
+    Bootsel,
     /// Raw serial words, each answered with the 17 bits shifted in.
     /// With the target running, the clocks are BKPT pulses.
     Xfer {
@@ -254,6 +257,14 @@ fn connect(pod: &str) -> Result<Box<dyn Transport>> {
 }
 
 fn run(pod: &str, command: Command) -> Result<()> {
+    if matches!(command, Command::Bootsel) {
+        if pod != "usb" {
+            bail!("bootsel needs the pod on USB, not {pod}");
+        }
+        reboot_to_bootloader()?;
+        writeln!(std::io::stdout(), "bootloader: copy the UF2 onto the RPI-RP2 drive")?;
+        return Ok(());
+    }
     let mut target = PodTarget::new(Pod::new(connect(pod)?));
     let version = target.pod().hello()?;
     if version != PROTOCOL_VERSION {
@@ -344,6 +355,7 @@ fn execute<T: Transport>(target: &mut PodTarget<T>, command: Command, out: &mut 
             let total = words.len() * usize::try_from(rounds)?;
             writeln!(out, "loopback: {total} words ok in {:.3} s", started.elapsed().as_secs_f64())?;
         }
+        Command::Bootsel => bail!("bootsel talks to the pod's reset interface, not through a target"),
         Command::Xfer { words } => {
             for (word, response) in words.iter().zip(target.pod().transfer(&words)?) {
                 writeln!(out, "{word:04x} -> {}:{:04x}", response >> 16, response & 0xFFFF)?;

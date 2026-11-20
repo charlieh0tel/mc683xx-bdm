@@ -11,9 +11,12 @@ use nusb::MaybeFuture;
 use nusb::descriptors::TransferType;
 use nusb::transfer::Buffer;
 use nusb::transfer::Bulk;
+use nusb::transfer::ControlOut;
+use nusb::transfer::ControlType;
 use nusb::transfer::Direction;
 use nusb::transfer::In;
 use nusb::transfer::Out;
+use nusb::transfer::Recipient;
 use pod_proto::usb::PACKET;
 use pod_proto::usb::PID;
 use pod_proto::usb::VID;
@@ -22,8 +25,20 @@ use pod_proto::usb::VID;
 /// longest, about 110 ms (`pod-fw`'s RESET pulse and FREEZE timeout).
 const TIMEOUT: Duration = Duration::from_secs(1);
 
-/// The pod's one interface (`pod-fw`'s vendor function).
+/// The pod's request interface (`pod-fw`'s first vendor function).
 const INTERFACE: u8 = 0;
+
+/// picotool's reset interface (`pod-fw`'s `reset`): vendor class,
+/// subclass 0, protocol 1, and its request into the bootloader.
+const RESET_CLASS: (u8, u8, u8) = (0xFF, 0x00, 0x01);
+const RESET_REQUEST_BOOTSEL: u8 = 0x01;
+
+/// The boot ROM's USB device, RP2040 and RP2350.
+const BOOTLOADER_VID: u16 = 0x2E8A;
+const BOOTLOADER_PIDS: [u16; 2] = [0x0003, 0x000F];
+/// How long the bootloader may take to appear, and how often to look.
+const BOOTLOADER_WAIT: Duration = Duration::from_secs(5);
+const BOOTLOADER_POLL: Duration = Duration::from_millis(100);
 
 /// Carries one request packet out and its reply packet back.
 pub trait Transport {
@@ -58,6 +73,13 @@ pub enum TransportError {
     /// The socket failed.
     #[error("socket failed")]
     Socket(#[from] std::io::Error),
+    /// The pod's firmware has no reset interface: one older than the
+    /// knock, which needs the BOOTSEL button.
+    #[error("the pod has no reset interface; hold BOOTSEL and replug it")]
+    NoResetInterface,
+    /// The bootloader did not appear after the request.
+    #[error("no bootloader appeared within {BOOTLOADER_WAIT:?}")]
+    NoBootloader,
     /// A stream message's length byte was 0 or more than a packet.
     #[error("bad message length {0}")]
     MessageLength(usize),
@@ -96,6 +118,50 @@ impl UsbTransport {
         let from_pod = interface.endpoint::<Bulk, In>(bulk(Direction::In)?)?;
         Ok(Self { to_pod, from_pod })
     }
+}
+
+/// Reboots the first pod found into the RP2040's USB bootloader, as
+/// `picotool reboot -u` does, and waits for the bootloader to appear.
+///
+/// # Errors
+/// No pod, no reset interface, or no bootloader afterwards.
+pub fn reboot_to_bootloader() -> Result<(), TransportError> {
+    let info = nusb::list_devices()
+        .wait()?
+        .find(|device| device.vendor_id() == VID && device.product_id() == PID)
+        .ok_or(TransportError::NotFound)?;
+    let device = info.open().wait()?;
+    let number = device
+        .active_configuration()
+        .map_err(|_| TransportError::NoResetInterface)?
+        .interface_alt_settings()
+        .find(|alt| (alt.class(), alt.subclass(), alt.protocol()) == RESET_CLASS)
+        .map(|alt| alt.interface_number())
+        .ok_or(TransportError::NoResetInterface)?;
+    let interface = device.claim_interface(number).wait()?;
+    let request = ControlOut {
+        control_type: ControlType::Class,
+        recipient: Recipient::Interface,
+        request: RESET_REQUEST_BOOTSEL,
+        value: 0,
+        index: u16::from(number),
+        data: &[],
+    };
+    // The pod leaves the bus before it can answer, so the transfer's
+    // own status says nothing: the bootloader appearing is the answer.
+    let sent = interface.control_out(request, TIMEOUT).wait();
+    let started = std::time::Instant::now();
+    while started.elapsed() < BOOTLOADER_WAIT {
+        let found = nusb::list_devices().wait()?.any(|device| {
+            device.vendor_id() == BOOTLOADER_VID && BOOTLOADER_PIDS.contains(&device.product_id())
+        });
+        if found {
+            return Ok(());
+        }
+        std::thread::sleep(BOOTLOADER_POLL);
+    }
+    sent?;
+    Err(TransportError::NoBootloader)
 }
 
 impl Transport for UsbTransport {

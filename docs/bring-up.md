@@ -36,9 +36,10 @@ Expect `mc683xx-pod up` in the log, and the Pico's LED (GP25) on; an
 RP2040-Zero has none there (its RGB LED on GP16 stays dark).
 
 Without a probe, flash a build without RTT over USB.  A blank Pico is
-in BOOTSEL already; a flashed one needs BOOTSEL held as USB is plugged
-in (the firmware has no picotool reset interface, so `-f` cannot reboot
-it):
+in BOOTSEL already.  A flashed one reboots into it with `bdm bootsel`
+(or `picotool reboot -u`, `picotool load -f`), then takes the UF2
+copied onto its RPI-RP2 drive or `picotool load`; firmware older than
+the reset interface needs BOOTSEL held as USB is plugged in:
 
 ```
 cargo build --release --no-default-features -F rp2040
