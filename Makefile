@@ -1,7 +1,12 @@
 # Repository chores.  The firmware and host build with cargo in
 # firmware/; the hardware release is ee_tooling's jlcpcb-release.
 
-.PHONY: hooks lint
+.PHONY: deb hooks lint
+
+# The bdm Debian package, as rust-build-deb (deb-workflows) builds it:
+# firmware/target/debian/mc683xx-pod_*.deb.
+deb:
+	cd firmware && cargo deb -p pod-host
 
 # Use the repository's git hooks (.githooks/), once per clone.
 hooks:

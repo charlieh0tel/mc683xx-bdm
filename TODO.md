@@ -4,12 +4,16 @@
 
 - Schematic: owner's KiCad pass on the draft (`hardware/mc683xx-pod/`).
 - USB PID from Raspberry Pi (PLAN.md, Open questions); then
-  `pod-proto`'s VID and PID, and the README's udev rule.
+  `pod-proto`'s VID and PID, and the udev rule
+  (`packaging/udev/70-mc683xx-pod.rules`).
 - Breadboard first: Pico + 74AHCT1G125s + 74LVC1G17s + BSS138BKs.
 - Carrier release (`jlcpcb-release` skill).
 
 ## Firmware
 
+- Release workflow for the `mc683xx-pod` package, calling
+  deb-workflows' `rust-build-deb`, once it can build a workspace below
+  the repository's root (`firmware/`).
 - DSCLK above 4 MHz, once the throughput test measures the margin.
 - A `Link` adapter onto m683xx-emu's BDM serial exchange once it
   lands; then delete `bdm-model`.

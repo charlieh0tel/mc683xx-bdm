@@ -1,0 +1,10 @@
+# The mc683xx pod (USB 1209:0001), for bdm without root.
+#
+# uaccess gives the pod to the user logged in at the machine's seat; it
+# must run before 73-seat-late.rules, hence 70.  A login over ssh has no
+# seat, so uaccess does nothing for it: the pod is also group plugdev,
+# mode 0660, and a remote user needs `sudo adduser USER plugdev`.
+#
+# 1209:0001 is pid.codes' shared test pair, so this also matches
+# anything else using it.
+SUBSYSTEM=="usb", ATTRS{idVendor}=="1209", ATTRS{idProduct}=="0001", TAG+="uaccess", GROUP="plugdev", MODE="0660"

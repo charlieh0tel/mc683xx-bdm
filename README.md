@@ -51,15 +51,24 @@ cargo run -p pod-host --bin bdm-stand-in -- unix:/tmp/pod.sock &      # a pod on
 cargo run -p pod-host --bin bdm -- --pod unix:/tmp/pod.sock reset
 ```
 
-Without root on Linux, the pod needs a udev rule, e.g.
-`/etc/udev/rules.d/70-mc683xx-pod.rules`:
+Without root on Linux, the pod needs the udev rule
+`packaging/udev/70-mc683xx-pod.rules`: copy it into
+`/etc/udev/rules.d/`, or install the Debian package, which carries it.
+It gives the pod to the user at the machine's seat (`TAG+="uaccess"`)
+and to group `plugdev`, mode 0660, since uaccess does nothing for a
+login over ssh: add a remote user with `sudo adduser USER plugdev`.
+Replug the pod after installing the rule.  1209:0001 is pid.codes'
+shared test pair, so the rule also matches anything else using it.
 
-```
-SUBSYSTEM=="usb", ATTRS{idVendor}=="1209", ATTRS{idProduct}=="0001", TAG+="uaccess"
-```
+### Debian package
 
-1209:0001 is pid.codes' shared test pair, so the rule also matches
-anything else using it.
+`make deb` builds `mc683xx-pod`, `bdm` and the udev rule, with
+cargo-deb 3.8.0 (deb-workflows' `rust-build-deb` pin):
+`firmware/target/debian/mc683xx-pod_VERSION-1_ARCH.deb`.  Metadata:
+`[package.metadata.deb]` in `firmware/pod-host/Cargo.toml`; changelog:
+`packaging/debian/changelog`.  No release workflow yet:
+`rust-build-deb` runs cargo at the repository's root, and the
+workspace is `firmware/`.
 
 ## License
 

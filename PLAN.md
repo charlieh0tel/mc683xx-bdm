@@ -362,7 +362,13 @@ code and no `unsafe`; no USB request, so the protocol is unchanged.
   hex listing.
   Each run restores SFC and DFC before it exits, since the next run
   knows nothing of it.
-- Linux needs a udev rule for access without root (README.md).
+- Linux needs a udev rule for access without root
+  (`packaging/udev/70-mc683xx-pod.rules`, README.md): uaccess for the
+  user at the seat, and group plugdev, mode 0660, for a login over
+  ssh, which uaccess does not reach.
+- Debian package `mc683xx-pod` (`make deb`): `bdm` and the udev rule,
+  built by cargo-deb as deb-workflows' `rust-build-deb` builds it.
+  `bdm-stand-in` is a test aid and does not ship.
 - `mc683xx-target` (m683xx-emu, no_std, MIT OR Apache-2.0) holds
   `Cpu32Target` and the types every crate here uses: Address, Size,
   Register, SystemRegister, FunctionCode, Entry.  Memory calls name
