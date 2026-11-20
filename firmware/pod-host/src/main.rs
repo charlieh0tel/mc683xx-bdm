@@ -1,5 +1,6 @@
 //! `bdm`: the pod from the command line.
 
+use std::io::ErrorKind;
 use std::io::Write;
 use std::path::Path;
 use std::path::PathBuf;
@@ -254,7 +255,7 @@ fn run(pod: &str, command: Command) -> Result<()> {
     if version != PROTOCOL_VERSION {
         bail!("the pod speaks protocol {version}, this bdm {PROTOCOL_VERSION}");
     }
-    let done = execute(&mut target, command);
+    let done = execute(&mut target, command, &mut std::io::stdout().lock());
     // The next bdm starts knowing nothing: leave the program's SFC and
     // DFC, whether or not the command worked.
     let restored = target.restore_function_codes();
@@ -262,34 +263,36 @@ fn run(pod: &str, command: Command) -> Result<()> {
     Ok(restored?)
 }
 
-fn execute<T: Transport>(target: &mut PodTarget<T>, command: Command) -> Result<()> {
+fn execute<T: Transport>(target: &mut PodTarget<T>, command: Command, out: &mut impl Write) -> Result<()> {
     match command {
         Command::Pins => {
             let pins = target.pod().pins()?;
             let level = |high: bool| if high { "high" } else { "low" };
-            println!("FREEZE {}", level(pins.freeze));
-            println!("RESET  {}", level(pins.reset));
-            println!("DS     {}", level(pins.ds));
-            println!("BERR   {}", level(pins.berr));
-            println!("VDD    {}.{:03} V", pins.vdd_mv / 1000, pins.vdd_mv % 1000);
+            writeln!(out, "FREEZE {}", level(pins.freeze))?;
+            writeln!(out, "RESET  {}", level(pins.reset))?;
+            writeln!(out, "DS     {}", level(pins.ds))?;
+            writeln!(out, "BERR   {}", level(pins.berr))?;
+            writeln!(out, "VDD    {}.{:03} V", pins.vdd_mv / 1000, pins.vdd_mv % 1000)?;
             match pins.atemp {
                 Atemp::None => {}
-                Atemp::Fresh(atemp) => println!("ATEMP  ${atemp:08x} ({})", Entry::from_atemp(atemp)),
-                Atemp::Stale(atemp) => println!("ATEMP  ${atemp:08x} (stale: the pod did not see the entry)"),
-                Atemp::Unread => println!("ATEMP  unread: the read after entry failed"),
+                Atemp::Fresh(atemp) => writeln!(out, "ATEMP  ${atemp:08x} ({})", Entry::from_atemp(atemp))?,
+                Atemp::Stale(atemp) => {
+                    writeln!(out, "ATEMP  ${atemp:08x} (stale: the pod did not see the entry)")?
+                }
+                Atemp::Unread => writeln!(out, "ATEMP  unread: the read after entry failed")?,
             }
         }
-        Command::Halt => println!("halted: {}", target.halt()?),
-        Command::Reset => println!("halted: {}", target.reset_halted()?),
+        Command::Halt => writeln!(out, "halted: {}", target.halt()?)?,
+        Command::Reset => writeln!(out, "halted: {}", target.reset_halted()?)?,
         Command::Go => target.go()?,
         Command::Call { address } => target.call(Address(address))?,
-        Command::Clock { hz } => println!("DSCLK {} Hz", target.pod().set_clock(hz)?),
+        Command::Clock { hz } => writeln!(out, "DSCLK {} Hz", target.pod().set_clock(hz)?)?,
         Command::Regs => {
             for register in Register::ALL {
-                println!("{register:<5} ${:08x}", target.read_register(register)?);
+                writeln!(out, "{register:<5} ${:08x}", target.read_register(register)?)?;
             }
             for register in SYSTEM_REGISTERS {
-                println!("{register:<5} ${:08x}", target.read_system_register(register)?);
+                writeln!(out, "{register:<5} ${:08x}", target.read_system_register(register)?)?;
             }
         }
         Command::Get { register: name } => {
@@ -297,7 +300,7 @@ fn execute<T: Transport>(target: &mut PodTarget<T>, command: Command) -> Result<
                 Named::Data(r) => target.read_register(r)?,
                 Named::System(r) => target.read_system_register(r)?,
             };
-            println!("${value:08x}");
+            writeln!(out, "${value:08x}")?;
         }
         Command::Set { register: name, value } => match register(&name)? {
             Named::Data(r) => target.write_register(r, value)?,
@@ -306,10 +309,9 @@ fn execute<T: Transport>(target: &mut PodTarget<T>, command: Command) -> Result<
         Command::Dump { address, length, size, fc, output } => {
             let mut data = vec![0; usize::try_from(length)?];
             target.read_memory(Address(address), fc, size.into(), &mut data)?;
-            let stdout = &mut std::io::stdout().lock();
             match output {
-                None => hex_listing(address, &data, stdout)?,
-                Some(path) => save_dump(address, &data, &path, stdout)?,
+                None => hex_listing(address, &data, out)?,
+                Some(path) => save_dump(address, &data, &path, out)?,
             }
         }
         Command::Write { address, bytes, size, fc } => {
@@ -332,21 +334,30 @@ fn execute<T: Transport>(target: &mut PodTarget<T>, command: Command) -> Result<
                 }
             }
             let total = words.len() * usize::try_from(rounds)?;
-            println!("loopback: {total} words ok in {:.3} s", started.elapsed().as_secs_f64());
+            writeln!(out, "loopback: {total} words ok in {:.3} s", started.elapsed().as_secs_f64())?;
         }
         Command::Xfer { words } => {
             for (word, response) in words.iter().zip(target.pod().transfer(&words)?) {
-                println!("{word:04x} -> {}:{:04x}", response >> 16, response & 0xFFFF);
+                writeln!(out, "{word:04x} -> {}:{:04x}", response >> 16, response & 0xFFFF)?;
             }
         }
     }
     Ok(())
 }
 
+/// Whether `error` is stdout closed by its reader (`bdm regs | head`):
+/// not a failure, and nothing to report.
+fn is_broken_pipe(error: &anyhow::Error) -> bool {
+    error.chain().any(|cause| {
+        cause.downcast_ref::<std::io::Error>().is_some_and(|io| io.kind() == ErrorKind::BrokenPipe)
+    })
+}
+
 fn main() -> ExitCode {
     let cli = Cli::parse();
     match run(&cli.pod, cli.command) {
         Ok(()) => ExitCode::SUCCESS,
+        Err(error) if is_broken_pipe(&error) => ExitCode::SUCCESS,
         Err(error) => {
             eprintln!("bdm: {error:#}");
             ExitCode::FAILURE
@@ -364,6 +375,7 @@ mod tests {
     use super::SystemRegister;
     use super::function_code;
     use super::hex_listing;
+    use super::is_broken_pipe;
     use super::loopback_mismatch;
     use super::loopback_words;
     use super::number;
@@ -455,5 +467,15 @@ mod tests {
         assert_eq!(function_code("7").unwrap(), FunctionCode::CPU_SPACE);
         assert!(function_code("8").is_err());
         assert!(function_code("0xD").is_err());
+    }
+
+    #[test]
+    fn a_closed_stdout_is_not_a_failure() {
+        let broken = || std::io::Error::from(std::io::ErrorKind::BrokenPipe);
+        assert!(is_broken_pipe(&anyhow::Error::from(broken())));
+        assert!(is_broken_pipe(&anyhow::Error::from(broken()).context("dump")));
+        let full = std::io::Error::from(std::io::ErrorKind::StorageFull);
+        assert!(!is_broken_pipe(&anyhow::Error::from(full)));
+        assert!(!is_broken_pipe(&anyhow::anyhow!("illegal command")));
     }
 }

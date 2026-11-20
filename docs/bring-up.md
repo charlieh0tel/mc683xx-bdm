@@ -151,6 +151,12 @@ bdm get ssp
 Record RPC and SSP against the reset vectors in the target's ROM at
 address 0 (initial SSP, then initial PC).
 
+A pod restarted (reflashed, replugged) while the target is halted
+leaves the CPU's serial link out of frame: while the Pico boots, U1
+lets DSCLK go, R3 pulls it high, and the CPU takes the edges as bits.
+The first request fails ("ATEMP unread" in `bdm pins`), and raw
+transfers read garbage.  `bdm reset` frames it again.
+
 ## 6. GO and IFETCH against FREEZE
 
 Scope pin 6 (FREEZE) and pin 8 (IFETCH/DSI) at the header, triggered on
