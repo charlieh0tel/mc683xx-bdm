@@ -7,7 +7,7 @@ it alone answers as the pod does.  The pod's implementation is
 `firmware/pod-proto/src/usb.rs`; where the two disagree, that is a bug
 in one of them.
 
-Protocol version: **3** (`PROTOCOL_VERSION`), raised on any change to a
+Protocol version: **4** (`PROTOCOL_VERSION`), raised on any change to a
 request or reply.
 
 ## Transport
@@ -93,13 +93,17 @@ Fields:
   mode, ATEMP 0 (Pins with FREEZE low only).  Kind 1, fresh: read first
   after entry, so the entry source.  Kind 2, stale: the pod did not see
   the entry (it started with FREEZE high), so commands may have come
-  first and the value is not an entry source.  Pins carries kind 0
-  exactly when FREEZE is low; Halt and ResetHalt never carry it.
+  first and the value is not an entry source.  Kind 3, unread: in
+  background mode, but the read after entry failed; ATEMP 0.  Pins
+  carries kind 0 exactly when FREEZE is low; Halt and ResetHalt never
+  carry it.
 
 Semantics:
 
 - Order of checks: the request is parsed (BadRequest); then the
-  ATEMP read below, whose failure is the reply's status; then the
+  ATEMP read below, whose failure is the reply's status (once: the
+  pod keeps kind 3 and does not read again until FREEZE moves, so
+  Pins, Transfer and ResetHalt still work); then the
   request's own checks (NoTarget, then NoFreeze); then the command.
 - Transfer is raw: the words go out as given, with no guard and no DSI
   release, whether or not the target is in background mode.  Every

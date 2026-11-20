@@ -26,6 +26,9 @@ const RAM: usize = 256;
 
 type ModelPod = Pod<ModelBoard<RAM>>;
 
+/// The Transfer request's opcode (docs/usb-protocol.md).
+const TRANSFER: u8 = 0x01;
+
 /// A pod on a running model, its BDM enabled or not.
 fn pod(bdm_enabled: bool) -> ModelPod {
     Pod::new(ModelBoard::new(Target::new(Address(RAM_BASE)), bdm_enabled))
@@ -127,6 +130,22 @@ fn a_cpu_halted_before_the_pod_started_is_stale() {
 #[test]
 fn reset_halt_is_a_new_entry() {
     let mut pod = pod_on_halted();
+    assert_eq!(parse_atemp(status(&send(&mut pod, &Request::ResetHalt)).unwrap()), Ok(Atemp::Fresh(0)));
+}
+
+#[test]
+fn a_failed_entry_read_fails_one_request() {
+    let mut pod = pod(true);
+    pod.board_mut().hold_dso_high(true);
+    assert_eq!(status(&send(&mut pod, &Request::ResetHalt)), failed(Status::Illegal));
+    // Not retried until the next entry: Pins and a raw transfer go on.
+    let pins = parse_pins(status(&send(&mut pod, &Request::Pins)).unwrap()).unwrap();
+    assert_eq!((pins.freeze, pins.atemp), (true, Atemp::Unread));
+    assert_eq!(status(&send(&mut pod, &Request::Halt)).map(parse_atemp), Ok(Ok(Atemp::Unread)));
+    // A Transfer of one NOP: DSO high comes back as is.
+    assert_eq!(status(&raw(&mut pod, &[TRANSFER, 0, 0])), Ok(&[0xFF, 0xFF, 1, 0][..]));
+    // A reset is a new entry, read again.
+    pod.board_mut().hold_dso_high(false);
     assert_eq!(parse_atemp(status(&send(&mut pod, &Request::ResetHalt)).unwrap()), Ok(Atemp::Fresh(0)));
 }
 

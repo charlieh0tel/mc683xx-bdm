@@ -21,7 +21,7 @@ pub const PACKET: usize = 64;
 
 /// This protocol's version, in the Hello reply: raised on any change
 /// to a request or reply (docs/usb-protocol.md).
-pub const PROTOCOL_VERSION: u32 = 3;
+pub const PROTOCOL_VERSION: u32 = 4;
 
 /// Bytes a reply's status takes.
 const STATUS_BYTES: usize = 1;
@@ -63,6 +63,7 @@ const LONG: usize = 4;
 const ATEMP_NONE: u8 = 0;
 const ATEMP_FRESH: u8 = 1;
 const ATEMP_STALE: u8 = 2;
+const ATEMP_UNREAD: u8 = 3;
 /// An ATEMP field: its kind byte, then the value.
 const ATEMP_BYTES: usize = 1 + LONG;
 /// A Pins reply's body: levels, VDD, ATEMP.
@@ -458,6 +459,10 @@ pub enum Atemp {
     /// CPU already halted), so commands may have come first: not an
     /// entry source.
     Stale(u32),
+    /// In background mode, but the read after entry failed: the
+    /// failure was that request's status, and the pod does not retry
+    /// it until the next entry.
+    Unread,
 }
 
 impl Atemp {
@@ -467,6 +472,7 @@ impl Atemp {
             Self::None => (ATEMP_NONE, 0),
             Self::Fresh(value) => (ATEMP_FRESH, value),
             Self::Stale(value) => (ATEMP_STALE, value),
+            Self::Unread => (ATEMP_UNREAD, 0),
         };
         let [b0, b1, b2, b3] = value.to_le_bytes();
         [kind, b0, b1, b2, b3]
@@ -479,6 +485,7 @@ impl Atemp {
             ATEMP_NONE if value == 0 => Some(Self::None),
             ATEMP_FRESH => Some(Self::Fresh(value)),
             ATEMP_STALE => Some(Self::Stale(value)),
+            ATEMP_UNREAD if value == 0 => Some(Self::Unread),
             _ => None,
         }
     }
@@ -606,6 +613,7 @@ pub fn parse_value(body: &[u8]) -> Result<u32, ReplyError> {
 mod tests {
     use super::ATEMP_FRESH;
     use super::ATEMP_NONE;
+    use super::ATEMP_UNREAD;
     use super::Address;
     use super::Atemp;
     use super::BERR;
@@ -773,13 +781,14 @@ mod tests {
     #[test]
     fn atemp_reply() {
         let mut packet = [0; PACKET];
-        for atemp in [Atemp::Fresh(0x1234_FFFF), Atemp::Stale(0xA7E3_A7E3)] {
+        for atemp in [Atemp::Fresh(0x1234_FFFF), Atemp::Stale(0xA7E3_A7E3), Atemp::Unread] {
             let length = encode_atemp(atemp, &mut packet);
             assert_eq!(parse_atemp(parse_reply(&packet[..length]).unwrap()), Ok(atemp));
         }
         let length = encode_atemp(Atemp::None, &mut packet);
         assert_eq!(parse_atemp(parse_reply(&packet[..length]).unwrap()), Err(ReplyError::Malformed));
-        assert_eq!(parse_atemp(&[3, 0, 0, 0, 0]), Err(ReplyError::Malformed));
+        assert_eq!(parse_atemp(&[ATEMP_UNREAD, 1, 0, 0, 0]), Err(ReplyError::Malformed));
+        assert_eq!(parse_atemp(&[4, 0, 0, 0, 0]), Err(ReplyError::Malformed));
         assert_eq!(parse_atemp(&[ATEMP_FRESH, 0, 0, 0]), Err(ReplyError::Malformed));
     }
 

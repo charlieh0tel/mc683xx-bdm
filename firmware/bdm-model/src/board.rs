@@ -18,6 +18,9 @@ use crate::Target;
 /// The VDD the board reports: a 5 V target.
 const VDD_MV: u16 = 5000;
 
+/// A response with DSO high for all 17 bits.
+const DSO_HIGH: u32 = 0x1_FFFF;
+
 /// A model target behind a pod's board.
 #[derive(Debug)]
 pub struct ModelBoard<const RAM: usize> {
@@ -27,18 +30,26 @@ pub struct ModelBoard<const RAM: usize> {
     /// BDM was enabled at the last reset: BKPT halts.  Without it a real
     /// CPU takes BKPT as a breakpoint exception and Halt fails.
     bdm_enabled: bool,
+    /// DSO held high, so every response reads as "illegal", as with
+    /// the link out of frame.
+    dso_high: bool,
 }
 
 impl<const RAM: usize> ModelBoard<RAM> {
     /// A board around `target`, its BDM enabled or not.
     #[must_use]
     pub const fn new(target: Target<RAM>, bdm_enabled: bool) -> Self {
-        Self { target, edges: 0, bdm_enabled }
+        Self { target, edges: 0, bdm_enabled, dso_high: false }
     }
 
     /// The model, for what a test checks or sets.
     pub const fn target(&mut self) -> &mut Target<RAM> {
         &mut self.target
+    }
+
+    /// Holds DSO high, or lets it go: the model still takes each word.
+    pub const fn hold_dso_high(&mut self, high: bool) {
+        self.dso_high = high;
     }
 
     /// The running CPU enters background mode on its own (BGND, a
@@ -58,7 +69,7 @@ impl<const RAM: usize> ModelBoard<RAM> {
         if was_frozen && !self.target.frozen() {
             self.edges = self.edges.wrapping_add(1);
         }
-        bits
+        if self.dso_high { DSO_HIGH } else { bits }
     }
 }
 

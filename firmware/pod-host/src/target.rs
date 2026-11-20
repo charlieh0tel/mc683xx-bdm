@@ -117,7 +117,7 @@ impl<T: Transport> PodTarget<T> {
     /// As [`Error`]; the pod's `NoFreeze` if the target runs.
     fn halted_state(&mut self) -> Result<&mut Halted, Error> {
         if self.halted.is_none() {
-            let entry = entry(self.pod.pins()?.atemp).ok_or(ReplyError::Failed(Status::NoFreeze))?;
+            let entry = entry(self.pod.pins()?.atemp)?.ok_or(ReplyError::Failed(Status::NoFreeze))?;
             self.halted = Some(Halted::new(entry));
         }
         Ok(self.halted.as_mut().expect("just set"))
@@ -125,7 +125,7 @@ impl<T: Transport> PodTarget<T> {
 
     /// Keeps the entry a halt or reset reported.
     fn halted_at(&mut self, atemp: Atemp) -> Result<Entry, Error> {
-        let entry = entry(atemp).ok_or(ReplyError::Malformed)?;
+        let entry = entry(atemp)?.ok_or(ReplyError::Malformed)?;
         self.halted = Some(Halted::new(entry));
         Ok(entry)
     }
@@ -175,7 +175,7 @@ impl<T: Transport> Cpu32Target for PodTarget<T> {
         if let Some(halted) = self.halted {
             return Ok(Some(halted.entry));
         }
-        let Some(entry) = entry(self.pod.pins()?.atemp) else { return Ok(None) };
+        let Some(entry) = entry(self.pod.pins()?.atemp)? else { return Ok(None) };
         self.halted = Some(Halted::new(entry));
         Ok(Some(entry))
     }
@@ -245,11 +245,16 @@ impl<T: Transport> Cpu32Target for PodTarget<T> {
 }
 
 /// The entry source a pod's ATEMP gives, `None` while the target runs.
-const fn entry(atemp: Atemp) -> Option<Entry> {
+///
+/// # Errors
+/// The pod could not read ATEMP after this entry: a target halted with
+/// no entry source cannot be worked on until the next entry.
+const fn entry(atemp: Atemp) -> Result<Option<Entry>, ReplyError> {
     match atemp {
-        Atemp::None => None,
-        Atemp::Fresh(value) => Some(Entry::from_atemp(value)),
-        Atemp::Stale(value) => Some(Entry::Unknown { atemp: value }),
+        Atemp::None => Ok(None),
+        Atemp::Fresh(value) => Ok(Some(Entry::from_atemp(value))),
+        Atemp::Stale(value) => Ok(Some(Entry::Unknown { atemp: value })),
+        Atemp::Unread => Err(ReplyError::Failed(Status::Unexpected)),
     }
 }
 

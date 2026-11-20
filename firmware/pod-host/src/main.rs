@@ -276,6 +276,7 @@ fn execute<T: Transport>(target: &mut PodTarget<T>, command: Command) -> Result<
                 Atemp::None => {}
                 Atemp::Fresh(atemp) => println!("ATEMP  ${atemp:08x} ({})", Entry::from_atemp(atemp)),
                 Atemp::Stale(atemp) => println!("ATEMP  ${atemp:08x} (stale: the pod did not see the entry)"),
+                Atemp::Unread => println!("ATEMP  unread: the read after entry failed"),
             }
         }
         Command::Halt => println!("halted: {}", target.halt()?),

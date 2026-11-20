@@ -266,8 +266,17 @@ impl<B: Board> Pod<B> {
             return Ok(());
         };
         board.drive_link();
-        let atemp = self.session.read_system_register(SystemRegister::Atemp).await?;
-        self.entry.record(edges, take(atemp));
-        Ok(())
+        match self.session.read_system_register(SystemRegister::Atemp).await {
+            Ok(atemp) => {
+                self.entry.record(edges, take(atemp));
+                Ok(())
+            }
+            // Recorded, so the failure fails this request alone and not
+            // every request until FREEZE moves.
+            Err(error) => {
+                self.entry.record(edges, Atemp::Unread);
+                Err(error.into())
+            }
+        }
     }
 }
