@@ -1,3 +1,7 @@
+# Its own workspace, so cargo never climbs to an enclosing one (a
+# worktree nested in another checkout).
+[workspace]
+
 [package]
 name = "pod-fw"
 version = "0.1.0"
