@@ -52,6 +52,9 @@ pub(crate) struct PioLink<'d> {
     dsi_enable: Pin<'d, PIO0>,
     /// DSCLK's rate, as the divider in effect gives it.
     dsclk_hz: u32,
+    /// DSCLK's level: as [`PioLink::set_dsclk`] left it, high after
+    /// each word.
+    dsclk_high: bool,
 }
 
 /// The pins [`PioLink::new`] takes over.
@@ -122,12 +125,18 @@ impl<'d> PioLink<'d> {
         sm.set_pin_dirs(Direction::Out, &[&dsclk, &dsi, &dsi_enable]);
         sm.set_pin_dirs(Direction::In, &[&dso]);
         sm.set_enable(true);
-        Self { sm, dsclk, dsi_enable, dsclk_hz: divider.dsclk_hz }
+        Self { sm, dsclk, dsi_enable, dsclk_hz: divider.dsclk_hz, dsclk_high: true }
     }
 
     /// Drives DSCLK (BKPT) between words: low to request a halt.
     pub(crate) fn set_dsclk(&mut self, level: Level) {
         self.sm.set_pins(level, &[&self.dsclk]);
+        self.dsclk_high = level == Level::High;
+    }
+
+    /// DSCLK high.
+    pub(crate) const fn dsclk_high(&self) -> bool {
+        self.dsclk_high
     }
 
     /// Sets `DSI_EN`: DSI is driven while it is high and FREEZE is.
@@ -151,6 +160,8 @@ impl<'d> PioLink<'d> {
     async fn shift(&mut self, osr: u32) -> u32 {
         self.sm.tx().wait_push(osr).await;
         let word = self.sm.rx().wait_pull().await & WORD_MASK;
+        // The word's last rise leaves it high.
+        self.dsclk_high = true;
         ACTIVITY.step();
         word
     }

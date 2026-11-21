@@ -21,6 +21,7 @@ use mc683xx_bdm_proto::session::Link;
 
 use crate::freeze::FREEZE;
 use crate::link::PioLink;
+use crate::reset::spin;
 
 /// How long FREEZE may take after BKPT, or after RESET releases, and
 /// to fall after CALL: long against stacking's bus cycles, a bus
@@ -35,6 +36,10 @@ const BERR_PULSE: Duration = Duration::from_micros(10);
 /// Each phase of a lone DSCLK edge: long against the CPU's 2-clock
 /// minimum at any system clock (MC68331UM Table A-7).
 const EDGE_PHASE: Duration = Duration::from_micros(10);
+/// From GP10 rising to U1 driving BKPT/DSCLK: long against Q3 switching
+/// and U1's output enable (SCLS378P 5.6), so the first DSCLK fall after
+/// [`Board::rest`] reaches the target whole; short against a request.
+const DSCLK_ENABLE_SETTLE: Duration = Duration::from_micros(1);
 /// The ADC: 12 bits against the Pico's 3.3 V reference.
 const ADC_FULL_SCALE: u32 = 1 << 12;
 const ADC_REFERENCE_MV: u32 = 3300;
@@ -48,6 +53,9 @@ pub(crate) struct PicoBoard<'d> {
     /// Q3's gate: high enables U1's BKPT/DSCLK output (its OE
     /// is pulled up to target VDD and Q3 pulls it low).
     dsclk_enable: Output<'d>,
+    /// U1 turned off by [`Board::rest`] with the link driven: the next
+    /// word turns it back on.
+    resting: bool,
     /// Q1's gate: high pulls RESET low.
     reset_drive: Output<'d>,
     /// Q2's gate: high pulls BERR low.
@@ -80,6 +88,7 @@ impl<'d> PicoBoard<'d> {
         Self {
             link,
             dsclk_enable: lines.dsclk_enable,
+            resting: false,
             reset_drive: lines.reset_drive,
             berr_drive: lines.berr_drive,
             reset: lines.reset,
@@ -95,9 +104,22 @@ impl<'d> PicoBoard<'d> {
         self.link.set_dsclk(Level::Low);
     }
 
-    /// Turns U1's BKPT/DSCLK output on, at DSCLK's level as it is.
+    /// Turns U1's BKPT/DSCLK output on, at DSCLK's level as it is, and
+    /// waits for it if it was off.
     fn enable_dsclk(&mut self) {
-        self.dsclk_enable.set_high();
+        self.resting = false;
+        if self.dsclk_enable.is_set_low() {
+            self.dsclk_enable.set_high();
+            spin(DSCLK_ENABLE_SETTLE);
+        }
+    }
+
+    /// Before a word or a lone edge: U1 back on if [`Board::rest`]
+    /// turned it off, DSCLK still high from then.
+    fn wake(&mut self) {
+        if self.resting {
+            self.enable_dsclk();
+        }
     }
 
     /// Runs `first`, then waits for FREEZE, all within
@@ -123,10 +145,12 @@ impl Link for PicoBoard<'_> {
     type Error = Infallible;
 
     async fn transfer(&mut self, word: u16) -> Result<u32, Infallible> {
+        self.wake();
         self.link.transfer(word).await
     }
 
     async fn transfer_exit(&mut self, word: u16) -> Result<u32, Infallible> {
+        self.wake();
         self.link.transfer_exit(word).await
     }
 
@@ -166,15 +190,25 @@ impl Board for PicoBoard<'_> {
         Ok(u16::try_from(mv).unwrap_or(u16::MAX))
     }
 
-    /// Raises DSCLK only while the pod is not driving it: after a halt
-    /// it is held low, and a rising edge now would be a bit to the CPU,
-    /// putting every later word out of frame.
+    /// Raises DSCLK only while U1 is off (since boot, or since
+    /// [`Board::rest`], DSCLK already high): with U1 on after a halt
+    /// BKPT is held low, and a rising edge now would be a bit to the
+    /// CPU, putting every later word out of frame.
     fn drive_link(&mut self) {
         if self.dsclk_enable.is_set_low() {
             self.link.set_dsclk(Level::High);
             self.enable_dsclk();
         }
         self.link.set_dsi_enabled(true);
+    }
+
+    /// R3 holds BKPT high once U1 is off; GP9 low (BKPT held low) keeps
+    /// it on.
+    fn rest(&mut self) {
+        if self.dsclk_enable.is_set_high() && self.link.dsclk_high() {
+            self.dsclk_enable.set_low();
+            self.resting = true;
+        }
     }
 
     /// BKPT low until FREEZE; BKPT stays low after, and the first word's
@@ -224,6 +258,7 @@ impl Board for PicoBoard<'_> {
     }
 
     async fn clock_bit(&mut self) {
+        self.wake();
         self.link.set_dsclk(Level::Low);
         Timer::after(EDGE_PHASE).await;
         self.link.set_dsclk(Level::High);

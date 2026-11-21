@@ -85,7 +85,8 @@ fight its output.  Loop back at J1 instead, through U2 and U5:
 - Pin 6 (FREEZE) to pin 9: U3 enables U2 only while FREEZE is high.
 - `bdm halt` first, whatever it answers: FREEZE already high, the pod
   sets DSI_EN and Q3 (DSCLK to pin 4) to read ATEMP.  A raw transfer
-  sets neither.
+  sets neither.  Between requests Q3 is off and R3 holds pin 4 high;
+  each word after `bdm halt` turns it on again.
 
 Scope pins 4 (DSCLK) and 8 (DSI) instead of GP9 and GP3.
 
@@ -168,14 +169,25 @@ A pod restarted while the target is halted can glitch BKPT: as the
 Pico resets, GP9 (U1's input) falls before GP10 turns U1 off, and the
 halted CPU takes the pulse as a DSCLK clock.  On a target that left
 the CPU refusing commands (RSREG ATEMP illegal) until `bdm reset`;
-idle time alone does not.  `bdm bootsel` turns U1 off before its
-reboot, and a restart that way leaves the CPU answering
-(docs/58503a/); the production build's panic handler does the same
-before the watchdog resets the pod.  A power loss, a replug, a panic
-in the `rtt` build or a watchdog reset with no panic (no software runs
-before it) still can.  After such a restart: `bdm reset` (or
-`bdm resync`, if only the link's framing is off).  A watchdog reset
-of the pod should be rare (PLAN.md, Firmware, Watchdog).
+idle time alone does not.  So U1 is on only while a request runs, and
+through a hold: at each request's end, with DSCLK high, the pod turns
+it off and R3 holds BKPT high (PLAN.md, Firmware).  A restart between
+requests, by a power loss, a replug or a watchdog reset, makes no
+glitch.  `bdm bootsel` turns U1 off before its reboot, and a restart
+that way leaves the CPU answering (docs/58503a/); the production
+build's panic handler does the same before the watchdog resets the
+pod.  What still can glitch BKPT: a power loss, a replug, a panic in
+the `rtt` build or a watchdog reset with no panic (no software runs
+before it) in the middle of a request or during `bdm hold`.  After
+such a restart: `bdm reset` (or `bdm resync`, if only the link's
+framing is off).  A watchdog reset of the pod should be rare (PLAN.md,
+Firmware, Watchdog).
+
+Check, halted (`bdm reset`): unplug the pod's USB for a few seconds,
+plug it back in, then `bdm regs`: it answers, with no `bdm reset` or
+`bdm resync` first.  The same after `bdm halt` from running.  After
+`bdm hold`, the same restart is expected to leave `bdm regs` failing
+until `bdm resync` or `bdm reset`.
 
 To leave the target running: `bdm go` straight after `bdm reset`
 starts it from the reset vector; `bdm reset --run` resets it to run
