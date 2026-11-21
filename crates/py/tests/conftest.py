@@ -1,4 +1,4 @@
-"""A stand-in pod for each test: `bdm-stand-in` (mc683xx-bdm) on a Unix
+"""A stand-in pod for each test: `bdm-stand-in` (mc683xx-bdm-stand-in) on a Unix
 socket, a model CPU32 behind it, built once per session with cargo."""
 
 import json
@@ -28,9 +28,7 @@ def stand_in_binary() -> Path:
             "build",
             "--quiet",
             "-p",
-            "mc683xx-bdm",
-            "--bin",
-            "bdm-stand-in",
+            "mc683xx-bdm-stand-in",
             "--message-format=json-render-diagnostics",
         ],
         cwd=FIRMWARE,

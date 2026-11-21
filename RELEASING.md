@@ -5,8 +5,10 @@
 Released together: the pod and `bdm` refuse each other unless their
 `PROTOCOL_VERSION` (`crates/proto/src/usb.rs`) matches.
 
-1. Bump `version` in `crates/*/Cargo.toml` and
-   `firmware/pod-fw/Cargo.toml`; add a
+1. Bump the version in the root `Cargo.toml` (`[workspace.package]`'s
+   `version` and each published crate's `=X.Y.Z` in
+   `[workspace.dependencies]`) and in `firmware/pod-fw/Cargo.toml`;
+   add a
    `packaging/debian/changelog` entry.  Raise `PROTOCOL_VERSION` and
    `docs/usb-protocol.md` if the wire changed.
 2. `make lint`, `cargo test --locked`.

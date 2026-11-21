@@ -331,6 +331,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "mc683xx-bdm-stand-in"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "mc683xx-bdm",
+ "mc683xx-bdm-model",
+ "mc683xx-bdm-proto",
+ "mc683xx-target",
+]
+
+[[package]]
 name = "mc683xx-cpu32"
 version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"

@@ -2,13 +2,29 @@
 # (thumbv6m-none-eabi or thumbv8m.main-none-eabihf, PLAN.md), so it
 # stays out with its own lockfile; it takes the shared crates by path.
 [workspace]
-members = ["crates/proto", "crates/model", "crates/host", "crates/py"]
+members = ["crates/proto", "crates/model", "crates/host", "crates/py", "crates/stand-in"]
 exclude = ["firmware/pod-fw"]
 resolver = "3"
 
+# One version for the crates and the Python package (RELEASING.md).
 [workspace.package]
+version = "0.1.0"
 edition = "2024"
+# The toolchain rust-toolchain.toml pins, the one CI builds and tests
+# with; no older compiler is checked, so none is claimed.
+rust-version = "1.99.1"
+authors = ["Christopher Hoover <ch@murgatroid.com>"]
 license = "GPL-3.0-only"
+repository = "https://github.com/charlieh0tel/mc683xx-bdm"
+
+# The workspace's crates, as its members depend on them: a path for the
+# workspace and, for the published ones, an exact version for crates.io,
+# so a host never mixes two releases' crates.  The version follows
+# [workspace.package]'s (RELEASING.md).
+[workspace.dependencies]
+mc683xx-bdm = { path = "crates/host", version = "=0.1.0" }
+mc683xx-bdm-model = { path = "crates/model" }
+mc683xx-bdm-proto = { path = "crates/proto", version = "=0.1.0" }
 
 [workspace.lints.rust]
 missing_debug_implementations = "warn"

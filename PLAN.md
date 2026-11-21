@@ -261,10 +261,10 @@ mc683xx-bdm/
 │   └── ee_tooling/      # shared KiCad tooling and house style (submodule, release/0.2)
 ├── crates/
 │   ├── proto/           # mc683xx-bdm-proto: BDM words and command sequences; USB commands; no_std
-│   ├── host/            # mc683xx-bdm: Rust library + `bdm` CLI (nusb)
+│   ├── host/            # mc683xx-bdm: Rust library + `bdm` CLI (nusb); git-version.rs, the git commit in its and pod-fw's versions
 │   ├── py/              # mc683xx-bdm-py: Python bindings, `mc683xx_bdm` (PyO3, maturin, uv)
 │   ├── model/           # mc683xx-bdm-model: a CPU32 in background mode at the serial word, and a board around it; no_std; test target
-│   └── git-version.rs   # the git commit in pod-fw's and mc683xx-bdm's versions
+│   └── stand-in/        # mc683xx-bdm-stand-in: `bdm-stand-in`, a pod on a socket over the model; test aid
 ├── firmware/
 │   └── pod-fw/          # Pico / Pico 2 firmware, embassy-rp, PIO; its own workspace
 ├── packaging/           # Debian changelog, udev rule
@@ -526,7 +526,12 @@ code and no `unsafe`; no USB request, so the protocol is unchanged.
   a write whose reply did not come: the next restore writes it.
 - `mc683xx-bdm`'s `stand_in` and `bdm-stand-in`: `mc683xx-bdm-proto`'s
   `pod` over `mc683xx-bdm-model`'s `ModelBoard` on a stream socket, one
-  client at a time.
+  client at a time.  The binary is a crate of its own,
+  `mc683xx-bdm-stand-in`, unpublished as the model is, so
+  `mc683xx-bdm` publishes without the model, which it takes for its
+  tests only (a path-only dev-dependency, which a package drops).
+  `bdm --pod unix:PATH` is Unix's: elsewhere (Windows) it fails, and
+  `tcp:HOST:PORT` reaches a stand-in.
   `bdm` and `PodTarget` run end to end against it with no hardware
   (`crates/host/tests/stand_in.rs`).  The model's FREEZE is its state, VDD
   5 V; a halt or reset enters with a breakpoint, and a reset keeps
