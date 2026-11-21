@@ -193,6 +193,14 @@ from the right: OP2 the rightmost, green; OP3, OP4, OP5, OP6 and OP7
 Reads of $20001D and $20001F start and stop the DUART's counter: write
 them only.
 
+## The rear Alarm output
+
+The rear Alarm jack follows PF5 (PORTF0 bit 5, NOT led_alarm): 5 V with
+PF5 high (no alarm), 0.6 mV with it low, measured at the jack (U33 pin
+73 not measured; 2026-11-21, step W3 of smartclock's checklist).  The
+firmware writes PF5 only when its alarm state changes, so a test that
+flips it puts it back.
+
 ## Programming the flash over BDM
 
 From one reset entry (firmware never run), with the chip selects set
