@@ -230,9 +230,14 @@ count 1).
 
 ## Repo layout
 
-One Rust workspace in `firmware/`, as in oncore-emulator, under one
-pinned toolchain (`firmware/rust-toolchain.toml`).  `pod-fw` builds
-only for the Pico targets, so it has its own `Cargo.lock`.
+The host Rust workspace is the repository's root (`Cargo.toml`,
+`Cargo.lock`): the host crates in `host/` and the shared `pod-proto` in
+`crates/`, so cargo, cargo-deb and maturin all run at the root.
+`firmware/pod-fw` builds only for the Pico targets, so it is its own
+workspace with its own `Cargo.lock`, and takes `pod-proto` by path.
+One pinned toolchain (`rust-toolchain.toml`) and one `clippy.toml` and
+`rustfmt.toml`, at the root, which cargo, clippy and rustfmt find from
+either workspace by searching upward.
 
 ```
 mc683xx-bdm/
@@ -240,13 +245,19 @@ mc683xx-bdm/
 │   ├── mc683xx-pod/      # KiCad schematic + board
 │   ├── production/       # each release as ordered
 │   └── ee_tooling/      # shared KiCad tooling and house style (submodule, pinned)
-├── firmware/
+├── crates/
+│   └── pod-proto/       # BDM words and command sequences; USB commands; no_std
+├── host/
 │   ├── bdm-model/       # a CPU32 in background mode at the serial word, and a board around it; no_std; test target
-│   ├── pod-proto/       # BDM words and command sequences; USB commands; no_std
-│   ├── pod-fw/          # Pico / Pico 2 firmware, embassy-rp, PIO
 │   ├── pod-host/        # Rust library + `bdm` CLI (nusb)
 │   └── pod-py/          # Python bindings, `mc683xx_bdm` (PyO3, maturin, uv)
+├── firmware/
+│   ├── pod-fw/          # Pico / Pico 2 firmware, embassy-rp, PIO; its own workspace
+│   └── git-version.rs   # the git commit in pod-fw's and pod-host's versions
+├── packaging/           # Debian changelog, udev rule
 ├── third_party/         # vendor manuals + NOTICE
+├── Cargo.toml           # the host workspace
+├── rust-toolchain.toml  # the toolchain, for both workspaces
 ├── README.md
 ├── PLAN.md
 └── TODO.md

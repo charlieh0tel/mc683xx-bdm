@@ -11,8 +11,9 @@
 ## Firmware
 
 - Release workflow for the `mc683xx-bdm` package, calling
-  deb-workflows' `rust-build-deb`, once it can build a workspace below
-  the repository's root (`firmware/`).
+  deb-workflows' `rust-build-deb`, once it can run a step before
+  `cargo deb`: the package ships the UF2 (`make uf2`: pod-fw for
+  thumbv6m-none-eabi, then picotool), which it does not build.
 - DSCLK above 4 MHz, once the throughput test measures the margin.
 - Report a watchdog reset to the host (WATCHDOG's REASON at start,
   say in Pins or Version, and in `bdm pins`): a protocol change, so

@@ -21,6 +21,6 @@ python = ["dep:pyo3"]
 [dependencies]
 mc683xx-target = "0.6.0"
 pod-host = { version = "0.1.0", path = "../pod-host" }
-pod-proto = { version = "0.1.0", path = "../pod-proto" }
+pod-proto = { version = "0.1.0", path = "../../crates/pod-proto" }
 pyo3 = { version = "0.30.1", optional = true }
 thiserror = "2.0.21"

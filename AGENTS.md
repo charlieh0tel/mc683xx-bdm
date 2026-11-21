@@ -92,7 +92,7 @@
 ## Rust Rules
 
 - Use the latest stable Rust edition.  The toolchain is pinned in
-  `firmware/rust-toolchain.toml`.
+  `rust-toolchain.toml`, for both workspaces.
 - Always run `cargo fmt` after changes and before commits.
 - Always run `cargo clippy` after major changes, and `make lint` (clippy
   on every crate and target) before commits; CI runs it too.
@@ -133,7 +133,7 @@
   between awaits is in its poll frame, on the stack, each time it is
   polled, and an inlined callee's locals join that frame.
 - Clippy enforces part of this, as errors: `large_stack_arrays`
-  (`firmware/clippy.toml`'s 512 bytes), `large_types_passed_by_value`
+  (`clippy.toml`'s 512 bytes), `large_types_passed_by_value`
   (Copy types only) and `large_const_arrays`.  No lint checks a return
   value.  `large_stack_frames` and `large_futures` are off: the first
   estimates frames before optimization, several times too large; task
