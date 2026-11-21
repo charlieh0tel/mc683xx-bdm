@@ -187,7 +187,7 @@ Check, halted (`bdm reset`): unplug the pod's USB for a few seconds,
 plug it back in, then `bdm regs`: it answers, with no `bdm reset` or
 `bdm resync` first.  The same after `bdm halt` from running.  After
 `bdm hold`, the same restart is expected to leave `bdm regs` failing
-until `bdm resync` or `bdm reset`.
+until `bdm reset`; `bdm resync` may not clear it (docs/58503a/).
 
 To leave the target running: `bdm go` straight after `bdm reset`
 starts it from the reset vector; `bdm reset --run` resets it to run
