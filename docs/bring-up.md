@@ -191,7 +191,7 @@ bdm go
 - DSI's driver turns off within 20 ns of FREEZE falling (PLAN.md,
   Hardware: 74AHCT1G00 then 74AHCT1G125).
 - IFETCH starts toggling only after that; any overlap shows as a step
-  across R2 (100 Ohm).
+  across R2 (220 Ohm).
 
 Repeat with a reset from the target's side (its reset button) while in
 background mode: FREEZE falls, and DSI goes off the same way.
@@ -219,7 +219,8 @@ bdm regs
 ```
 
 Not-ready handling shows on slow accesses (step 9): the pod retries up
-to 1000 NOPs, then answers NotReady.
+to 1000 NOPs, then takes the access to be hung, pulses BERR to end it
+and answers BusError (docs/usb-protocol.md).
 
 ## 9. SIM registers
 
