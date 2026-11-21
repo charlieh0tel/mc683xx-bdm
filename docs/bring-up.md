@@ -49,8 +49,8 @@ picotool load -x -t elf target/thumbv6m-none-eabi/release/pod-fw
 ```
 
 It logs nothing; the pod enumerating as 1209:0001 (`lsusb`) stands in
-for the log line.  A rev 0.2 carrier has J2 not fitted: flash it this
-way.
+for the log line.  A rev 0.2 carrier (`hardware/README.md`, Revisions) has J2 not
+fitted: flash it this way.
 
 ```
 bdm pins

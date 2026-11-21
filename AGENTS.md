@@ -11,7 +11,8 @@
 
 - `hardware/*/*.kicad_*` are the owner's: edit them only when handed over,
   with KiCad closed.
-- Bump REV in both title blocks before a release.  `hardware/production/` holds
+- Bump REV in both title blocks and in the silkscreen text before a
+  release, and add the release to `hardware/README.md`, Revisions.  `hardware/production/` holds
   what was ordered; do not change it afterwards.
 - `hardware/ee_tooling` follows ee_tooling's `release/0.2` branch (the
   0.2 line, fixes only; the ee_tooling section below): board work is
