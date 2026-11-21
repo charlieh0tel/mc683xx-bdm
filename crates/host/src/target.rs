@@ -509,7 +509,9 @@ mod tests {
     use mc683xx_bdm_proto::usb::PACKET;
     use mc683xx_bdm_proto::usb::Pins;
     use mc683xx_bdm_proto::usb::ReplyError;
+    use mc683xx_bdm_proto::usb::ReplyHeader;
     use mc683xx_bdm_proto::usb::Request;
+
     use mc683xx_bdm_proto::usb::Status;
     use mc683xx_bdm_proto::usb::encode_atemp;
     use mc683xx_bdm_proto::usb::encode_pins;
@@ -541,21 +543,25 @@ mod tests {
     /// A reply with no body.
     const DONE: &[u8] = &[0];
 
+    /// A header the script replaces: replies here are status and body.
+    const HEADER: ReplyHeader = ReplyHeader { tag: 0, freeze_edges: 0 };
+    const HEADER_BYTES: usize = 2;
+
     /// A Pins reply: RESET and DS high, 5 V, FREEZE high unless `atemp`
     /// is `Atemp::None`.
     fn pins(atemp: Atemp) -> Vec<u8> {
         let mut packet = [0; PACKET];
         let pins =
             Pins { freeze: atemp != Atemp::None, reset: true, ds: true, berr: true, vdd_mv: 5000, atemp };
-        let length = encode_pins(&pins, &mut packet);
-        packet[..length].to_vec()
+        let length = encode_pins(HEADER, &pins, &mut packet);
+        packet[HEADER_BYTES..length].to_vec()
     }
 
     /// A `Halt` or `ResetHalt` reply.
     fn halted(atemp: Atemp) -> Vec<u8> {
         let mut packet = [0; PACKET];
-        let length = encode_atemp(atemp, &mut packet);
-        packet[..length].to_vec()
+        let length = encode_atemp(HEADER, atemp, &mut packet);
+        packet[HEADER_BYTES..length].to_vec()
     }
 
     fn target(replies: &[&[u8]]) -> PodTarget<Script> {

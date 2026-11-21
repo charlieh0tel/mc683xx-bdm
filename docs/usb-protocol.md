@@ -7,7 +7,7 @@ it alone answers as the pod does.  The pod's implementation is
 `crates/proto/src/usb.rs`; where the two disagree, that is a bug
 in one of them.
 
-Protocol version: **9** (`PROTOCOL_VERSION`), raised on any change to a
+Protocol version: **10** (`PROTOCOL_VERSION`), raised on any change to a
 request or reply.
 
 ## Transport
@@ -30,7 +30,11 @@ USB:
   ROM's interface-disable mask.  `bdm bootsel` and `picotool -f` send
   it.
 - One request per OUT packet, one reply per IN packet.  An OUT
-  packet longer than 64 bytes is answered BadRequest.
+  packet longer than 64 bytes is answered BadRequest, tagged 0.
+- The pod writes each reply before it reads the next request, so a
+  reply the host has not read holds back every later request: a host
+  that gives up on a reply keeps a read waiting for it, or sends no
+  request until it has read it.
 - A request that goes 8 s without a word over the BDM link is a
   firmware fault: the pod's watchdog resets it (PLAN.md, Firmware,
   Watchdog), so it leaves the bus without a reply and enumerates
@@ -52,20 +56,40 @@ Stream (Unix or TCP socket):
 
 Either way:
 
-- Strictly one request, then its reply.  The host reads the reply
+- Strictly one request, then its reply.  The host waits for the reply
   before sending the next request.  No pipelining, no batching beyond
   what one request carries (15 raw words, 56 memory bytes).
+- Every request but Hello starts with a tag byte, which the reply
+  echoes.  A host that gave up waiting for a reply (its timeout, an
+  interrupt) may later read it ahead of the next request's: it takes
+  only the reply with its request's tag and discards any other.  A
+  host's tags are 1-255, a new one for each request, so the last 254
+  requests' replies are told apart; tag 0 marks the pod's reply to a
+  packet with no tag.
 - Multi-byte fields of this protocol are little-endian.  Memory bytes
   are the target's, in address order (big-endian values).
 - A host sends Hello first and stops if the version is not its own.
+  Hello is untagged and the same in every version, so the check works
+  across versions: the request is the one byte 0x0E, the reply status
+  0 (Ok) and the u32 version, 5 bytes.  No tagged reply has a first
+  byte of 0, so a host reading for Hello's reply discards any other.
+
+## Hello
+
+| Request | Reply |
+|---|---|
+| 0x0E (the whole packet) | 0x00, then u32 protocol version |
+
+A one-byte packet other than 0x0E is a tag with no request:
+BadRequest.
 
 ## Requests
 
-Byte 0 is the code; the body follows.  Every body length is exact, as
-the table gives it; any other length, an empty packet or an unknown
-code is answered BadRequest.  "FREEZE" means refused with NoFreeze
-unless the target is in background mode, since a command's clocks
-would otherwise be BKPT pulses that halt it.
+Byte 0 is the tag, byte 1 the code; the body follows.  Every body
+length is exact, as the table gives it; any other length, a packet
+with no code or an unknown code is answered BadRequest.  "FREEZE" means
+refused with NoFreeze unless the target is in background mode, since a
+command's clocks would otherwise be BKPT pulses that halt it.
 
 | Code | Request | Body | Reply body (status Ok) | FREEZE |
 |---|---|---|---|---|
@@ -80,9 +104,8 @@ would otherwise be BKPT pulses that halt it.
 | 0x09 | ReadSystemRegister | u8 select code | u32 value | yes |
 | 0x0A | WriteSystemRegister | u8 select code, u32 value | none | yes |
 | 0x0B | ReadMemory | u32 address, u8 size, u8 length | exactly length bytes | yes |
-| 0x0C | WriteMemory | u32 address, u8 size, 1-56 data bytes (6-61 bytes in all) | none | yes |
+| 0x0C | WriteMemory | u32 address, u8 size, 1-56 data bytes (7-63 bytes with tag and code) | none | yes |
 | 0x0D | Call | u32 address | none | yes |
-| 0x0E | Hello | none | u32 protocol version | no |
 | 0x0F | ResetRun | none | none | no |
 | 0x10 | Resync | none | ATEMP field, kind 2 | yes |
 | 0x11 | Version | none | the firmware's version, ASCII: crate version and git commit (`0.1.0 1a2b3c4`, `-dirty` if built with uncommitted changes) | no |
@@ -123,7 +146,7 @@ Fields:
 Semantics:
 
 - Order of checks: the request is parsed (BadRequest); then, except
-  for Hello, Version, SetClock, ResetHalt, ResetRun, Resync, Hold and
+  for Version, SetClock, ResetHalt, ResetRun, Resync, Hold and
   BerrPulse, the ATEMP read below, whose failure is the reply's status
   (once: the pod keeps kind 3 and does not read again until FREEZE
   moves, so Pins, Transfer and ResetHalt still work); then the
@@ -152,11 +175,20 @@ Semantics:
   asserts.  ResetHalt holds BKPT low and pulses RESET low for 10 ms,
   whatever the target's state.  Both are refused with NoTarget below
   4.5 V VDD, and NoFreeze if FREEZE does not assert within 100 ms
-  (then BKPT is released).
+  (then BKPT is released); ResetHalt with ResetHeld instead if RESET
+  is still low then.
 - ResetRun drives BKPT high and DSI off, pulses RESET low for 10 ms
   and waits up to 100 ms for RESET to rise: the target comes out of
   reset running, background mode off until the next ResetHalt.
-  Refused with NoTarget below 4.5 V VDD.
+  Refused with NoTarget below 4.5 V VDD; ResetHeld if RESET is still
+  low after the 100 ms (the target holds it; it runs, background mode
+  off, once it lets go).
+- Halt guard: after the pod's own ResetRun, until its next ResetHalt
+  or until FREEZE's edge count moves (an entry shows background mode
+  on), Halt on a running target and Hold are refused with BdmDisabled,
+  BKPT untouched: BKPT low would be a breakpoint exception in the
+  running program.  After the pod's start, or a reset it did not make,
+  it cannot know, and goes ahead.
 - Resync brings a halted CPU's serial link back into frame, as after a
   pod restart under it (lone DSCLK edges while the Pico boots): it
   clocks NOP pairs, and while the second does not read "command
@@ -170,7 +202,7 @@ Semantics:
   that resets meanwhile (its watchdog, say) comes out of reset in
   background mode, BKPT being low as RESET rises.  The next request's
   first word releases BKPT, after its ATEMP read.  NoTarget below
-  4.5 V.
+  4.5 V; BdmDisabled under the halt guard.
 - A halted CPU still not ready after the retries (at the ATEMP read or
   in a command) is taken to be in a bus cycle no device answers, as
   happens with SIMCR's FRZBM set: the pod pulses BERR for 10 us, reads
@@ -181,7 +213,8 @@ Semantics:
 - Halt works only if BDM was enabled at the target's last reset (BKPT
   low as RESET rises, MC68331UM 5.10.2.1), as ResetHalt does.  Without
   it BKPT is a breakpoint exception, vector $0C (MC68331UM 5.10.2.2.1,
-  Table 5-3): the program takes it, and Halt answers NoFreeze.
+  Table 5-3): the program takes it, and Halt answers NoFreeze.  The
+  halt guard refuses it first where the pod knows.
 - Go and Call release DSI after their last word (PLAN.md, PIO
   program); nothing is clocked after them while the target runs.
   After their Ok the target runs: Go at RPC, Call at the address with
@@ -197,12 +230,20 @@ Semantics:
   then sets; 0 counts as 1.  A stand-in with no clock answers with the
   asked rate held to 1 Hz-4 MHz.
 - No state carries from one request to the next except the target's
-  own, DSCLK's rate and the kept ATEMP.
+  own, DSCLK's rate, the kept ATEMP and the halt guard.
 
 ## Replies
 
-Byte 0 is the status.  The reply body follows only for Ok, exactly as
-the request table gives it; every other status is a one-byte reply.
+Byte 0 is the request's tag, byte 1 FREEZE's edge count, byte 2 the
+status.  The reply body follows only for Ok, exactly as the request
+table gives it; every other status is a three-byte reply.
+
+- FREEZE's edge count: its low 8 bits, as the reply is written (the
+  pod's FREEZE watch, PLAN.md, Firmware).  A count that moved between
+  two replies means the CPU left background mode in between, perhaps
+  to enter it again: a reset under Hold, say, which FREEZE's level
+  alone does not show.  A stand-in counts its model's entries and
+  exits.
 
 | Status | Name | Meaning |
 |---|---|---|
@@ -214,6 +255,8 @@ the request table gives it; every other status is a one-byte reply.
 | 5 | Illegal | The target refused the command |
 | 6 | NotReady | Still not ready after the retries |
 | 7 | Unexpected | A response the command's sequence does not allow, or the pod could not read VDD |
+| 8 | BdmDisabled | Halt or Hold under the halt guard: the pod's last reset was ResetRun |
+| 9 | ResetHeld | RESET still low 100 ms after the pod's reset pulse: the target holds it |
 
 ## Checking
 

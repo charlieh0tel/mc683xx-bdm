@@ -15,19 +15,22 @@ use crate::entry::EntryWatch;
 use crate::session::Link;
 use crate::session::Session;
 use crate::usb::Atemp;
+use crate::usb::HELLO_REQUEST;
 use crate::usb::MAX_MEMORY_BYTES;
 use crate::usb::MAX_TRANSFER_WORDS;
 use crate::usb::PACKET;
-use crate::usb::PROTOCOL_VERSION;
 use crate::usb::Pins;
+use crate::usb::ReplyHeader;
 use crate::usb::Request;
 use crate::usb::Status;
 use crate::usb::encode_atemp;
 use crate::usb::encode_data;
+use crate::usb::encode_hello_reply;
 use crate::usb::encode_pins;
 use crate::usb::encode_status;
 use crate::usb::encode_transfer_reply;
 use crate::usb::encode_value;
+use crate::usb::split_tag;
 
 /// NOPs clocked while the target answers "not ready", about 17 ms at
 /// 1 MHz: far longer than any access on the 68331's bus.
@@ -88,8 +91,9 @@ pub trait Board: Link {
     async fn left_background(&mut self, edges: u32) -> bool;
 
     /// Pulses RESET with BKPT high, so the CPU comes out of reset
-    /// running, background mode off, and waits for RESET to rise.
-    async fn reset_run(&mut self);
+    /// running, background mode off, and waits for RESET to rise
+    /// within the halt timeout.  Returns whether it rose.
+    async fn reset_run(&mut self) -> bool;
 
     /// Drives BKPT low and leaves it, clocking nothing: a running CPU
     /// with background mode enabled halts, and a CPU reset meanwhile
@@ -140,16 +144,16 @@ enum Answer {
 }
 
 /// Whether `request` waits on the ATEMP read after an entry.  Not those
-/// that touch no target (`Hello`, `Version`, `SetClock`), so a host's
-/// `Hello` works over a link out of frame; not a reset, which makes the
+/// that touch no target (`Version`, `SetClock`, and Hello, which is no
+/// `Request`), so a host's Hello works over a link out of frame; not a
+/// reset, which makes the
 /// entry moot, nor `Resync`, which a link out of frame must not stop;
 /// not `Hold`, whose words would release BKPT, nor `BerrPulse`, for a
 /// CPU that cannot answer the read.
 const fn reads_entry_first(request: &Request<'_>) -> bool {
     !matches!(
         request,
-        Request::Hello
-            | Request::Version
+        Request::Version
             | Request::SetClock { .. }
             | Request::ResetHalt
             | Request::ResetRun
@@ -165,12 +169,18 @@ pub struct Pod<B> {
     session: Session<B>,
     /// ATEMP, read first after each entry.
     entry: EntryWatch,
+    /// FREEZE's edge count after the pod's own `ResetRun`, while that is
+    /// the last reset the pod made: background mode is then off, until
+    /// a `ResetHalt` or until FREEZE moves (an entry shows it on again).
+    /// `None` when the pod cannot know: since its start, or a reset it
+    /// did not make.
+    bdm_off_at: Option<u32>,
 }
 
 impl<B: Board> Pod<B> {
     /// The pod on `board`.
     pub const fn new(board: B) -> Self {
-        Self { session: Session::new(board, NOT_READY_RETRIES), entry: EntryWatch::new() }
+        Self { session: Session::new(board, NOT_READY_RETRIES), entry: EntryWatch::new(), bdm_off_at: None }
     }
 
     /// The board, for what tests do to the target between requests.
@@ -181,29 +191,64 @@ impl<B: Board> Pod<B> {
     /// Carries out the request in `packet` and writes the reply into
     /// `reply`, returning its length.
     pub async fn handle(&mut self, packet: &[u8], reply: &mut [u8; PACKET]) -> usize {
-        let Ok(request) = Request::parse(packet) else {
-            return encode_status(Status::BadRequest, reply);
-        };
-        if reads_entry_first(&request)
-            && let Err(status) = self.read_entry().await
-        {
-            let status = self.unstick(status).await;
-            return encode_status(status, reply);
+        if packet == HELLO_REQUEST {
+            return encode_hello_reply(reply);
         }
+        let Some((tag, message)) = split_tag(packet) else {
+            return self.oversized(reply);
+        };
         let mut responses = [0; MAX_TRANSFER_WORDS];
         let mut data = [0; MAX_MEMORY_BYTES];
-        match self.carry_out(request, &mut responses, &mut data).await {
-            Ok(Answer::Done) => encode_status(Status::Ok, reply),
-            Ok(Answer::Value(value)) => encode_value(value, reply),
-            Ok(Answer::Atemp(atemp)) => encode_atemp(atemp, reply),
-            Ok(Answer::Pins(pins)) => encode_pins(&pins, reply),
-            Ok(Answer::Data(n)) => encode_data(&data[..n], reply),
-            Ok(Answer::Text(text)) => encode_data(text.as_bytes(), reply),
-            Ok(Answer::Responses(n)) => encode_transfer_reply(&responses[..n], reply),
-            Err(status) => {
-                let status = self.unstick(status).await;
-                encode_status(status, reply)
+        let answer = match Request::parse(message) {
+            Ok(request) => self.answer(request, &mut responses, &mut data).await,
+            Err(_) => Err(Status::BadRequest),
+        };
+        let header = self.header(tag);
+        match answer {
+            Ok(Answer::Done) => encode_status(header, Status::Ok, reply),
+            Ok(Answer::Value(value)) => encode_value(header, value, reply),
+            Ok(Answer::Atemp(atemp)) => encode_atemp(header, atemp, reply),
+            Ok(Answer::Pins(pins)) => encode_pins(header, &pins, reply),
+            Ok(Answer::Data(n)) => encode_data(header, &data[..n], reply),
+            Ok(Answer::Text(text)) => encode_data(header, text.as_bytes(), reply),
+            Ok(Answer::Responses(n)) => encode_transfer_reply(header, &responses[..n], reply),
+            Err(status) => encode_status(header, status, reply),
+        }
+    }
+
+    /// The reply to a packet too short to carry a tag, or too long for
+    /// one (the USB driver's overflow): `BadRequest`, tagged 0, which no
+    /// host's request carries.
+    pub fn oversized(&mut self, reply: &mut [u8; PACKET]) -> usize {
+        encode_status(self.header(0), Status::BadRequest, reply)
+    }
+
+    /// The header of the reply to the request tagged `tag`, FREEZE's
+    /// edge count as of now.
+    fn header(&mut self, tag: u8) -> ReplyHeader {
+        let [freeze_edges, ..] = self.session.link_mut().freeze_edges().to_le_bytes();
+        ReplyHeader { tag, freeze_edges }
+    }
+
+    /// The entry read, then the request; a not-ready failure of either
+    /// gets the BERR abort.
+    async fn answer(
+        &mut self,
+        request: Request<'_>,
+        responses: &mut [u32; MAX_TRANSFER_WORDS],
+        data: &mut [u8; MAX_MEMORY_BYTES],
+    ) -> Result<Answer, Status> {
+        let answer = if reads_entry_first(&request) {
+            match self.read_entry().await {
+                Ok(()) => self.carry_out(request, responses, data).await,
+                Err(status) => Err(status),
             }
+        } else {
+            self.carry_out(request, responses, data).await
+        };
+        match answer {
+            Err(status) => Err(self.unstick(status).await),
+            answer => answer,
         }
     }
 
@@ -252,7 +297,6 @@ impl<B: Board> Pod<B> {
             Request::SetClock { dsclk_hz } => Ok(Answer::Value(self.session.link_mut().set_clock(dsclk_hz))),
             Request::Go => self.command(&Command::Go).await.map(|_| Answer::Done),
             Request::Call(address) => self.call(address).await.map(|()| Answer::Done),
-            Request::Hello => Ok(Answer::Value(PROTOCOL_VERSION)),
             Request::Version => Ok(Answer::Text(self.session.link_mut().version())),
             Request::ReadRegister(register) => {
                 self.command(&Command::ReadRegister(register)).await.map(Answer::Value)
@@ -343,6 +387,7 @@ impl<B: Board> Pod<B> {
     async fn halt(&mut self) -> Result<Atemp, Status> {
         if !self.session.link_mut().frozen() {
             self.require_target().await?;
+            self.require_bdm()?;
             if !self.session.link_mut().halt().await {
                 return Err(Status::NoFreeze);
             }
@@ -353,22 +398,43 @@ impl<B: Board> Pod<B> {
     /// Holds BKPT low; no ATEMP read, which would release it.
     async fn hold(&mut self) -> Result<(), Status> {
         self.require_target().await?;
+        if !self.session.link_mut().frozen() {
+            self.require_bdm()?;
+        }
         self.session.link_mut().hold();
         Ok(())
     }
 
-    /// Resets the CPU to run.
-    async fn reset_run(&mut self) -> Result<(), Status> {
-        self.require_target().await?;
-        self.session.link_mut().reset_run().await;
-        Ok(())
+    /// `BdmDisabled` if the pod's own last reset was `ResetRun` and FREEZE
+    /// has not moved since: BKPT low would then be a breakpoint exception
+    /// in the running program (MC68331UM 5.10.2.2.1), not a halt.
+    fn require_bdm(&mut self) -> Result<(), Status> {
+        let edges = self.session.link_mut().freeze_edges();
+        if self.bdm_off_at == Some(edges) { Err(Status::BdmDisabled) } else { Ok(()) }
     }
 
-    /// Resets the CPU into background mode; returns ATEMP.
+    /// Resets the CPU to run; `ResetHeld` if RESET stays low.  Either way
+    /// background mode is off when RESET rises.
+    async fn reset_run(&mut self) -> Result<(), Status> {
+        self.require_target().await?;
+        let released = self.session.link_mut().reset_run().await;
+        self.bdm_off_at = Some(self.session.link_mut().freeze_edges());
+        if released { Ok(()) } else { Err(Status::ResetHeld) }
+    }
+
+    /// Resets the CPU into background mode; returns ATEMP.  `ResetHeld`
+    /// if RESET stays low, else `NoFreeze` if FREEZE does not rise.
     async fn reset_halt(&mut self) -> Result<Atemp, Status> {
         self.require_target().await?;
+        // Whatever it ends in, the pod no longer knows background mode
+        // is off.
+        self.bdm_off_at = None;
         if !self.session.link_mut().reset_halt().await {
-            return Err(Status::NoFreeze);
+            return Err(if self.session.link_mut().reset_high() {
+                Status::NoFreeze
+            } else {
+                Status::ResetHeld
+            });
         }
         self.entry_atemp().await
     }

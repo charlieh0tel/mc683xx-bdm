@@ -22,11 +22,13 @@ use nusb::transfer::Direction;
 use nusb::transfer::In;
 use nusb::transfer::Out;
 use nusb::transfer::Recipient;
-use nusb::transfer::TransferError;
 
-/// How long a request packet may wait for the pod to take it, and the
-/// bootloader knock for its answer.
-const SEND_TIMEOUT: Duration = Duration::from_secs(1);
+/// How long the bootloader knock may wait for its answer.
+const KNOCK_TIMEOUT: Duration = Duration::from_secs(1);
+
+/// Request packets sent and not yet taken by the pod before the host
+/// stops sending more: the pod is stuck.
+const MAX_UNTAKEN: usize = 4;
 
 /// The shortest read timeout a socket is given: a zero timeout is an
 /// error to the OS.
@@ -88,10 +90,13 @@ pub enum TransportError {
     NoEndpoint(Direction),
     /// A transfer failed or timed out.
     #[error("USB transfer failed")]
-    Transfer(#[from] TransferError),
+    Transfer(#[from] nusb::transfer::TransferError),
     /// No reply came in time.
     #[error("no reply from the pod within {0:?}")]
     NoReply(Duration),
+    /// The pod took none of this many request packets.
+    #[error("the pod took none of the last {0} requests")]
+    Untaken(usize),
     /// The socket failed.
     #[error("socket failed")]
     Socket(#[from] std::io::Error),
@@ -339,7 +344,7 @@ pub fn reboot_to_bootloader(serial: Option<&str>) -> Result<(), TransportError> 
     };
     // The pod leaves the bus before it can answer, so the transfer's
     // own status says nothing: a new bootloader appearing is the answer.
-    let sent = interface.control_out(request, SEND_TIMEOUT).wait();
+    let sent = interface.control_out(request, KNOCK_TIMEOUT).wait();
     let started = std::time::Instant::now();
     while started.elapsed() < BOOTLOADER_WAIT {
         if appeared(&before, &bootloaders()?) {
@@ -351,19 +356,47 @@ pub fn reboot_to_bootloader(serial: Option<&str>) -> Result<(), TransportError> 
     Err(TransportError::NoBootloader)
 }
 
+impl UsbTransport {
+    /// Collects the request packets the pod has taken: an error if one
+    /// failed, or if the pod has taken none of the last
+    /// [`MAX_UNTAKEN`].
+    fn collect_sent(&mut self) -> Result<(), TransportError> {
+        while self.to_pod.pending() > 0 {
+            let Some(done) = self.to_pod.wait_next_complete(Duration::ZERO) else { break };
+            done.status?;
+        }
+        if self.to_pod.pending() >= MAX_UNTAKEN { Err(TransportError::Untaken(MAX_UNTAKEN)) } else { Ok(()) }
+    }
+
+    /// Keeps a read waiting for the next reply.
+    fn read_ahead(&mut self) {
+        if self.from_pod.pending() == 0 {
+            self.from_pod.submit(Buffer::new(PACKET));
+        }
+    }
+}
+
+/// A request goes out without waiting for the pod to take it, and a
+/// read always waits for the next reply: a pod still writing a reply
+/// the host gave up on takes no request until that reply is read, so
+/// waiting for the request first would wait for ever.
 impl Transport for UsbTransport {
     fn send(&mut self, request: &[u8]) -> Result<(), TransportError> {
+        self.collect_sent()?;
         let mut out = Buffer::new(request.len());
         out.extend_from_slice(request);
-        Ok(self.to_pod.transfer_blocking(out, SEND_TIMEOUT).status?)
+        self.to_pod.submit(out);
+        self.read_ahead();
+        Ok(())
     }
 
     fn receive(&mut self, reply: &mut [u8; PACKET], timeout: Duration) -> Result<usize, TransportError> {
-        let done = self.from_pod.transfer_blocking(Buffer::new(PACKET), timeout);
-        match done.status {
-            Err(TransferError::Cancelled) => return Err(TransportError::NoReply(timeout)),
-            status => status?,
-        }
+        self.read_ahead();
+        let Some(done) = self.from_pod.wait_next_complete(timeout) else {
+            self.collect_sent()?;
+            return Err(TransportError::NoReply(timeout));
+        };
+        done.status?;
         let length = done.actual_len.min(PACKET);
         reply[..length].copy_from_slice(&done.buffer[..length]);
         Ok(length)

@@ -41,9 +41,8 @@ use mc683xx_bdm_proto::dsclk::divider;
 use mc683xx_bdm_proto::pod::Pod;
 use mc683xx_bdm_proto::usb::PACKET;
 use mc683xx_bdm_proto::usb::PID;
-use mc683xx_bdm_proto::usb::Status;
 use mc683xx_bdm_proto::usb::VID;
-use mc683xx_bdm_proto::usb::encode_status;
+
 #[cfg(feature = "rtt")]
 use panic_probe as _;
 use static_cell::ConstStaticCell;
@@ -168,7 +167,7 @@ async fn serve(
                     let _busy = ACTIVITY.request();
                     pod.handle(&request[..n], &mut reply).await
                 }
-                Err(EndpointError::BufferOverflow) => encode_status(Status::BadRequest, &mut reply),
+                Err(EndpointError::BufferOverflow) => pod.oversized(&mut reply),
                 Err(EndpointError::Disabled) => break,
             };
             if to_host.write(&reply[..length]).await.is_err() {
