@@ -6,7 +6,7 @@ build-backend = "maturin"
 name = "mc683xx-bdm"
 description = "The mc683xx CPU32 BDM pod, for Python scripts"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.12"
 license = "GPL-3.0-only"
 # A copy of the root's, so the wheel and sdist carry it (RELEASING.md).
 license-files = ["LICENSE"]
@@ -43,8 +43,8 @@ dev = [
 python-source = "python"
 module-name = "mc683xx_bdm.mc683xx_bdm"
 # `python` builds the bindings (Cargo.toml); abi3 makes one module for
-# every Python from 3.10.
-features = ["python", "pyo3/extension-module", "pyo3/abi3-py310"]
+# every Python from 3.12.
+features = ["python", "pyo3/extension-module", "pyo3/abi3-py312"]
 
 [tool.uv]
 # uv rebuilds the module when the Rust it is built from changes.
@@ -61,7 +61,7 @@ cache-keys = [
 
 [tool.ruff]
 line-length = 100
-target-version = "py310"
+target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "UP", "B", "RUF"]

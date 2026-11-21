@@ -579,7 +579,7 @@ code and no `unsafe`; no USB request, so the protocol is unchanged.
   `registers()`, `bus_read`/`bus_write(address, size, ...,
   function_code=5)`, `Entry`, `BusError`, `TargetError`.  Its build is
   cpu32-py's (maturin, a `python` feature so `cargo test` needs no
-  Python, abi3 from 3.10, stubs in `python/`), but in a uv project
+  Python, abi3 from 3.12, stubs in `python/`), but in a uv project
   (AGENTS.md, Python) rather than a Makefile's venv.  `make lint` runs
   clippy with `python`, ruff and pytest against `bdm-stand-in`, mypy's
   stubtest of the stubs against the module (allowlist:
