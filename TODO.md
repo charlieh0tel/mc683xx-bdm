@@ -3,11 +3,6 @@
 ## Hardware
 
 - Schematic: owner's KiCad pass on the draft (`hardware/mc683xx-pod/`).
-- A USB PID of the pod's own, applied for when the repository goes
-  open source (pid.codes wants a public open-source project; or
-  Raspberry Pi's program; PLAN.md, Open questions); then
-  `mc683xx-bdm-proto`'s VID and PID, and the udev rule
-  (`packaging/udev/70-mc683xx-pod.rules`).
 - Carrier release (`jlcpcb-release` skill).
 
 ## Firmware

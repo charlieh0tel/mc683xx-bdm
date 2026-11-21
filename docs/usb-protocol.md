@@ -14,7 +14,7 @@ request or reply.
 
 USB:
 
-- VID:PID 1209:0001 (pid.codes' test pair, until the pod has its own).
+- VID:PID 1209:0001 (pid.codes' shared test pair).
 - Serial number string (iSerialNumber): the chip's unique ID, 8
   bytes, as 16 uppercase hex digits, first byte first (pico-sdk's
   `pico_get_unique_board_id_string`): the RP2040's flash unique ID
