@@ -8,6 +8,8 @@
 mod board;
 mod freeze;
 mod link;
+#[cfg(not(feature = "rtt"))]
+mod panic;
 mod reset;
 mod serial;
 mod watchdog;
@@ -34,8 +36,6 @@ use embassy_usb::Builder;
 use embassy_usb::driver::EndpointError;
 use embassy_usb::driver::EndpointIn;
 use embassy_usb::driver::EndpointOut;
-#[cfg(not(feature = "rtt"))]
-use panic_halt as _;
 #[cfg(feature = "rtt")]
 use panic_probe as _;
 use pod_proto::dsclk::DEFAULT_HZ;

@@ -169,8 +169,10 @@ halted CPU takes the pulse as a DSCLK clock.  On a target that left
 the CPU refusing commands (RSREG ATEMP illegal) until `bdm reset`;
 idle time alone does not.  `bdm bootsel` turns U1 off before its
 reboot, and a restart that way leaves the CPU answering
-(docs/58503a/).  A power loss, replug, panic or watchdog reset still
-can.  After such a restart: `bdm reset` (or
+(docs/58503a/); the production build's panic handler does the same
+before the watchdog resets the pod.  A power loss, a replug, a panic
+in the `rtt` build or a watchdog reset with no panic (no software runs
+before it) still can.  After such a restart: `bdm reset` (or
 `bdm resync`, if only the link's framing is off).  A watchdog reset
 of the pod should be rare (PLAN.md, Firmware, Watchdog).
 
