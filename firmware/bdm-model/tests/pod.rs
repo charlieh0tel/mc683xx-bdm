@@ -252,6 +252,26 @@ fn hold_halts_and_leaves_the_entry_unread() {
 }
 
 #[test]
+fn a_hung_access_is_ended_by_berr() {
+    let mut pod = pod(true);
+    send(&mut pod, &Request::ResetHalt);
+    pod.board_mut().target().memory_busy = u32::MAX;
+    let read = Request::ReadMemory { address: Address(RAM_BASE), size: Size::Word, length: 2 };
+    assert_eq!(status(&send(&mut pod, &read)), failed(Status::BusError));
+    // The CPU answers again.
+    pod.board_mut().target().memory_busy = 0;
+    assert!(status(&send(&mut pod, &read)).is_ok());
+}
+
+#[test]
+fn berr_pulse_needs_a_halted_target_and_says_whether_anything_hung() {
+    let mut pod = pod(true);
+    assert_eq!(status(&send(&mut pod, &Request::BerrPulse)), failed(Status::NoFreeze));
+    send(&mut pod, &Request::ResetHalt);
+    assert_eq!(parse_value(status(&send(&mut pod, &Request::BerrPulse)).unwrap()), Ok(0));
+}
+
+#[test]
 fn memory_round_trips() {
     let mut pod = pod(true);
     send(&mut pod, &Request::ResetHalt);

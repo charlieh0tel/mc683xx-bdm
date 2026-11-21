@@ -7,7 +7,7 @@ it alone answers as the pod does.  The pod's implementation is
 `firmware/pod-proto/src/usb.rs`; where the two disagree, that is a bug
 in one of them.
 
-Protocol version: **8** (`PROTOCOL_VERSION`), raised on any change to a
+Protocol version: **9** (`PROTOCOL_VERSION`), raised on any change to a
 request or reply.
 
 ## Transport
@@ -87,6 +87,7 @@ would otherwise be BKPT pulses that halt it.
 | 0x10 | Resync | none | ATEMP field, kind 2 | yes |
 | 0x11 | Version | none | the firmware's version, ASCII: crate version and git commit (`0.1.0 1a2b3c4`, `-dirty` if built with uncommitted changes) | no |
 | 0x12 | Hold | none | none | no |
+| 0x13 | BerrPulse | none | u32: 1 if a hung access ended, else 0 | yes |
 
 Fields:
 
@@ -122,7 +123,7 @@ Fields:
 Semantics:
 
 - Order of checks: the request is parsed (BadRequest); then, except
-  for ResetHalt, ResetRun, Resync, Version and Hold, the ATEMP read below, whose failure is the reply's status (once: the
+  for ResetHalt, ResetRun, Resync, Version, Hold and BerrPulse, the ATEMP read below, whose failure is the reply's status (once: the
   pod keeps kind 3 and does not read again until FREEZE moves, so
   Pins, Transfer and ResetHalt still work); then the
   request's own checks (NoTarget, then NoFreeze); then the command.
@@ -166,6 +167,13 @@ Semantics:
   background mode, BKPT being low as RESET rises.  The next request's
   first word releases BKPT, after its ATEMP read.  NoTarget below
   4.5 V.
+- A halted CPU still not ready after the retries (at the ATEMP read or
+  in a command) is taken to be in a bus cycle no device answers, as
+  happens with SIMCR's FRZBM set: the pod pulses BERR for 10 us, reads
+  the bus error that ends the access, and replies BusError instead of
+  NotReady; the CPU then takes commands again.  BerrPulse does the same
+  on request.  Never with FREEZE low: a running program would take
+  BERR as a bus error.
 - Halt works only if BDM was enabled at the target's last reset (BKPT
   low as RESET rises, MC68331UM 5.10.2.1), as ResetHalt does.  Without
   it BKPT is a breakpoint exception, vector $0C (MC68331UM 5.10.2.2.1,

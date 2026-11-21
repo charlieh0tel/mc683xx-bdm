@@ -170,6 +170,12 @@ impl PodView {
         Ok(self.with(py, |target| Ok(target.reset_halted()?))?.into())
     }
 
+    /// BERR pulsed with the target halted; whether a BDM access hung in a
+    /// bus cycle ended.
+    fn berr_pulse(&mut self, py: Python<'_>) -> Result<bool, Error> {
+        self.with(py, |target| Ok(target.pod().berr_pulse()?))
+    }
+
     /// BKPT held low, nothing clocked: the CPU halts, and comes out of
     /// any reset meanwhile in background mode; the next call releases it.
     fn hold(&mut self, py: Python<'_>) -> Result<(), Error> {

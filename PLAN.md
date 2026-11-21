@@ -292,6 +292,10 @@ pods apart (`bdm --pod usb:SERIAL`).  Requests:
 - Hold: BKPT low with no ATEMP read, so nothing releases it until the
   next request: the CPU halts and stays in, or comes back to,
   background mode through a reset the pod did not make (a watchdog's).
+- BERR abort: a halted CPU not ready after the retries gets a 10 us
+  BERR pulse (Q2) and its bus error is read, so a BDM access nothing
+  answers (FRZBM set, an unmapped address) cannot leave the pod and
+  the CPU stuck until a reset.  Never while FREEZE is low.
 - Resync: NOP pairs, and a lone DSCLK edge after each pair whose second
   NOP does not read "command complete", until one does (at most 17).
   On request only: on a target a pod restart left the link in frame
@@ -437,7 +441,7 @@ code and no `unsafe`; no USB request, so the protocol is unchanged.
   any other instruction, an access outside RAM or 1000 instructions
   and it runs on unwatched.  Enough for `PodTarget::step`; anything
   else enters background mode by the test's hand.
-- `bdm`: pins, halt, hold, reset (`--run`: ResetRun), resync, bootsel, list, version, go, call, clock, regs, get, set, dump,
+- `bdm`: pins, halt, hold, berr, reset (`--run`: ResetRun), resync, bootsel, list, version, go, call, clock, regs, get, set, dump,
   write, xfer, loopback, gdb (Host, gdb), through `PodTarget` (bootsel
   and list excepted).  Halt and reset print the entry
   source.  Dump and write take `--fc`, default 5 (supervisor data).

@@ -167,6 +167,10 @@ impl<const RAM: usize> Board for ModelBoard<RAM> {
         concat!("bdm-model ", env!("CARGO_PKG_VERSION"))
     }
 
+    async fn pulse_berr(&mut self) {
+        self.target.bus_error();
+    }
+
     fn hold(&mut self) {
         if self.bdm_enabled {
             self.enter_background(Entry::Breakpoint);

@@ -146,6 +146,18 @@ impl<T: Transport> Pod<T> {
         self.atemp(&Request::Resync)
     }
 
+    /// Pulses BERR with the target halted; whether a BDM access hung in a
+    /// bus cycle ended (the pod also does this itself when a halted
+    /// target stays not ready).
+    ///
+    /// # Errors
+    /// As [`Error`]; `NoFreeze` if the target runs.
+    pub fn berr_pulse(&mut self) -> Result<bool, Error> {
+        let mut reply = [0; PACKET];
+        let body = self.request(&Request::BerrPulse, &mut reply)?;
+        Ok(parse_value(body)? != 0)
+    }
+
     /// Holds BKPT low, clocking nothing: the target halts, and comes out
     /// of any reset meanwhile in background mode.  The next request
     /// releases it.

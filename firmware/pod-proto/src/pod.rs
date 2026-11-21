@@ -97,6 +97,11 @@ pub trait Board: Link {
     /// The next word's first rising edge releases it.
     fn hold(&mut self);
 
+    /// Pulses BERR (asserted long against the CPU's bus clock), ending
+    /// a bus cycle no device answers.  Only with the CPU halted: a
+    /// running program would take it as a bus error.
+    async fn pulse_berr(&mut self);
+
     /// The firmware's version: crate version and git commit, ASCII,
     /// shorter than a packet.
     fn version(&self) -> &'static str;
@@ -163,9 +168,15 @@ impl<B: Board> Pod<B> {
         // stop the reset that frames it again.
         if !matches!(
             request,
-            Request::ResetHalt | Request::ResetRun | Request::Resync | Request::Version | Request::Hold
+            Request::ResetHalt
+                | Request::ResetRun
+                | Request::Resync
+                | Request::Version
+                | Request::Hold
+                | Request::BerrPulse
         ) && let Err(status) = self.read_entry().await
         {
+            let status = self.unstick(status).await;
             return encode_status(status, reply);
         }
         let mut responses = [0; MAX_TRANSFER_WORDS];
@@ -178,8 +189,34 @@ impl<B: Board> Pod<B> {
             Ok(Answer::Data(n)) => encode_data(&data[..n], reply),
             Ok(Answer::Text(text)) => encode_data(text.as_bytes(), reply),
             Ok(Answer::Responses(n)) => encode_transfer_reply(&responses[..n], reply),
-            Err(status) => encode_status(status, reply),
+            Err(status) => {
+                let status = self.unstick(status).await;
+                encode_status(status, reply)
+            }
         }
+    }
+
+    /// A halted CPU still not ready after the retries is taken to be in
+    /// a bus cycle no device answers (SIMCR's FRZBM stops the bus monitor
+    /// that would end it): pulse BERR, and report the bus error that ends
+    /// it.  Any other status, or a running CPU, is left as it is.
+    async fn unstick(&mut self, status: Status) -> Status {
+        if status != Status::NotReady || !self.session.link_mut().frozen() {
+            return status;
+        }
+        match self.berr_pulse().await {
+            Ok(true) => Status::BusError,
+            _ => status,
+        }
+    }
+
+    /// Pulses BERR with the CPU halted; whether a hung access ended.
+    async fn berr_pulse(&mut self) -> Result<bool, Status> {
+        if !self.session.link_mut().frozen() {
+            return Err(Status::NoFreeze);
+        }
+        self.session.link_mut().pulse_berr().await;
+        self.session.take_bus_error().await.map_err(Status::from)
     }
 
     async fn carry_out(
@@ -200,6 +237,7 @@ impl<B: Board> Pod<B> {
             Request::ResetHalt => self.reset_halt().await.map(Answer::Atemp),
             Request::ResetRun => self.reset_run().await.map(|()| Answer::Done),
             Request::Hold => self.hold().await.map(|()| Answer::Done),
+            Request::BerrPulse => self.berr_pulse().await.map(|ended| Answer::Value(u32::from(ended))),
             Request::Resync => self.resync_request().await.map(Answer::Atemp),
             Request::Halt => self.halt().await.map(Answer::Atemp),
             Request::SetClock { dsclk_hz } => Ok(Answer::Value(self.session.link_mut().set_clock(dsclk_hz))),

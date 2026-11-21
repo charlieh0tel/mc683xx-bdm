@@ -172,6 +172,9 @@ enum Command {
     List,
     /// bdm's version and the pod firmware's, and their protocol.
     Version,
+    /// Pulse BERR to end a bus cycle a halted target's BDM access hung in
+    /// (the pod does this itself when a halted target stays not ready).
+    Berr,
     /// Hold BKPT low and return, clocking nothing: the target halts, and
     /// comes out of any reset meanwhile (a watchdog's, say) in
     /// background mode.  The next command releases it.
@@ -384,6 +387,10 @@ fn execute<T: Transport>(target: &mut PodTarget<T>, command: Command, out: &mut 
             }
             let total = words.len() * usize::try_from(rounds)?;
             writeln!(out, "loopback: {total} words ok in {:.3} s", started.elapsed().as_secs_f64())?;
+        }
+        Command::Berr => {
+            let ended = target.pod().berr_pulse()?;
+            writeln!(out, "BERR pulsed: {}", if ended { "a hung access ended" } else { "nothing was hung" })?;
         }
         Command::Hold => {
             target.hold()?;

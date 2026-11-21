@@ -93,12 +93,12 @@ async fn main(_spawner: Spawner) {
     let lines = Lines {
         dsclk_enable: Output::new(p.PIN_10, Level::Low),
         reset_drive: Output::new(p.PIN_11, Level::Low),
+        berr_drive: Output::new(p.PIN_7, Level::Low),
         reset: Input::new(p.PIN_12, Pull::None),
         ds: Input::new(p.PIN_6, Pull::None),
         berr: Input::new(p.PIN_8, Pull::None),
     };
     let freeze = Input::new(p.PIN_5, Pull::Down);
-    let _berr_drive = Output::new(p.PIN_7, Level::Low);
     let _led = Output::new(p.PIN_25, Level::High);
 
     let Pio { mut common, sm0, .. } = Pio::new(p.PIO0, Irqs);

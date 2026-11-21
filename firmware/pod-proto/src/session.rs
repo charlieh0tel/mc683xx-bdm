@@ -213,6 +213,22 @@ impl<L: Link> Session<L> {
         Ok(())
     }
 
+    /// After a BERR pulse: NOPs until the CPU answers; whether its answer
+    /// is the bus error that ends an access it hung in.
+    ///
+    /// # Errors
+    /// The link failed.
+    pub async fn take_bus_error(&mut self) -> Result<bool, Error<L::Error>> {
+        for _ in 0..=self.retries {
+            match self.transfer(NOP).await? {
+                Response::NotReady => {}
+                Response::BusError => return Ok(true),
+                _ => return Ok(false),
+            }
+        }
+        Ok(false)
+    }
+
     /// The first word of an answer: NOPs until the CPU is ready.
     async fn first_word(&mut self) -> Result<u16, Error<L::Error>> {
         for _ in 0..=self.retries {

@@ -240,6 +240,17 @@ impl<const RAM: usize> Target<RAM> {
         self.block = Block::None;
     }
 
+    /// BERR asserted: an access still answering "not ready" (`memory_busy`)
+    /// ends in a bus error.  The model has done the access already, so a
+    /// write's value stays; a real one would not be written.
+    pub const fn bus_error(&mut self) {
+        if self.busy > 0 && self.queued > 0 {
+            self.busy = 0;
+            self.queue[0] = (BUS_ERROR, Input::Discard);
+            self.queued = 1;
+        }
+    }
+
     /// FREEZE: in background mode.
     #[must_use]
     pub const fn frozen(&self) -> bool {

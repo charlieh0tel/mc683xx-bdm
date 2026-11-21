@@ -39,7 +39,7 @@ pub fn serial_number<'a>(id: &[u8; UNIQUE_ID_BYTES], text: &'a mut [u8; SERIAL_N
 
 /// This protocol's version, in the Hello reply: raised on any change
 /// to a request or reply (docs/usb-protocol.md).
-pub const PROTOCOL_VERSION: u32 = 8;
+pub const PROTOCOL_VERSION: u32 = 9;
 
 /// Bytes a reply's status takes.
 const STATUS_BYTES: usize = 1;
@@ -71,6 +71,7 @@ const RESET_RUN: u8 = 0x0F;
 const RESYNC: u8 = 0x10;
 const VERSION: u8 = 0x11;
 const HOLD: u8 = 0x12;
+const BERR_PULSE: u8 = 0x13;
 
 /// Pin level bits in a Pins reply: set for high.
 const FREEZE: u8 = 1 << 0;
@@ -112,6 +113,9 @@ pub enum Request<'a> {
     /// Drive BKPT low and leave it, clocking nothing: the CPU halts and
     /// comes out of any reset meanwhile in background mode.
     Hold,
+    /// Pulse BERR to end a bus cycle a halted CPU's BDM access hung in;
+    /// the reply says whether one ended.
+    BerrPulse,
     /// Stop the running target in background mode; the reply is ATEMP.
     Halt,
     /// GO: resume at RPC.
@@ -223,6 +227,7 @@ impl<'a> Request<'a> {
             RESYNC => empty(Self::Resync),
             VERSION => empty(Self::Version),
             HOLD => empty(Self::Hold),
+            BERR_PULSE => empty(Self::BerrPulse),
             HALT => empty(Self::Halt),
             GO => empty(Self::Go),
             SET_CLOCK => Ok(Self::SetClock { dsclk_hz: long(exact::<LONG>(body).ok_or(length)?) }),
@@ -294,6 +299,9 @@ impl<'a> Request<'a> {
             }
             Self::Hold => {
                 out.put(&[HOLD]);
+            }
+            Self::BerrPulse => {
+                out.put(&[BERR_PULSE]);
             }
             Self::Halt => {
                 out.put(&[HALT]);
@@ -709,6 +717,7 @@ mod tests {
         round_trip(Request::Resync);
         round_trip(Request::Version);
         round_trip(Request::Hold);
+        round_trip(Request::BerrPulse);
         round_trip(Request::Halt);
         round_trip(Request::Go);
         round_trip(Request::SetClock { dsclk_hz: 1_000_000 });

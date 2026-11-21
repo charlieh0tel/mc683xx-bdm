@@ -29,6 +29,9 @@ const FREEZE_TIMEOUT: Duration = Duration::from_millis(100);
 /// RESET held low by the pod: long against the SIM's reset timing
 /// (SIMRM), short against a person.
 const RESET_PULSE: Duration = Duration::from_millis(10);
+/// BERR held low by the pod: many bus clocks at any system clock, so the
+/// CPU samples it and ends the cycle.
+const BERR_PULSE: Duration = Duration::from_micros(10);
 /// Each phase of a lone DSCLK edge: long against the CPU's 2-clock
 /// minimum at any system clock (MC68331UM Table A-7).
 const EDGE_PHASE: Duration = Duration::from_micros(10);
@@ -47,6 +50,8 @@ pub(crate) struct PicoBoard<'d> {
     dsclk_enable: Output<'d>,
     /// Q1's gate: high pulls RESET low.
     reset_drive: Output<'d>,
+    /// Q2's gate: high pulls BERR low.
+    berr_drive: Output<'d>,
     reset: Input<'d>,
     ds: Input<'d>,
     berr: Input<'d>,
@@ -60,6 +65,8 @@ pub(crate) struct Lines<'d> {
     pub(crate) dsclk_enable: Output<'d>,
     /// See [`PicoBoard`].
     pub(crate) reset_drive: Output<'d>,
+    /// See [`PicoBoard`].
+    pub(crate) berr_drive: Output<'d>,
     /// RESET, low in reset.
     pub(crate) reset: Input<'d>,
     /// DS, low during a bus cycle's data phase.
@@ -74,6 +81,7 @@ impl<'d> PicoBoard<'d> {
             link,
             dsclk_enable: lines.dsclk_enable,
             reset_drive: lines.reset_drive,
+            berr_drive: lines.berr_drive,
             reset: lines.reset,
             ds: lines.ds,
             berr: lines.berr,
@@ -190,6 +198,12 @@ impl Board for PicoBoard<'_> {
 
     fn version(&self) -> &'static str {
         concat!(env!("CARGO_PKG_VERSION"), " ", env!("GIT_VERSION"))
+    }
+
+    async fn pulse_berr(&mut self) {
+        self.berr_drive.set_high();
+        Timer::after(BERR_PULSE).await;
+        self.berr_drive.set_low();
     }
 
     fn hold(&mut self) {
