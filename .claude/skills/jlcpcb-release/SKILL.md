@@ -31,5 +31,6 @@ directory (`hardware/production/`) and source files.
 ## Rotations and offsets
 
 The corrections are by LCSC part, in
-`hardware/ee_tooling/src/ee_tooling/parts.toml`; a new part's goes there
-(in ee_tooling, then the submodule updated here).
+`hardware/ee_tooling/src/ee_tooling/parts.toml`.  The submodule is
+pinned at 318c266, which built rev 0.2 (AGENTS.md): a new release
+starts by deciding, with the owner, whether to move it.
