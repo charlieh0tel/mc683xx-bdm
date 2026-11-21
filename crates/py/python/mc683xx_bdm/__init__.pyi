@@ -30,8 +30,11 @@ class BusError(Exception):
 class TargetError(RuntimeError):
     """Raised when the pod or the target refuses a call: no target power,
     the CPU not in background mode for a call that needs it (or not
-    entering it, for halt), an illegal command, the target not ready,
-    or a response the command does not allow.  As the emulator's
+    entering it, for halt), halt or hold after the pod's own reset to
+    run (background mode off), RESET held low by the target, an illegal
+    command, the target not ready, a response the command does not
+    allow, or a target that left background mode since it was seen
+    halted (a reset; look again).  As the emulator's
     mc683xx.TargetError."""
 
 class TransportError(OSError):
@@ -154,7 +157,17 @@ class Ending:
 class Pod:
     """The pod, open from construction until close; best used as
     `with Pod(...) as pod:`.  One collected unclosed closes itself,
-    best effort, with a ResourceWarning.  One thread at a time."""
+    best effort, with a ResourceWarning.  One thread at a time.
+
+    Its methods raise TransportError, ProtocolError, TargetError and
+    BusError as those say, and ValueError for a call the bindings
+    refuse before it reaches the pod: a register name the pod does not
+    have, an access size other than 1, 2 or 4, a function code past 7,
+    a value wider than its access, or a call after close.
+
+    After a BGND entry (Entry.Background) the PC (RPC) is the address
+    after the BGND, the BGND's own plus 2 (CPU32RM 4, BGND; seen on
+    silicon)."""
 
     def __new__(cls, pod: str = "usb") -> Pod: ...
     def close(self) -> None: ...
