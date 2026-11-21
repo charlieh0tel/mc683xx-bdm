@@ -15,8 +15,6 @@
 - Report a watchdog reset to the host (WATCHDOG's REASON at start,
   say in Pins or Version, and in `bdm pins`): a protocol change, so
   `PROTOCOL_VERSION`, `docs/usb-protocol.md` and `mc683xx-bdm` with it.
-- A `Link` adapter onto m683xx-emu's BDM serial exchange once it
-  lands; then delete `mc683xx-bdm-model`.
 - `bdm load` and `bdm init` over m683xx-emu's `mc683xx-debug` once it
   lands (PLAN.md, Host); tests against `bdm-stand-in`.  FRZSW is set
   at reset (SIMCR $60CF), but a program may clear it, and then the
@@ -34,8 +32,6 @@
   so a power loss, replug or bare watchdog reset cannot glitch BKPT.
 - Python bindings (`mc683xx-bdm-py`): `step` (and the scratch area) now that
   `PodTarget::step` is in.
-- `mc683xx-bdm` integration test against `mc683xx-run --bdm` and its
-  example image, once m683xx-emu's virtual cable lands.
 - A second Pico as a stand-in CPU32: a target-side PIO program around
   `mc683xx-bdm-model`, driving FREEZE and watching BKPT and RESET.
 - Bring-up, what is left (PLAN.md, Bring-up checklist; docs/bring-up.md):

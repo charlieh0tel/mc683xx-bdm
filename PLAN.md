@@ -501,7 +501,7 @@ code and no `unsafe`; no USB request, so the protocol is unchanged.
   `list_pods` reads each pod's serial number and bus-ports from the
   OS's descriptor cache without opening it.  `StreamTransport`
   on a Unix or TCP socket, each message a length byte and the packet,
-  for m683xx-emu's virtual BDM cable (`bdm --pod unix:PATH`).  The
+  for `bdm-stand-in` (`bdm --pod unix:PATH`).  The
   protocol is `docs/usb-protocol.md`; this repo owns it.  `bdm`
   sends Hello first and stops on another protocol version, then asks
   DSCLK's rate (GetClock) for its timeouts (`Pod::handshake`).
