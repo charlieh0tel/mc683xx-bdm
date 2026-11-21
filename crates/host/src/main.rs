@@ -314,7 +314,7 @@ fn run(pod: Option<&str>, command: Command) -> Result<()> {
         return Ok(());
     }
     let mut target = PodTarget::new(Pod::new(connect(pod)?));
-    target.pod().check_protocol()?;
+    target.pod().handshake()?;
     let done = execute(&mut target, command, &mut std::io::stdout().lock());
     // The next bdm starts knowing nothing: leave the program's SFC and
     // DFC, whether or not the command worked.

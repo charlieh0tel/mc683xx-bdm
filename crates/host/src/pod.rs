@@ -155,11 +155,12 @@ impl<T: Transport> Pod<T> {
         }
     }
 
-    /// Says Hello, and checks the pod speaks this host's protocol.
+    /// What a host does first on a connection: says Hello, and checks
+    /// the pod speaks this host's protocol.
     ///
     /// # Errors
     /// As [`Error`]; [`Error::Protocol`] for another version.
-    pub fn check_protocol(&mut self) -> Result<(), Error> {
+    pub fn handshake(&mut self) -> Result<(), Error> {
         let version = self.hello()?;
         if version == PROTOCOL_VERSION { Ok(()) } else { Err(Error::Protocol(version)) }
     }
@@ -678,10 +679,8 @@ mod tests {
     fn another_protocol_is_refused() {
         let reply = |version: u32| -> Vec<u8> { std::iter::once(0).chain(version.to_le_bytes()).collect() };
         let mut pod = pod(&[&reply(PROTOCOL_VERSION), &reply(PROTOCOL_VERSION + 1)]);
-        pod.check_protocol().unwrap();
-        assert!(
-            matches!(pod.check_protocol(), Err(Error::Protocol(version)) if version == PROTOCOL_VERSION + 1)
-        );
+        pod.handshake().unwrap();
+        assert!(matches!(pod.handshake(), Err(Error::Protocol(version)) if version == PROTOCOL_VERSION + 1));
     }
 
     #[test]

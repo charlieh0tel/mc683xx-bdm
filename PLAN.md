@@ -500,7 +500,7 @@ code and no `unsafe`; no USB request, so the protocol is unchanged.
   for m683xx-emu's virtual BDM cable (`bdm --pod unix:PATH`).  The
   protocol is `docs/usb-protocol.md`; this repo owns it.  `bdm`
   sends Hello first and stops on another protocol version
-  (`Pod::check_protocol`).
+  (`Pod::handshake`).
 - `mc683xx-bdm`'s `register`: registers by name, `d0`-`a7`, `sp`, `pc`
   (RPC, the emulator's name) and the system registers, read and
   written through any `Cpu32Target`, and the system registers in
