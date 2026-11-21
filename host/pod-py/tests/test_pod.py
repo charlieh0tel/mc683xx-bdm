@@ -2,6 +2,8 @@
 across calls, the target's halts, registers and memory, and the errors
 as exceptions."""
 
+import gc
+import re
 import socket
 import struct
 import threading
@@ -105,6 +107,20 @@ def test_function_codes_are_restored(stand_in):
         assert pod.halt() == Entry.Breakpoint()
         assert pod.read_register("SFC") == USER_DATA, "put back by close"
         assert pod.read_register("DFC") == USER_DATA, "put back by close"
+
+
+def test_a_pod_collected_unclosed_closes_itself_and_warns(stand_in):
+    pod_name = stand_in()
+    pod = Pod(pod_name)
+    pod.reset_with_breakpoint()
+    pod.write_register("SFC", USER_DATA)
+    pod.read_memory(RAM_BASE, 2, function_code=SUPERVISOR_DATA)
+    with pytest.warns(ResourceWarning, match=re.escape(f"unclosed Pod '{pod_name}'")):
+        del pod
+        gc.collect()
+    with Pod(pod_name) as pod:
+        assert pod.halt() == Entry.Breakpoint()
+        assert pod.read_register("SFC") == USER_DATA, "put back as close does"
 
 
 def test_go_then_poll_then_halt(stand_in):

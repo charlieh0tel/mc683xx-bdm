@@ -127,8 +127,10 @@ function_code=5)`, `Entry`, `BusError`, `TargetError`.  Blocks are
 `read_memory(address, length, *, size=1, function_code=5)` and
 `write_memory(address, data, ...)`; `pins`, `version`, `hello`,
 `set_clock`, `resync`, `call`, `reset` (to run) and `transfer` are the
-pod's own.  Leaving the `with` block, or `close()`, puts back the
-program's SFC and DFC, as `bdm` does.  Exceptions: `TransportError`
+pod's own.  Open it with `with mc683xx_bdm.Pod(...) as pod:`: leaving
+the block, or `close()`, puts back the program's SFC and DFC, as `bdm`
+does.  A Pod collected unclosed does the same, best effort, and issues
+a `ResourceWarning`, as Python's files do.  Exceptions: `TransportError`
 (an `OSError`), `ProtocolError`, `TargetError`, `BusError`, and
 `ValueError` for a bad name, size or function code.  Types:
 `python/mc683xx_bdm/__init__.pyi`, which `make lint` checks against the
