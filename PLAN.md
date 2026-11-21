@@ -605,9 +605,10 @@ code and no `unsafe`; no USB request, so the protocol is unchanged.
   Register, SystemRegister, FunctionCode, Entry.  Memory calls name
   their function code; halting returns the entry source decoded from
   ATEMP.  From crates.io (0.6).
-- Loading and init (agreed with m683xx-emu, 2026-11-01):
-  `mc683xx-debug`, in m683xx-emu (MIT OR Apache-2.0), over
-  `Cpu32Target`.
+- Loading and init (agreed with m683xx-emu, 2026-11-01; pending:
+  `mc683xx-debug` has not landed, and neither `bdm load` nor `bdm
+  init` exists yet, TODO.md): `mc683xx-debug`, in m683xx-emu (MIT OR
+  Apache-2.0), over `Cpu32Target`.
   - Loading: S-records (checksums, S5/S6 counts), ELF32 big-endian
     m68k PT_LOAD segments, and raw binary at an address.  Writes are
     fc 5 by default, word writes with odd-edge bytes, an optional
@@ -617,8 +618,8 @@ code and no `unsafe`; no USB request, so the protocol is unchanged.
     `write_system_register`, `read_memory.w ADDRESS expect VALUE [mask
     MASK] [fc]` and `poll_memory.w ADDRESS mask MASK expect VALUE
     timeout_ms N`, in host time.
-  - The pod adds `bdm load` and `bdm init`, tested end to end against
-    `bdm-stand-in`.
+  - The pod is to add `bdm load` and `bdm init`, tested end to end
+    against `bdm-stand-in`.
 - gdb (agreed with m683xx-emu, 2026-11-01): one gdb remote adapter
   over `Cpu32Target`, in m683xx-emu, with `m68k:cpu32` and no FPU.  An
   optional capability trait gives the emulator ROM breakpoints,
