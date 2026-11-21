@@ -5,7 +5,10 @@ use embassy_futures::block_on;
 use mc683xx_bdm_model::Target;
 use mc683xx_bdm_model::board::ModelBoard;
 use mc683xx_bdm_proto::bdm::Command;
+use mc683xx_bdm_proto::dsclk::MIN_HZ;
+use mc683xx_bdm_proto::pod::NOT_READY_TIMEOUT_US;
 use mc683xx_bdm_proto::pod::Pod;
+use mc683xx_bdm_proto::session::Link;
 use mc683xx_bdm_proto::usb::Atemp;
 use mc683xx_bdm_proto::usb::HELLO_REQUEST;
 use mc683xx_bdm_proto::usb::PACKET;
@@ -396,6 +399,23 @@ fn set_clock_is_held_to_the_range() {
     let rate = |pod: &mut ModelPod, dsclk_hz| {
         parse_value(status(&send(pod, &Request::SetClock { dsclk_hz })).unwrap())
     };
-    assert_eq!(rate(&mut pod, 0), Ok(1));
+    assert_eq!(rate(&mut pod, 0), Ok(MIN_HZ));
+    assert_eq!(rate(&mut pod, MIN_HZ - 1), Ok(MIN_HZ));
     assert_eq!(rate(&mut pod, 10_000_000), Ok(4_000_000));
+}
+
+#[test]
+fn a_not_ready_wait_at_the_slowest_rate_ends_by_time() {
+    let mut pod = pod(true);
+    send(&mut pod, &Request::ResetHalt);
+    send(&mut pod, &Request::SetClock { dsclk_hz: MIN_HZ });
+    pod.board_mut().target().memory_busy = u32::MAX;
+    let start = pod.board_mut().clock_us();
+    let read = Request::ReadMemory { address: Address(RAM_BASE), size: Size::Word, length: 2 };
+    assert_eq!(status(&send(&mut pod, &read)), failed(Status::BusError));
+    // Two waits (the access's, then the bus error's after BERR), each
+    // ended by its 20 ms, not by 1000 NOPs (1.7 s at 10 kHz).
+    let spent_us = pod.board_mut().clock_us().wrapping_sub(start);
+    let word_us = 17 * 1_000_000 / MIN_HZ;
+    assert!(spent_us <= 2 * (NOT_READY_TIMEOUT_US + word_us) + 10 * word_us, "{spent_us} us");
 }

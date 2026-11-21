@@ -6,13 +6,16 @@
 
 use mc683xx_target::address::Address;
 use mc683xx_target::register::SystemRegister;
+use mc683xx_target::size::Size;
 
 use crate::bdm::COMPLETE;
 use crate::bdm::Command;
 use crate::bdm::NOP;
 use crate::bdm::Response;
+use crate::bdm::byte_count;
 use crate::entry::EntryWatch;
 use crate::session::Link;
+use crate::session::NotReadyLimit;
 use crate::session::Session;
 use crate::usb::Atemp;
 use crate::usb::HELLO_REQUEST;
@@ -35,6 +38,66 @@ use crate::usb::split_tag;
 /// NOPs clocked while the target answers "not ready", about 17 ms at
 /// 1 MHz: far longer than any access on the 68331's bus.
 pub const NOT_READY_RETRIES: u32 = 1000;
+/// The longest a not-ready wait lasts whatever DSCLK's rate: the
+/// retries' time near 1 MHz, so below it time ends the wait first.
+pub const NOT_READY_TIMEOUT_US: u32 = 20_000;
+/// The pod's not-ready limit.
+const NOT_READY: NotReadyLimit =
+    NotReadyLimit { retries: NOT_READY_RETRIES, timeout_us: NOT_READY_TIMEOUT_US };
+
+/// The most a request can clock, for a host's timeout: words over the
+/// link, and not-ready waits, each up to [`NOT_READY_TIMEOUT_US`] or
+/// [`NOT_READY_RETRIES`] words.  Fixed waits (a reset's pulse, FREEZE's
+/// 100 ms) are not counted.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Workload {
+    /// Words outside the waits.
+    pub words: u32,
+    /// Not-ready waits.
+    pub waits: u32,
+}
+
+/// Words in one sequenced command at most, outside its wait: WRITE's
+/// opcode, address and long, and a long result's two words.
+const COMMAND_WORDS: u32 = 7;
+/// The ATEMP read: RSREG and its two result words.
+const ENTRY_WORDS: u32 = 3;
+/// Resync's NOP pairs and lone edges, each taken as a word.
+const RESYNC_WORDS: u32 = 3 * WORD_BITS as u32;
+
+impl Workload {
+    /// The most `request` can clock: its own sequence, the ATEMP read
+    /// before it, and a BERR abort's wait after.
+    #[must_use]
+    pub fn of(request: &Request<'_>) -> Self {
+        let commands = |n: u32| Self { words: n * COMMAND_WORDS, waits: n };
+        let own = match *request {
+            Request::Transfer(words) => {
+                Self { words: u32::try_from(words.len()).unwrap_or(u32::MAX), waits: 0 }
+            }
+            Request::Version | Request::SetClock { .. } | Request::Hold | Request::ResetRun => {
+                Self { words: 0, waits: 0 }
+            }
+            Request::Go => Self { words: 1, waits: 0 },
+            Request::BerrPulse => Self { words: 0, waits: 1 },
+            Request::Pins | Request::Halt | Request::ResetHalt => Self { words: ENTRY_WORDS, waits: 1 },
+            Request::Resync => Self { words: RESYNC_WORDS + ENTRY_WORDS, waits: 1 },
+            Request::ReadRegister(_)
+            | Request::WriteRegister(..)
+            | Request::ReadSystemRegister(_)
+            | Request::WriteSystemRegister(..)
+            | Request::Call(_) => commands(1),
+            Request::ReadMemory { size, length, .. } => commands(accesses(size, length)),
+            Request::WriteMemory { size, data, .. } => commands(accesses(size, data.len())),
+        };
+        Self { words: own.words + ENTRY_WORDS, waits: own.waits + 2 }
+    }
+}
+
+/// Accesses in a memory request of `length` bytes.
+fn accesses(size: Size, length: usize) -> u32 {
+    u32::try_from(length / byte_count(size)).unwrap_or(u32::MAX)
+}
 
 /// Bits in a serial word: a resync tries at most this many frames.
 const WORD_BITS: usize = 17;
@@ -180,7 +243,7 @@ pub struct Pod<B> {
 impl<B: Board> Pod<B> {
     /// The pod on `board`.
     pub const fn new(board: B) -> Self {
-        Self { session: Session::new(board, NOT_READY_RETRIES), entry: EntryWatch::new(), bdm_off_at: None }
+        Self { session: Session::new(board, NOT_READY), entry: EntryWatch::new(), bdm_off_at: None }
     }
 
     /// The board, for what tests do to the target between requests.

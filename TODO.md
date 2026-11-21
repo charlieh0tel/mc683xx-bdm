@@ -19,8 +19,8 @@
   unpublished.  Each crate's metadata, then the publishing tokens as
   repository secrets.
 - DSCLK above 4 MHz, once the throughput test measures the margin.
-- From the review, decided (2026-11-21): a 10 kHz floor on
-  SetClock; FREEZE checked before every word, aborting with NoFreeze; DSI_EN held a few PIO
+- From the review, decided (2026-11-21): FREEZE checked before every
+  word, aborting with NoFreeze; DSI_EN held a few PIO
   cycles longer after GO's and CALL's last word (over one CLKOUT at
   the slowest target clock).
 - Report a watchdog reset to the host (WATCHDOG's REASON at start,

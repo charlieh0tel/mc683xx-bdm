@@ -36,6 +36,20 @@ pub trait Link {
     /// stops driving DSI as soon as the word is out, since pin 8 is
     /// IFETCH, a CPU output, once FREEZE negates (PLAN.md, Hardware).
     async fn transfer_exit(&mut self, word: u16) -> Result<u32, Self::Error>;
+
+    /// A free-running count of microseconds, wrapping: a not-ready wait
+    /// is bounded by it as well as by its NOPs.
+    fn clock_us(&self) -> u32;
+}
+
+/// How long a session waits out "not ready" for each result: NOPs, and
+/// microseconds on the link's clock, whichever runs out first.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct NotReadyLimit {
+    /// NOPs clocked after the first not-ready answer, at most.
+    pub retries: u32,
+    /// Microseconds from the first NOP, at most, checked after each.
+    pub timeout_us: u32,
 }
 
 /// Why a command did not complete.
@@ -50,8 +64,8 @@ pub enum Error<L> {
     /// The CPU did not take the command.
     #[error("illegal command")]
     Illegal,
-    /// Still not ready after the session's retries.
-    #[error("not ready after {0} retries")]
+    /// Still not ready after the session's retries or its time.
+    #[error("not ready after {0} NOPs")]
     NotReady(u32),
     /// A response the command's sequence does not allow.
     #[error("unexpected response {0:?}")]
@@ -70,15 +84,16 @@ pub enum Error<L> {
 #[derive(Debug)]
 pub struct Session<L> {
     link: L,
-    /// NOPs clocked while the CPU answers "not ready" before giving up.
-    retries: u32,
+    /// How long the CPU may answer "not ready" before the session gives
+    /// up.
+    limit: NotReadyLimit,
 }
 
 impl<L: Link> Session<L> {
-    /// A session over `link`, waiting up to `retries` NOPs for each
-    /// result.
-    pub const fn new(link: L, retries: u32) -> Self {
-        Self { link, retries }
+    /// A session over `link`, waiting out "not ready" up to `limit` for
+    /// each result.
+    pub const fn new(link: L, limit: NotReadyLimit) -> Self {
+        Self { link, limit }
     }
 
     /// The link, to give it back.
@@ -219,28 +234,39 @@ impl<L: Link> Session<L> {
     /// # Errors
     /// The link failed.
     pub async fn take_bus_error(&mut self) -> Result<bool, Error<L::Error>> {
-        for _ in 0..=self.retries {
-            match self.transfer(NOP).await? {
-                Response::NotReady => {}
-                Response::BusError => return Ok(true),
-                _ => return Ok(false),
-            }
+        match self.wait_ready().await? {
+            Ok(Response::BusError) => Ok(true),
+            _ => Ok(false),
         }
-        Ok(false)
     }
 
     /// The first word of an answer: NOPs until the CPU is ready.
     async fn first_word(&mut self) -> Result<u16, Error<L::Error>> {
-        for _ in 0..=self.retries {
-            match self.transfer(NOP).await? {
-                Response::NotReady => {}
-                Response::Data(data) => return Ok(data),
-                Response::BusError => return Err(Error::BusError),
-                Response::Illegal => return Err(Error::Illegal),
-                other @ Response::Unknown(_) => return Err(Error::Unexpected(other)),
+        match self.wait_ready().await? {
+            Ok(Response::Data(data)) => Ok(data),
+            Ok(Response::BusError) => Err(Error::BusError),
+            Ok(Response::Illegal) => Err(Error::Illegal),
+            Ok(other) => Err(Error::Unexpected(other)),
+            Err(nops) => Err(Error::NotReady(nops)),
+        }
+    }
+
+    /// NOPs until the CPU answers other than "not ready": its answer, or
+    /// the NOPs clocked if the limit ran out first.
+    async fn wait_ready(&mut self) -> Result<Result<Response, u32>, Error<L::Error>> {
+        let start = self.link.clock_us();
+        let mut nops = 0;
+        loop {
+            let response = self.transfer(NOP).await?;
+            nops += 1;
+            if response != Response::NotReady {
+                return Ok(Ok(response));
+            }
+            if nops > self.limit.retries || self.link.clock_us().wrapping_sub(start) >= self.limit.timeout_us
+            {
+                return Ok(Err(nops));
             }
         }
-        Err(Error::NotReady(self.retries))
     }
 
     /// The second word of a long result, which follows the first at once.
@@ -271,6 +297,7 @@ mod tests {
     use super::Command;
     use super::Error;
     use super::Link;
+    use super::NotReadyLimit;
     use super::Register;
     use super::Response;
     use super::Session;
@@ -285,6 +312,8 @@ mod tests {
     /// Whatever the CPU answers to an opcode: the previous command's.
     const STALE: u32 = COMPLETE;
     const RETRIES: u32 = 3;
+    /// Long against any script's time: only the NOPs run out.
+    const LIMIT: NotReadyLimit = NotReadyLimit { retries: RETRIES, timeout_us: u32::MAX };
 
     /// A link that checks each word sent against a script and answers
     /// from it.
@@ -294,6 +323,10 @@ mod tests {
         steps: VecDeque<(u16, u32)>,
         /// The words sent with `transfer_exit`.
         exits: Vec<u16>,
+        /// Microseconds each word takes on the clock.
+        word_us: u32,
+        /// The clock.
+        clock_us: u32,
     }
 
     impl Link for Script {
@@ -302,12 +335,17 @@ mod tests {
         async fn transfer(&mut self, word: u16) -> Result<u32, ()> {
             let (expected, response) = self.steps.pop_front().expect("script ended early");
             assert_eq!(word, expected, "word sent");
+            self.clock_us = self.clock_us.wrapping_add(self.word_us);
             Ok(response)
         }
 
         async fn transfer_exit(&mut self, word: u16) -> Result<u32, ()> {
             self.exits.push(word);
             self.transfer(word).await
+        }
+
+        fn clock_us(&self) -> u32 {
+            self.clock_us
         }
     }
 
@@ -323,8 +361,8 @@ mod tests {
         exits: &[u16],
         body: impl AsyncFnOnce(&mut Session<Script>) -> T,
     ) -> T {
-        let link = Script { steps: script.iter().copied().collect(), exits: Vec::new() };
-        let mut session = Session::new(link, RETRIES);
+        let link = Script { steps: script.iter().copied().collect(), ..Script::default() };
+        let mut session = Session::new(link, LIMIT);
         let result = block_on(body(&mut session));
         let link = session.into_link();
         assert!(link.steps.is_empty(), "script not used up");
@@ -404,7 +442,23 @@ mod tests {
             ],
             async |s| s.execute(&Command::ResetPeripherals).await,
         );
-        assert_eq!(result, Err(Error::NotReady(RETRIES)));
+        assert_eq!(result, Err(Error::NotReady(RETRIES + 1)));
+    }
+
+    #[test]
+    fn not_ready_gives_up_after_its_time_too() {
+        // 10 us a word against 25 us: three NOPs, not the four the
+        // retries allow; the clock wraps on the way.
+        let link = Script {
+            steps: [(0x0400, STALE), (0, NOT_READY), (0, NOT_READY), (0, NOT_READY)].into_iter().collect(),
+            word_us: 10,
+            clock_us: u32::MAX - 15,
+            ..Script::default()
+        };
+        let mut session = Session::new(link, NotReadyLimit { retries: RETRIES, timeout_us: 25 });
+        let result = block_on(session.execute(&Command::ResetPeripherals));
+        assert_eq!(result, Err(Error::NotReady(3)));
+        assert!(session.into_link().steps.is_empty());
     }
 
     #[test]

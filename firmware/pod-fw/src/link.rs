@@ -20,6 +20,7 @@ use embassy_rp::pio::Pin;
 use embassy_rp::pio::ShiftConfig;
 use embassy_rp::pio::ShiftDirection;
 use embassy_rp::pio::StateMachine;
+use embassy_time::Instant;
 use fixed::FixedU32;
 use mc683xx_bdm_proto::dsclk::Divider;
 use mc683xx_bdm_proto::session::Link;
@@ -148,5 +149,10 @@ impl Link for PioLink<'_> {
 
     async fn transfer_exit(&mut self, word: u16) -> Result<u32, Infallible> {
         Ok(self.shift(u32::from(word) << LEFT_JUSTIFY | RELEASE_DSI).await)
+    }
+
+    /// embassy-time's clock, its low 32 bits.
+    fn clock_us(&self) -> u32 {
+        Instant::now().as_micros() as u32
     }
 }

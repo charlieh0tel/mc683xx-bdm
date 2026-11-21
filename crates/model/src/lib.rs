@@ -194,7 +194,12 @@ pub struct Target<const RAM: usize> {
     /// The last command was a CALL whose stacking failed: the CPU stayed
     /// in background mode after the pod's DSI release.
     call_failed: bool,
+    /// The link's clock as a `Link`: [`WORD_US`] a word.
+    clock_us: u32,
 }
+
+/// Microseconds a word takes on the model's own link: 17 bits at 1 MHz.
+const WORD_US: u32 = 17;
 
 impl<const RAM: usize> Target<RAM> {
     /// A running CPU with zeroed registers and memory.
@@ -218,6 +223,7 @@ impl<const RAM: usize> Target<RAM> {
             violations: 0,
             peripheral_resets: 0,
             call_failed: false,
+            clock_us: 0,
         }
     }
 
@@ -581,10 +587,16 @@ impl<const RAM: usize> Link for Target<RAM> {
     type Error = Infallible;
 
     async fn transfer(&mut self, word: u16) -> Result<u32, Infallible> {
+        self.clock_us = self.clock_us.wrapping_add(WORD_US);
         Ok(self.exchange(word, false))
     }
 
     async fn transfer_exit(&mut self, word: u16) -> Result<u32, Infallible> {
+        self.clock_us = self.clock_us.wrapping_add(WORD_US);
         Ok(self.exchange(word, true))
+    }
+
+    fn clock_us(&self) -> u32 {
+        self.clock_us
     }
 }

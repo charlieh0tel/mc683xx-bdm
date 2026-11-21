@@ -224,8 +224,8 @@ bdm regs
 ```
 
 Not-ready handling shows on slow accesses (step 9): the pod retries up
-to 1000 NOPs, then takes the access to be hung, pulses BERR to end it
-and answers BusError (docs/usb-protocol.md).
+to 1000 NOPs or 20 ms, then takes the access to be hung, pulses BERR
+to end it and answers BusError (docs/usb-protocol.md).
 
 ## 9. SIM registers
 

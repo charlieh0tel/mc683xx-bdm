@@ -157,8 +157,8 @@ Semantics:
   a request drives it.  Every other command is sequenced by the pod
   (CPU32RM 7.2.8): BKPT/DSCLK high and DSI driven once FREEZE is
   checked (no DSCLK edge; BerrPulse and Resync too), operands out, NOPs
-  until the result, not-ready retried up to 1000 NOPs at each step,
-  then NotReady.
+  until the result, not-ready retried at each step up to 1000 NOPs or
+  20 ms, whichever comes first, then NotReady.
 - ReadMemory and WriteMemory: the accesses in address order, each
   `size` bytes, as READ then DUMPs or WRITE then FILLs.  On BusError
   the accesses before the failing one have happened; a write is not
@@ -224,11 +224,19 @@ Semantics:
   background mode (CPU32RM 7.2.8.13): the pod drives DSI again, reads
   the error with a NOP and answers BusError, the target halted, its
   registers and the kept ATEMP as before.
-- SetClock sets DSCLK's rate and replies with the rate in effect: at
-  most 4 MHz, and never faster than asked unless asked for less than
-  the slowest rate the pod's divider gives (about 120 Hz), which it
-  then sets; 0 counts as 1.  A stand-in with no clock answers with the
-  asked rate held to 1 Hz-4 MHz.
+- SetClock sets DSCLK's rate and replies with the rate in effect:
+  10 kHz to 4 MHz, never faster than asked unless asked for less than
+  10 kHz, which it then sets (never slower).  The floor bounds every
+  request's time, so a host's timeout can cover the slowest (below).
+  A stand-in with no clock answers with the asked rate held to
+  10 kHz-4 MHz.
+- A request's time: its words at the rate in effect (17 bits each,
+  plus the pod's handling) and its not-ready waits, each at most
+  1000 NOPs or 20 ms, whichever comes first (`pod::Workload` counts
+  both for a request; a host that does not know the rate takes
+  10 kHz), plus fixed waits: a reset's 10 ms pulse and 100 ms for
+  RESET or FREEZE, Call's 100 ms.  `mc683xx-bdm` waits for each reply
+  1 s beyond its words and waits.
 - No state carries from one request to the next except the target's
   own, DSCLK's rate, the kept ATEMP and the halt guard.
 

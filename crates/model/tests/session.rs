@@ -8,6 +8,7 @@ use mc683xx_bdm_model::Violation;
 use mc683xx_bdm_proto::bdm::Command;
 use mc683xx_bdm_proto::session::Error;
 use mc683xx_bdm_proto::session::Link;
+use mc683xx_bdm_proto::session::NotReadyLimit;
 use mc683xx_bdm_proto::session::Session;
 use mc683xx_target::address::Address;
 use mc683xx_target::entry::Entry;
@@ -19,6 +20,8 @@ use mc683xx_target::size::Size;
 const RAM_BASE: u32 = 0x0010_0000;
 const RAM: usize = 256;
 const RETRIES: u32 = 8;
+/// Only the NOPs run out: the model's clock is long against them.
+const LIMIT: NotReadyLimit = NotReadyLimit { retries: RETRIES, timeout_us: u32::MAX };
 
 type Model = Target<RAM>;
 
@@ -26,7 +29,7 @@ type Model = Target<RAM>;
 fn halted() -> Session<Model> {
     let mut target = Model::new(Address(RAM_BASE));
     target.enter_background(Entry::Breakpoint);
-    Session::new(target, RETRIES)
+    Session::new(target, LIMIT)
 }
 
 /// Checks the model saw nothing a real CPU32 would not take.
@@ -43,7 +46,7 @@ fn atemp_read_first_gives_the_entry_source() {
     ] {
         let mut target = Model::new(Address(RAM_BASE));
         target.enter_background(entry);
-        let mut session = Session::new(target, RETRIES);
+        let mut session = Session::new(target, LIMIT);
         assert_eq!(block_on(session.read_system_register(SystemRegister::Atemp)), Ok(atemp));
         clean(&mut session);
     }
@@ -141,7 +144,7 @@ fn not_ready_past_the_retries() {
     session.link_mut().memory_busy = RETRIES + 2;
     assert_eq!(
         block_on(session.execute(&Command::Read(Size::Byte, Address(RAM_BASE)))),
-        Err(Error::NotReady(RETRIES))
+        Err(Error::NotReady(RETRIES + 1))
     );
     clean(&mut session);
 }
@@ -231,7 +234,7 @@ fn reset_peripherals_completes() {
 
 #[test]
 fn clocking_a_running_cpu_is_caught() {
-    let mut session = Session::new(Model::new(Address(RAM_BASE)), RETRIES);
+    let mut session = Session::new(Model::new(Address(RAM_BASE)), LIMIT);
     block_on(session.link_mut().transfer(0x0000)).unwrap();
     assert_eq!(session.link_mut().violations().0, Some(Violation::ClockedWhileRunning(0x0000)));
 }
