@@ -40,6 +40,11 @@ pub trait Link {
     /// A free-running count of microseconds, wrapping: a not-ready wait
     /// is bounded by it as well as by its NOPs.
     fn clock_us(&self) -> u32;
+
+    /// FREEZE high now, read from the pin: the CPU is in background mode,
+    /// so a word clocked now is a command and not BKPT pulses.  A
+    /// session checks it before every word.
+    fn freeze_high(&self) -> bool;
 }
 
 /// How long a session waits out "not ready" for each result: NOPs, and
@@ -58,6 +63,10 @@ pub enum Error<L> {
     /// The link failed.
     #[error("serial link failed")]
     Link(L),
+    /// FREEZE was low before a word: the CPU left background mode (a
+    /// reset, say), so the session stopped clocking.
+    #[error("the CPU left background mode")]
+    NoFreeze,
     /// The access ended in a bus or address error.
     #[error("bus error")]
     BusError,
@@ -213,6 +222,7 @@ impl<L: Link> Session<L> {
         let exits = command.reply() == Reply::Exit;
         for (n, word) in words.iter().enumerate() {
             let response = if exits && n + 1 == words.len() {
+                self.require_freeze()?;
                 let bits = self.link.transfer_exit(*word).await.map_err(Error::Link)?;
                 Response::decode(bits)
             } else {
@@ -278,8 +288,15 @@ impl<L: Link> Session<L> {
     }
 
     async fn transfer(&mut self, word: u16) -> Result<Response, Error<L::Error>> {
+        self.require_freeze()?;
         let bits = self.link.transfer(word).await.map_err(Error::Link)?;
         Ok(Response::decode(bits))
+    }
+
+    /// FREEZE high now, or [`Error::NoFreeze`]: a word to a CPU that
+    /// left background mode would be BKPT pulses.
+    fn require_freeze(&self) -> Result<(), Error<L::Error>> {
+        if self.link.freeze_high() { Ok(()) } else { Err(Error::NoFreeze) }
     }
 }
 
@@ -327,6 +344,10 @@ mod tests {
         word_us: u32,
         /// The clock.
         clock_us: u32,
+        /// FREEZE falls once this many words are out.
+        leaves_after: Option<usize>,
+        /// Words out.
+        sent: usize,
     }
 
     impl Link for Script {
@@ -335,7 +356,9 @@ mod tests {
         async fn transfer(&mut self, word: u16) -> Result<u32, ()> {
             let (expected, response) = self.steps.pop_front().expect("script ended early");
             assert_eq!(word, expected, "word sent");
+            assert!(self.freeze_high(), "a word clocked with FREEZE low");
             self.clock_us = self.clock_us.wrapping_add(self.word_us);
+            self.sent += 1;
             Ok(response)
         }
 
@@ -346,6 +369,10 @@ mod tests {
 
         fn clock_us(&self) -> u32 {
             self.clock_us
+        }
+
+        fn freeze_high(&self) -> bool {
+            self.leaves_after.is_none_or(|words| self.sent < words)
         }
     }
 
@@ -459,6 +486,32 @@ mod tests {
         let result = block_on(session.execute(&Command::ResetPeripherals));
         assert_eq!(result, Err(Error::NotReady(3)));
         assert!(session.into_link().steps.is_empty());
+    }
+
+    #[test]
+    fn a_cpu_that_leaves_mid_wait_gets_no_more_words() {
+        let link = Script {
+            steps: [(0x2180, STALE), (0, NOT_READY), (0, NOT_READY)].into_iter().collect(),
+            leaves_after: Some(3),
+            ..Script::default()
+        };
+        let mut session = Session::new(link, LIMIT);
+        assert_eq!(block_on(session.read_register(Register::D0)), Err(Error::NoFreeze));
+        assert!(session.into_link().steps.is_empty());
+    }
+
+    #[test]
+    fn a_cpu_that_left_gets_not_even_the_exit_word() {
+        let link = Script {
+            steps: [(0x0800, STALE), (0x0004, NOT_READY)].into_iter().collect(),
+            leaves_after: Some(2),
+            ..Script::default()
+        };
+        let mut session = Session::new(link, LIMIT);
+        assert_eq!(block_on(session.execute(&Command::Call(Address(0x0004_1000)))), Err(Error::NoFreeze));
+        let link = session.into_link();
+        assert!(link.steps.is_empty());
+        assert!(link.exits.is_empty());
     }
 
     #[test]

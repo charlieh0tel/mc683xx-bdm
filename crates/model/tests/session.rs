@@ -166,8 +166,11 @@ fn go_leaves_background_mode_with_dsi_released() {
     block_on(session.execute(&Command::Go)).unwrap();
     assert!(!session.link_mut().frozen());
     clean(&mut session);
-    // Any clock now is a BKPT pulse.
-    block_on(session.execute(&Command::Nop)).ok();
+    // Any clock now is a BKPT pulse: the session clocks none, and the
+    // model catches a raw one.
+    assert_eq!(block_on(session.execute(&Command::Nop)), Err(Error::NoFreeze));
+    clean(&mut session);
+    block_on(session.link_mut().transfer(0x0000)).unwrap();
     assert_eq!(session.link_mut().violations().0, Some(Violation::ClockedWhileRunning(0x0000)));
 }
 

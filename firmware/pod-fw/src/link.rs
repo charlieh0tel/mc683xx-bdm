@@ -25,6 +25,7 @@ use fixed::FixedU32;
 use mc683xx_bdm_proto::dsclk::Divider;
 use mc683xx_bdm_proto::session::Link;
 
+use crate::freeze;
 use crate::watchdog::ACTIVITY;
 
 /// Bits in a serial word.
@@ -154,5 +155,9 @@ impl Link for PioLink<'_> {
     /// embassy-time's clock, its low 32 bits.
     fn clock_us(&self) -> u32 {
         Instant::now().as_micros() as u32
+    }
+
+    fn freeze_high(&self) -> bool {
+        freeze::level()
     }
 }

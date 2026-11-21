@@ -14,6 +14,7 @@ use crate::bdm::NOP;
 use crate::bdm::Response;
 use crate::bdm::byte_count;
 use crate::entry::EntryWatch;
+use crate::session;
 use crate::session::Link;
 use crate::session::NotReadyLimit;
 use crate::session::Session;
@@ -320,19 +321,27 @@ impl<B: Board> Pod<B> {
     /// that would end it): pulse BERR, and report the bus error that ends
     /// it.  Any other status, or a running CPU, is left as it is.
     async fn unstick(&mut self, status: Status) -> Status {
-        if status != Status::NotReady || !self.session.link_mut().frozen() {
+        if status != Status::NotReady {
             return status;
         }
         match self.berr_pulse().await {
             Ok(true) => Status::BusError,
+            Err(Status::NoFreeze) => Status::NoFreeze,
             _ => status,
         }
     }
 
     /// Pulses BERR with the CPU halted; whether a hung access ended.
+    /// FREEZE is read from the pin right before the pulse: BERR to a
+    /// CPU that left background mode would be a bus error in its
+    /// program.
     async fn berr_pulse(&mut self) -> Result<bool, Status> {
         self.require_frozen()?;
-        self.session.link_mut().pulse_berr().await;
+        let board = self.session.link_mut();
+        if !board.freeze_high() {
+            return Err(Status::NoFreeze);
+        }
+        board.pulse_berr().await;
         self.session.take_bus_error().await.map_err(Status::from)
     }
 
@@ -399,16 +408,25 @@ impl<B: Board> Pod<B> {
     /// stacking took one (CPU32RM 7.2.8.13).  FREEZE tells which before
     /// anything more is clocked: to a running CPU a clock is a BKPT
     /// pulse.
+    ///
+    /// A CPU still in background mode when the wait ends may yet leave:
+    /// stacking that outlasted the wait (a slow bus) worked.  So FREEZE
+    /// is read from the pin before driving DSI again, and before each
+    /// word of the error's read; a CPU found gone took the CALL, and
+    /// gets no more words.
     async fn call(&mut self, address: Address) -> Result<(), Status> {
         self.require_frozen()?;
         let edges = self.session.link_mut().freeze_edges();
         self.session.execute(&Command::Call(address)).await?;
         let board = self.session.link_mut();
-        if board.left_background(edges).await {
+        if board.left_background(edges).await || !board.freeze_high() {
             return Ok(());
         }
         board.drive_link();
-        Err(self.session.exit_refused().await.into())
+        match self.session.exit_refused().await {
+            session::Error::NoFreeze => Ok(()),
+            error => Err(error.into()),
+        }
     }
 
     /// FREEZE high, or `NoFreeze`; then the link driven for the words that
@@ -567,15 +585,20 @@ impl<B: Board> Pod<B> {
     /// within a word's bits of them a NOP reads "command complete".
     /// A command the CPU took out of frame may take the NOPs' zeros as
     /// operands.
+    /// FREEZE is read before every word and edge, as in a command.
     async fn resync(&mut self) -> Result<(), Status> {
         let board = self.session.link_mut();
+        let frozen = |board: &B| if board.freeze_high() { Ok(()) } else { Err(Status::NoFreeze) };
         for _ in 0..WORD_BITS {
             // The first NOP ends whatever the CPU was answering.
+            frozen(board)?;
             board.transfer(NOP).await.map_err(|_| Status::Unexpected)?;
+            frozen(board)?;
             let answer = board.transfer(NOP).await.map_err(|_| Status::Unexpected)?;
             if Response::decode(answer) == Response::Data(COMPLETE) {
                 return Ok(());
             }
+            frozen(board)?;
             board.clock_bit().await;
         }
         Err(Status::Unexpected)

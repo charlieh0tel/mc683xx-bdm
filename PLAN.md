@@ -322,7 +322,8 @@ pods apart (`bdm --pod usb:SERIAL`).  Requests:
 - BERR abort: a halted CPU not ready after the retries gets a 10 us
   BERR pulse (Q2) and its bus error is read, so a BDM access nothing
   answers (FRZBM set, an unmapped address) cannot leave the pod and
-  the CPU stuck until a reset.  Never while FREEZE is low.
+  the CPU stuck until a reset.  Never while FREEZE is low: read from
+  the pin right before the pulse.
 - Resync: NOP pairs, and a lone DSCLK edge after each pair whose second
   NOP does not read "command complete", until one does (at most 17).
   On request only: on a target a pod restart left the link in frame
@@ -376,7 +377,20 @@ pods apart (`bdm --pod usb:SERIAL`).  Requests:
     the error with a NOP and answers BusError.  The timeout is long
     against stacking's two bus cycles, a bus monitor's timeout and
     FREEZE's 10 ms refresh (`freeze.rs`); a stacking cycle that
-    outlasts it with no bus monitor reads as not ready.
+    outlasts it with no bus monitor reads as not ready.  Stacking that
+    ends after the wait is not a failure: FREEZE, read from the pin
+    before DSI is driven and before each NOP, shows the CPU gone, and
+    the CALL answers Ok with nothing more clocked.
+- FREEZE before every word: each sequenced command reads FREEZE from
+  the pin (SIO's `GPIO_IN`, `freeze::level`, not the watcher's last
+  look) before each word through `Session` (`Link::freeze_high`), and
+  stops with NoFreeze once it is low, so a target reset in the middle
+  of a command (a block DUMP or FILL, a not-ready wait, the BERR
+  abort's read, Resync) gets no BKPT pulses.  A word already going out
+  when FREEZE falls still goes: the check narrows the window to one
+  word.  The cost is one register read a word; on the model,
+  host-side, DUMP throughput did not change measurably (about
+  70 MB/s either way).
 
 Watchdog (`watchdog.rs`, `mc683xx-bdm-proto`'s `watchdog`): the chip's
 hardware watchdog, 8 s on either chip, the RP2040's longest (2^24
@@ -433,7 +447,9 @@ and `mc683xx-bdm-model`, a CPU32 in background mode that answers each word as
 CPU32RM 7.2.8 says, decodes opcodes independently of `mc683xx-bdm-proto`, and
 records what a real CPU would not take: clocks while running, words
 lost while busy, DUMP or FILL without READ or WRITE, GO or CALL
-without the DSI release.  It is `no_std` so a second Pico can run it
+without the DSI release, BERR while running.  Its board can reset the
+target in the middle of a command and make CALL's FREEZE fall late.
+It is `no_std` so a second Pico can run it
 as a stand-in target later.
 
 Each result is collected with NOPs, so a DUMP or FILL block costs about
