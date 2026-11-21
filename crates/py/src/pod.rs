@@ -127,7 +127,7 @@ impl PodView {
         let address: PodAddress = pod.parse()?;
         let target = py.detach(|| -> Result<Target, Error> {
             let mut target = PodTarget::new(Pod::new(address.connect()?));
-            target.pod().check_protocol()?;
+            target.pod().handshake()?;
             Ok(target)
         })?;
         Ok(Self { name: pod.to_owned(), target: Mutex::new(Some(target)) })
