@@ -135,6 +135,12 @@ breakpoint-exception restarts in the reset log are logged "Re-boot"
 too.  A 15 s halt with the watchdog frozen still logged "Holdover
 started, invalid GPS 1PPS": the loop sees a long halt.
 
+With `bdm hold` (BKPT held low, nothing clocked) after the firmware had
+run, its watchdog reset the CPU into background mode at the reset
+vector: ATEMP $0000, RSR $20 (the watchdog alone), SIMCR $60CF, SYPCR
+$80, RPC $550, VBR 0.  After GO the firmware read warm_start 1
+(2026-11-21).
+
 ## Pod restarts
 
 A pod restarted while the CPU is halted can glitch BKPT
