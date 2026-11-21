@@ -81,6 +81,8 @@ pub enum Violation {
     DumpWithoutRead,
     /// FILL with no WRITE or FILL before it: undefined (CPU32RM 7.2.8.11).
     FillWithoutWrite,
+    /// BERR asserted while the CPU runs: its program takes a bus error.
+    BerrWhileRunning,
 }
 
 /// A decoded command.
@@ -249,7 +251,11 @@ impl<const RAM: usize> Target<RAM> {
     /// BERR asserted: an access still answering "not ready" (`memory_busy`)
     /// ends in a bus error.  The model has done the access already, so a
     /// write's value stays; a real one would not be written.
-    pub const fn bus_error(&mut self) {
+    pub fn bus_error(&mut self) {
+        if self.running {
+            self.violate(Violation::BerrWhileRunning);
+            return;
+        }
         if self.busy > 0 && self.queued > 0 {
             self.busy = 0;
             self.queue[0] = (BUS_ERROR, Input::Discard);
@@ -598,5 +604,9 @@ impl<const RAM: usize> Link for Target<RAM> {
 
     fn clock_us(&self) -> u32 {
         self.clock_us
+    }
+
+    fn freeze_high(&self) -> bool {
+        self.frozen()
     }
 }

@@ -6,6 +6,7 @@ use mc683xx_bdm_model::Target;
 use mc683xx_bdm_model::board::ModelBoard;
 use mc683xx_bdm_proto::bdm::Command;
 use mc683xx_bdm_proto::dsclk::MIN_HZ;
+use mc683xx_bdm_proto::pod::NOT_READY_RETRIES;
 use mc683xx_bdm_proto::pod::NOT_READY_TIMEOUT_US;
 use mc683xx_bdm_proto::pod::Pod;
 use mc683xx_bdm_proto::session::Link;
@@ -336,6 +337,44 @@ fn a_hung_access_is_ended_by_berr() {
     // The CPU answers again.
     pod.board_mut().target().memory_busy = 0;
     assert!(status(&send(&mut pod, &read)).is_ok());
+}
+
+#[test]
+fn a_reset_in_the_middle_of_a_dump_gets_no_bkpt_pulses() {
+    let mut pod = pod(true);
+    send(&mut pod, &Request::ResetHalt);
+    pod.board_mut().reset_after(7);
+    let read = Request::ReadMemory { address: Address(RAM_BASE), size: Size::Long, length: 56 };
+    assert_eq!(status(&send(&mut pod, &read)), failed(Status::NoFreeze));
+    let target = pod.board_mut().target();
+    assert!(!target.frozen());
+    assert_eq!(target.violations(), (None, 0));
+}
+
+#[test]
+fn a_reset_that_ends_a_not_ready_wait_gets_no_berr() {
+    let mut pod = pod(true);
+    send(&mut pod, &Request::ResetHalt);
+    pod.board_mut().target().memory_busy = u32::MAX;
+    // READ's three words, then every NOP the wait allows: the reset
+    // comes with the last, just before the BERR abort.
+    let read_words = Command::Read(Size::Word, Address(RAM_BASE)).encode().as_slice().len();
+    pod.board_mut().reset_after(u32::try_from(read_words).unwrap() + NOT_READY_RETRIES + 1);
+    let read = Request::ReadMemory { address: Address(RAM_BASE), size: Size::Word, length: 2 };
+    assert_eq!(status(&send(&mut pod, &read)), failed(Status::NoFreeze));
+    assert_eq!(pod.board_mut().target().violations(), (None, 0));
+}
+
+#[test]
+fn a_call_whose_stacking_outlasts_the_wait_worked() {
+    let mut pod = pod(true);
+    send(&mut pod, &Request::ResetHalt);
+    send(&mut pod, &Request::WriteRegister(Register::A7, RAM_BASE + 0x80));
+    pod.board_mut().fall_late(true);
+    assert_eq!(status(&send(&mut pod, &Request::Call(Address(0x0004_8000)))), Ok(&[][..]));
+    let target = pod.board_mut().target();
+    assert!(!target.frozen());
+    assert_eq!(target.violations(), (None, 0), "no NOP to the running CPU");
 }
 
 #[test]

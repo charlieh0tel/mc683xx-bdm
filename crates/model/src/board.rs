@@ -55,6 +55,12 @@ pub struct ModelBoard<const RAM: usize> {
     /// The link's clock: each word takes its time at `dsclk_hz`, a lone
     /// edge [`EDGE_US`].
     clock_us: u32,
+    /// Words until the target resets to run on its own (a watchdog, a
+    /// reset button), FREEZE falling.
+    reset_in: Option<u32>,
+    /// The pod's wait for FREEZE after CALL ends before FREEZE falls, as
+    /// with stacking slower than the wait.
+    freeze_late: bool,
 }
 
 /// Microseconds in a second.
@@ -76,7 +82,21 @@ impl<const RAM: usize> ModelBoard<RAM> {
             reset_held: false,
             dsclk_hz: DEFAULT_HZ,
             clock_us: 0,
+            reset_in: None,
+            freeze_late: false,
         }
+    }
+
+    /// Resets the target to run, from its own side, once `words` more
+    /// words are out: in the middle of a command, say.
+    pub const fn reset_after(&mut self, words: u32) {
+        self.reset_in = Some(words);
+    }
+
+    /// Makes the pod's wait for FREEZE to fall after CALL end first, as
+    /// when stacking outlasts it.
+    pub const fn fall_late(&mut self, late: bool) {
+        self.freeze_late = late;
     }
 
     /// Holds RESET low from the target's side, or lets it go: the pod's
@@ -133,7 +153,24 @@ impl<const RAM: usize> ModelBoard<RAM> {
                 self.edges = self.edges.wrapping_add(1);
             }
         }
-        if self.dso_high { DSO_HIGH } else { bits }
+        let bits = if self.dso_high { DSO_HIGH } else { bits };
+        self.count_down_reset();
+        bits
+    }
+
+    /// One word nearer the target's own reset.
+    fn count_down_reset(&mut self) {
+        match self.reset_in {
+            Some(0 | 1) => {
+                self.reset_in = None;
+                if self.target.frozen() {
+                    self.edges = self.edges.wrapping_add(1);
+                }
+                self.target.reset_running();
+            }
+            Some(words) => self.reset_in = Some(words - 1),
+            None => {}
+        }
     }
 }
 
@@ -150,6 +187,10 @@ impl<const RAM: usize> Link for ModelBoard<RAM> {
 
     fn clock_us(&self) -> u32 {
         self.clock_us
+    }
+
+    fn freeze_high(&self) -> bool {
+        self.target.frozen()
     }
 }
 
@@ -205,7 +246,7 @@ impl<const RAM: usize> Board for ModelBoard<RAM> {
     }
 
     async fn left_background(&mut self, edges: u32) -> bool {
-        !self.target.frozen() || self.edges != edges
+        !self.freeze_late && (!self.target.frozen() || self.edges != edges)
     }
 
     /// With RESET held the CPU stays in reset: it is not running, but

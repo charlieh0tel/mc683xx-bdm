@@ -159,6 +159,12 @@ Semantics:
   checked (no DSCLK edge; BerrPulse and Resync too), operands out, NOPs
   until the result, not-ready retried at each step up to 1000 NOPs or
   20 ms, whichever comes first, then NotReady.
+- In a sequenced command (Resync's NOPs and edges, the ATEMP read and
+  the BERR abort's read included) FREEZE is read from the pin before
+  every word: once it is low the CPU has left background mode (a reset
+  from the target's side, say), and the pod stops clocking at once and
+  answers NoFreeze, since each further clock would be a BKPT pulse.
+  What came before that word has happened.
 - ReadMemory and WriteMemory: the accesses in address order, each
   `size` bytes, as READ then DUMPs or WRITE then FILLs.  On BusError
   the accesses before the failing one have happened; a write is not
@@ -209,7 +215,8 @@ Semantics:
   the bus error that ends the access, and replies BusError instead of
   NotReady; the CPU then takes commands again.  BerrPulse does the same
   on request.  Never with FREEZE low: a running program would take
-  BERR as a bus error.
+  BERR as a bus error.  FREEZE is read from the pin right before the
+  pulse; low, the reply is NoFreeze.
 - Halt works only if BDM was enabled at the target's last reset (BKPT
   low as RESET rises, MC68331UM 5.10.2.1), as ResetHalt does.  Without
   it BKPT is a breakpoint exception, vector $0C (MC68331UM 5.10.2.2.1,
@@ -223,7 +230,11 @@ Semantics:
   stacking took a bus or address error and the CPU stayed in
   background mode (CPU32RM 7.2.8.13): the pod drives DSI again, reads
   the error with a NOP and answers BusError, the target halted, its
-  registers and the kept ATEMP as before.
+  registers and the kept ATEMP as before.  FREEZE is read from the pin
+  before DSI is driven and before each NOP: found low, stacking took
+  longer than the wait and worked, and the reply is Ok.  Stacking hung
+  on a bus cycle no device answers reads not ready, and gets the BERR
+  abort.
 - SetClock sets DSCLK's rate and replies with the rate in effect:
   10 kHz to 4 MHz, never faster than asked unless asked for less than
   10 kHz, which it then sets (never slower).  The floor bounds every

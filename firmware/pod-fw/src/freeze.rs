@@ -8,6 +8,8 @@ use embassy_rp::gpio::Input;
 use embassy_rp::gpio::Pin;
 use embassy_rp::gpio::Pull;
 use embassy_rp::pac::IO_BANK0;
+use embassy_rp::pac::SIO;
+use embassy_rp::peripherals::PIN_5;
 use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
 use embassy_sync::signal::Signal;
 use embassy_time::Duration;
@@ -25,6 +27,15 @@ const REFRESH: Duration = Duration::from_millis(10);
 /// Pins per INTR register, each with 4 bits: level low, level high, edge
 /// low, edge high (RP2040 and RP2350 datasheets, `IO_BANK0`'s INTR0).
 const PINS_PER_INTR: usize = 8;
+/// FREEZE's pin, GP5 (PLAN.md, Hardware), as its bit in SIO's `GPIO_IN`
+/// for bank 0.
+const FREEZE_BIT: u32 = 1 << 5;
+
+/// FREEZE's level now, read from SIO's `GPIO_IN`: what a word about to be
+/// clocked goes to, where [`FREEZE`] is the watcher's last look.
+pub(crate) fn level() -> bool {
+    SIO.gpio_in(0).read() & FREEZE_BIT != 0
+}
 
 /// FREEZE as [`watch`] last saw it.
 pub(crate) struct Freeze {
@@ -90,7 +101,7 @@ impl Freeze {
 /// before the next arm clears them; an edge outside them (while
 /// arming, or between reading them and the level) shows in the level
 /// (`mc683xx_bdm_proto::entry::freeze_edges`).
-pub(crate) async fn watch(pin: Peri<'static, impl Pin>) -> ! {
+pub(crate) async fn watch(pin: Peri<'static, PIN_5>) -> ! {
     let gpio = usize::from(pin.pin());
     let mut pin = Input::new(pin, Pull::Down);
     let mut was_high = pin.is_high();

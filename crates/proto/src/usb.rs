@@ -491,6 +491,7 @@ impl<L> From<session::Error<L>> for Status {
             session::Error::BusError => Self::BusError,
             session::Error::Illegal => Self::Illegal,
             session::Error::NotReady(_) => Self::NotReady,
+            session::Error::NoFreeze => Self::NoFreeze,
             session::Error::Length { .. } => Self::BadRequest,
             session::Error::Link(_) | session::Error::Unexpected(_) => Self::Unexpected,
         }

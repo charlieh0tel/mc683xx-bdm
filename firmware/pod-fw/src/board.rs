@@ -128,6 +128,10 @@ impl Link for PicoBoard<'_> {
     fn clock_us(&self) -> u32 {
         self.link.clock_us()
     }
+
+    fn freeze_high(&self) -> bool {
+        self.link.freeze_high()
+    }
 }
 
 impl Board for PicoBoard<'_> {
