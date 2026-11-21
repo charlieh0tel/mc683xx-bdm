@@ -6,6 +6,8 @@ Pico 2 on a carrier board with 5 V level translators and the standard
 10-pin BDM header.  PIO clocks the BDM serial link; firmware and host
 are Rust.
 
+![The rev 0.2 carrier, top: the Pico at right, the BDM header J1 at left](docs/images/mc683xx-pod-top.png)
+
 Status: the rev 0.2 carrier (`hardware/mc683xx-pod/`, 68 x 59 mm, 4
 layers; `hardware/production/20261102-0.2/`, assembled with the Pico,
 J2 not fitted) passes its checks without a target: inputs, VDD sense
@@ -39,7 +41,7 @@ package; `bdm bootsel` puts the pod into its bootloader for it.
 | `PLAN.md` | the design and why it is the way it is |
 | `TODO.md` | the work list |
 | `RELEASING.md` | cutting a release: firmware, the Debian package, crates.io, PyPI; a board release |
-| `docs/` | the host-pod protocol (`usb-protocol.md`), bring-up steps (`bring-up.md`); `oncore-vp/`, notes on the Motorola Oncore VP's BDM test points; `58503a/`, the HP 58503A's BDM header and reading its flash |
+| `docs/` | the host-pod protocol (`usb-protocol.md`), bring-up steps (`bring-up.md`); `oncore-vp/`, notes on the Motorola Oncore VP's BDM test points; `58503a/`, the HP 58503A's BDM header and reading its flash; `images/`, the carrier's render (`make render`) |
 | `hardware/` | the KiCad carrier board; `ee_tooling/`, the shared tooling (a submodule on ee_tooling's `release/0.2` branch), whose `jlcpcb-release` builds a JLCPCB order into `production/`, each release as ordered; `fastcheck.py`, a report on the BDM link's fast nets (`uv run python fastcheck.py mc683xx-pod/mc683xx-pod.kicad_pcb`) |
 | `Cargo.toml` | the host Rust workspace: `crates/` |
 | `crates/` | `proto/`, `mc683xx-bdm-proto`, shared by the firmware and the host; the host crates: `host/`, `mc683xx-bdm` (library and `bdm` CLI), `py/`, `mc683xx-bdm-py` (Python bindings), `model/`, `mc683xx-bdm-model` (a model CPU32, for tests), `stand-in/`, `mc683xx-bdm-stand-in` (`bdm-stand-in`, a pod on a socket over the model) |
