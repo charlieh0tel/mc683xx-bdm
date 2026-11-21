@@ -223,9 +223,7 @@ impl<B: Board> Pod<B> {
 
     /// Pulses BERR with the CPU halted; whether a hung access ended.
     async fn berr_pulse(&mut self) -> Result<bool, Status> {
-        if !self.session.link_mut().frozen() {
-            return Err(Status::NoFreeze);
-        }
+        self.require_frozen()?;
         self.session.link_mut().pulse_berr().await;
         self.session.take_bus_error().await.map_err(Status::from)
     }
@@ -306,8 +304,17 @@ impl<B: Board> Pod<B> {
         Err(self.session.exit_refused().await.into())
     }
 
+    /// FREEZE high, or `NoFreeze`; then the link driven for the words that
+    /// follow, which may be the first since the pod booted, since a GO
+    /// the CPU did not take, or since a self-entry no request has read.
+    /// Driving makes no DSCLK edge.
     fn require_frozen(&mut self) -> Result<(), Status> {
-        if self.session.link_mut().frozen() { Ok(()) } else { Err(Status::NoFreeze) }
+        let board = self.session.link_mut();
+        if !board.frozen() {
+            return Err(Status::NoFreeze);
+        }
+        board.drive_link();
+        Ok(())
     }
 
     /// FREEZE as of the ATEMP read: if it moves between the two, the
@@ -409,10 +416,7 @@ impl<B: Board> Pod<B> {
     /// stale, since whatever the CPU took out of frame came first.
     async fn resync_request(&mut self) -> Result<Atemp, Status> {
         self.require_target().await?;
-        if !self.session.link_mut().frozen() {
-            return Err(Status::NoFreeze);
-        }
-        self.session.link_mut().drive_link();
+        self.require_frozen()?;
         self.resync().await?;
         let edges = self.session.link_mut().freeze_edges();
         match self.session.read_system_register(SystemRegister::Atemp).await {

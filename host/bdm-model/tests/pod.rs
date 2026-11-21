@@ -8,6 +8,7 @@ use mc683xx_target::address::Address;
 use mc683xx_target::entry::Entry;
 use mc683xx_target::register::Register;
 use mc683xx_target::size::Size;
+use pod_proto::bdm::Command;
 use pod_proto::pod::Pod;
 use pod_proto::usb::Atemp;
 use pod_proto::usb::PACKET;
@@ -282,6 +283,40 @@ fn berr_pulse_needs_a_halted_target_and_says_whether_anything_hung() {
     assert_eq!(status(&send(&mut pod, &Request::BerrPulse)), failed(Status::NoFreeze));
     send(&mut pod, &Request::ResetHalt);
     assert_eq!(parse_value(status(&send(&mut pod, &Request::BerrPulse)).unwrap()), Ok(0));
+}
+
+#[test]
+fn berr_pulse_drives_the_link_first() {
+    // A CPU hung in a BDM read before the pod booted: the pod has not
+    // driven the link, and nothing else in the request does.
+    let mut target = Target::new(Address(RAM_BASE));
+    target.enter_background(Entry::Background);
+    target.memory_busy = u32::MAX;
+    for word in Command::Read(Size::Word, Address(RAM_BASE)).encode().as_slice() {
+        target.exchange(*word, false);
+    }
+    let mut pod = Pod::new(ModelBoard::new(target, true));
+    assert_eq!(parse_value(status(&send(&mut pod, &Request::BerrPulse)).unwrap()), Ok(1));
+}
+
+#[test]
+fn commands_drive_the_link_after_a_go_the_cpu_did_not_take() {
+    // GO's word drops DSI as it ends, taken or not; FREEZE has not moved,
+    // so no entry read drives the link again.
+    let mut pod = pod(true);
+    send(&mut pod, &Request::ResetHalt);
+    let data = [1, 2];
+    for request in [
+        Request::WriteMemory { address: Address(RAM_BASE), size: Size::Word, data: &data },
+        Request::ReadMemory { address: Address(RAM_BASE), size: Size::Word, length: 2 },
+        Request::ReadRegister(Register::D0),
+    ] {
+        pod.board_mut().put_out_of_frame(9);
+        send(&mut pod, &Request::Go);
+        assert!(pod.board_mut().target().frozen());
+        pod.board_mut().put_out_of_frame(0);
+        assert!(status(&send(&mut pod, &request)).is_ok(), "{request:?}");
+    }
 }
 
 #[test]

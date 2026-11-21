@@ -129,10 +129,13 @@ Semantics:
   moves, so Pins, Transfer and ResetHalt still work); then the
   request's own checks (NoTarget, then NoFreeze); then the command.
 - Transfer is raw: the words go out as given, with no guard and no DSI
-  release, whether or not the target is in background mode.  Every
-  other command is sequenced by the pod (CPU32RM 7.2.8): operands out,
-  NOPs until the result, not-ready retried up to 1000 NOPs at each
-  step, then NotReady.
+  release, whether or not the target is in background mode, and on the
+  link as the last request left it: undriven after the pod's boot until
+  a request drives it.  Every other command is sequenced by the pod
+  (CPU32RM 7.2.8): BKPT/DSCLK high and DSI driven once FREEZE is
+  checked (no DSCLK edge; BerrPulse and Resync too), operands out, NOPs
+  until the result, not-ready retried up to 1000 NOPs at each step,
+  then NotReady.
 - ReadMemory and WriteMemory: the accesses in address order, each
   `size` bytes, as READ then DUMPs or WRITE then FILLs.  On BusError
   the accesses before the failing one have happened; a write is not
