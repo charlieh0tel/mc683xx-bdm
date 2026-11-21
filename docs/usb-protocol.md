@@ -7,7 +7,7 @@ it alone answers as the pod does.  The pod's implementation is
 `crates/proto/src/usb.rs`; where the two disagree, that is a bug
 in one of them.
 
-Protocol version: **10** (`PROTOCOL_VERSION`), raised on any change to a
+Protocol version: **11** (`PROTOCOL_VERSION`), raised on any change to a
 request or reply.
 
 ## Transport
@@ -73,6 +73,9 @@ Either way:
   across versions: the request is the one byte 0x0E, the reply status
   0 (Ok) and the u32 version, 5 bytes.  No tagged reply has a first
   byte of 0, so a host reading for Hello's reply discards any other.
+- Then a host sends GetClock, timed at 10 kHz, and sizes each later
+  request's timeout from the rate it gives (Semantics, a request's
+  time).
 
 ## Hello
 
@@ -111,6 +114,7 @@ command's clocks would otherwise be BKPT pulses that halt it.
 | 0x11 | Version | none | the firmware's version, ASCII: crate version and git commit (`0.1.0 1a2b3c4`, `-dirty` if built with uncommitted changes) | no |
 | 0x12 | Hold | none | none | no |
 | 0x13 | BerrPulse | none | u32: 1 if a hung access ended, else 0 | yes |
+| 0x14 | GetClock | none | u32 DSCLK Hz in effect | no |
 
 Fields:
 
@@ -146,8 +150,8 @@ Fields:
 Semantics:
 
 - Order of checks: the request is parsed (BadRequest); then, except
-  for Version, SetClock, ResetHalt, ResetRun, Resync, Hold and
-  BerrPulse, the ATEMP read below, whose failure is the reply's status
+  for Version, SetClock, GetClock, ResetHalt, ResetRun, Resync, Hold
+  and BerrPulse, the ATEMP read below, whose failure is the reply's status
   (once: the pod keeps kind 3 and does not read again until FREEZE
   moves, so Pins, Transfer and ResetHalt still work); then the
   request's own checks (NoTarget, then NoFreeze); then the command.
@@ -242,11 +246,15 @@ Semantics:
   request's time, so a host's timeout can cover the slowest (below).
   A stand-in with no clock answers with the asked rate held to
   10 kHz-4 MHz.
+- GetClock replies with the rate in effect, the value the last
+  SetClock replied with; before any SetClock since the pod started,
+  its starting rate, 1 MHz (`dsclk::DEFAULT_HZ`).  The rate carries
+  from one host to the next.
 - A request's time: its words at the rate in effect (17 bits each,
   plus the pod's handling) and its not-ready waits, each at most
   1000 NOPs or 20 ms, whichever comes first (`pod::Workload` counts
-  both for a request; a host that does not know the rate takes
-  10 kHz), plus fixed waits: a reset's 10 ms pulse and 100 ms for
+  both for a request; a host takes the rate GetClock or SetClock last
+  gave, and 10 kHz for its first GetClock), plus fixed waits: a reset's 10 ms pulse and 100 ms for
   RESET or FREEZE, Call's 100 ms.  `mc683xx-bdm` waits for each reply
   1 s beyond its words and waits.
 - No state carries from one request to the next except the target's

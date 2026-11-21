@@ -19,9 +19,13 @@ USER_DATA = 1
 SUPERVISOR_DATA = 5
 # An address no model memory answers.
 UNMAPPED = 0x10
-# The Hello request's code and the OK status (docs/usb-protocol.md).
+# The Hello and GetClock requests' codes and the OK status
+# (docs/usb-protocol.md).
 HELLO = 0x0E
+GET_CLOCK = 0x14
 OK = 0
+# DSCLK's rate a pod starts at (`dsclk::DEFAULT_HZ`).
+DEFAULT_HZ = 1_000_000
 
 
 def test_a_session(stand_in):
@@ -179,7 +183,9 @@ def test_a_halt_the_pod_did_not_see_is_unknown(stand_in):
 def test_clock_and_raw_transfer(stand_in):
     with Pod(stand_in()) as pod:
         pod.reset_with_breakpoint()
-        assert pod.set_clock(1_000_000) > 0
+        assert pod.get_clock() == DEFAULT_HZ
+        assert pod.set_clock(100_000) == 100_000
+        assert pod.get_clock() == 100_000
         assert len(pod.transfer([0x0000] * 20)) == 20
         with pytest.raises(OverflowError):
             pod.transfer([0x10000])
@@ -215,6 +221,13 @@ def hello_reply() -> bytes:
     return bytes([len(reply)]) + reply
 
 
+def clock_reply(tag: int) -> bytes:
+    """A GetClock reply to the request tagged `tag`, OK and
+    `DEFAULT_HZ`, FREEZE's edge count 0, as a stream message."""
+    reply = bytes([tag, 0, OK]) + struct.pack("<I", DEFAULT_HZ)
+    return bytes([len(reply)]) + reply
+
+
 def test_the_gil_is_released_while_waiting_on_the_pod(socket_dir):
     """A pod answered by a Python thread: it can answer only if the
     calls release the GIL while they wait, or they time out."""
@@ -228,8 +241,12 @@ def test_the_gil_is_released_while_waiting_on_the_pod(socket_dir):
         connection, _ = listener.accept()
         with connection:
             while length := connection.recv(1):
-                requests.append(connection.recv(length[0]))
-                connection.sendall(hello_reply())
+                request = connection.recv(length[0])
+                requests.append(request)
+                if request == bytes([HELLO]):
+                    connection.sendall(hello_reply())
+                else:
+                    connection.sendall(clock_reply(request[0]))
 
     server = threading.Thread(target=serve)
     server.start()
@@ -239,4 +256,4 @@ def test_the_gil_is_released_while_waiting_on_the_pod(socket_dir):
     finally:
         server.join()
         listener.close()
-    assert requests == [bytes([HELLO]), bytes([HELLO])]
+    assert requests == [bytes([HELLO]), bytes([1, GET_CLOCK]), bytes([HELLO])]

@@ -1,7 +1,9 @@
 //! `PodTarget` over a stream to the stand-in pod: the host side end to
 //! end, through `mc683xx_bdm_proto::pod`'s request rules, against a model CPU.
 
+use std::net::TcpListener;
 use std::os::unix::net::UnixStream;
+use std::process::Command;
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::thread;
@@ -14,6 +16,7 @@ use mc683xx_bdm::target::PodTarget;
 use mc683xx_bdm::transport::StreamTransport;
 use mc683xx_bdm_model::Target;
 use mc683xx_bdm_model::board::ModelBoard;
+use mc683xx_bdm_proto::dsclk::DEFAULT_HZ;
 use mc683xx_bdm_proto::usb::PROTOCOL_VERSION;
 use mc683xx_bdm_proto::usb::ReplyError;
 use mc683xx_bdm_proto::usb::Status;
@@ -39,6 +42,35 @@ fn stand_in(bdm_enabled: bool) -> (PodTarget<StreamTransport<UnixStream>>, Arc<M
     let served = Arc::clone(&pod);
     thread::spawn(move || serve(pod_side, &served).unwrap());
     (PodTarget::new(Pod::new(StreamTransport::new(host))), pod)
+}
+
+/// What `bdm` with `args` prints, run on a stand-in pod on a socket
+/// that serves `pod` for its one connection; it must succeed.
+fn bdm(pod: &Arc<Mutex<ModelPod>>, args: &[&str]) -> String {
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let at = listener.local_addr().unwrap();
+    let served = Arc::clone(pod);
+    let server = thread::spawn(move || {
+        let (stream, _) = listener.accept().unwrap();
+        serve(stream, &served).unwrap();
+    });
+    let output = Command::new(env!("CARGO_BIN_EXE_bdm"))
+        .arg("--pod")
+        .arg(format!("tcp:{at}"))
+        .args(args)
+        .output()
+        .unwrap();
+    server.join().unwrap();
+    assert!(output.status.success(), "bdm {args:?}: {}", String::from_utf8_lossy(&output.stderr));
+    String::from_utf8(output.stdout).unwrap()
+}
+
+#[test]
+fn bdm_clock_shows_the_rate_or_sets_it() {
+    let pod = Arc::new(Mutex::new(ModelPod::new(ModelBoard::new(Target::new(Address(RAM_BASE)), true))));
+    assert_eq!(bdm(&pod, &["clock"]), format!("DSCLK {DEFAULT_HZ} Hz\n"));
+    assert_eq!(bdm(&pod, &["clock", "100000"]), "DSCLK 100000 Hz\n");
+    assert_eq!(bdm(&pod, &["clock"]), "DSCLK 100000 Hz\n", "the pod keeps it from one bdm to the next");
 }
 
 #[test]

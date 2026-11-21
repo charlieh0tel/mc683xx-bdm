@@ -50,6 +50,8 @@ pub(crate) struct PioLink<'d> {
     sm: StateMachine<'d, PIO0, 0>,
     dsclk: Pin<'d, PIO0>,
     dsi_enable: Pin<'d, PIO0>,
+    /// DSCLK's rate, as the divider in effect gives it.
+    dsclk_hz: u32,
 }
 
 /// The pins [`PioLink::new`] takes over.
@@ -120,7 +122,7 @@ impl<'d> PioLink<'d> {
         sm.set_pin_dirs(Direction::Out, &[&dsclk, &dsi, &dsi_enable]);
         sm.set_pin_dirs(Direction::In, &[&dso]);
         sm.set_enable(true);
-        Self { sm, dsclk, dsi_enable }
+        Self { sm, dsclk, dsi_enable, dsclk_hz: divider.dsclk_hz }
     }
 
     /// Drives DSCLK (BKPT) between words: low to request a halt.
@@ -137,6 +139,12 @@ impl<'d> PioLink<'d> {
     /// Changes DSCLK's rate.
     pub(crate) fn set_divider(&mut self, divider: Divider) {
         self.sm.set_clock_divider(FixedU32::from_bits(divider.bits));
+        self.dsclk_hz = divider.dsclk_hz;
+    }
+
+    /// DSCLK's rate, as the divider in effect gives it.
+    pub(crate) const fn dsclk_hz(&self) -> u32 {
+        self.dsclk_hz
     }
 
     /// One word out and in; each counts as progress for the watchdog.

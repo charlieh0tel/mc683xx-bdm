@@ -5,6 +5,7 @@ use embassy_futures::block_on;
 use mc683xx_bdm_model::Target;
 use mc683xx_bdm_model::board::ModelBoard;
 use mc683xx_bdm_proto::bdm::Command;
+use mc683xx_bdm_proto::dsclk::DEFAULT_HZ;
 use mc683xx_bdm_proto::dsclk::MIN_HZ;
 use mc683xx_bdm_proto::pod::NOT_READY_RETRIES;
 use mc683xx_bdm_proto::pod::NOT_READY_TIMEOUT_US;
@@ -303,6 +304,7 @@ fn requests_that_need_no_target_skip_the_entry_read() {
     assert_eq!(parse_hello_reply(&raw(&mut pod, &HELLO_REQUEST)), Some(PROTOCOL_VERSION));
     assert!(status(&send(&mut pod, &Request::Version)).is_ok());
     assert!(status(&send(&mut pod, &Request::SetClock { dsclk_hz: 1_000_000 })).is_ok());
+    assert!(status(&send(&mut pod, &Request::GetClock)).is_ok());
     let atemp = parse_atemp(status(&send(&mut pod, &Request::Resync)).unwrap());
     assert!(matches!(atemp, Ok(Atemp::Stale(_))), "{atemp:?}");
 }
@@ -441,6 +443,18 @@ fn set_clock_is_held_to_the_range() {
     assert_eq!(rate(&mut pod, 0), Ok(MIN_HZ));
     assert_eq!(rate(&mut pod, MIN_HZ - 1), Ok(MIN_HZ));
     assert_eq!(rate(&mut pod, 10_000_000), Ok(4_000_000));
+}
+
+#[test]
+fn get_clock_is_the_rate_set_and_needs_no_target() {
+    let mut pod = pod(false);
+    let rate = |pod: &mut ModelPod, request| parse_value(status(&send(pod, &request)).unwrap());
+    assert_eq!(rate(&mut pod, Request::GetClock), Ok(DEFAULT_HZ), "the board's starting rate");
+    let set = rate(&mut pod, Request::SetClock { dsclk_hz: 123_456 });
+    assert_eq!(set, Ok(123_456));
+    assert_eq!(rate(&mut pod, Request::GetClock), set, "as SetClock's reply gave it");
+    assert_eq!(rate(&mut pod, Request::SetClock { dsclk_hz: 0 }), Ok(MIN_HZ));
+    assert_eq!(rate(&mut pod, Request::GetClock), Ok(MIN_HZ));
 }
 
 #[test]

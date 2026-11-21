@@ -321,8 +321,8 @@ pods apart (`bdm --pod usb:SERIAL`).  Requests:
   background mode off; refused without VDD, and ResetHeld if RESET is
   still low 100 ms later (the target holds it).  It and ResetHalt skip
   the ATEMP read, so a link out of frame cannot stop them; so do Hello,
-  Version and SetClock, which touch no target, so the Hello a host
-  sends first cannot stop them either.
+  Version, SetClock and GetClock, which touch no target, so the Hello
+  and GetClock a host sends first cannot stop them either.
 - Halt guard: after its own ResetRun the pod knows background mode is
   off, so until a ResetHalt or a FREEZE edge (an entry shows it on) it
   refuses Halt and Hold with BdmDisabled instead of pulling BKPT low,
@@ -371,8 +371,12 @@ pods apart (`bdm --pod usb:SERIAL`).  Requests:
   and at least 10 kHz (`dsclk::MIN_HZ`): with not-ready waits bounded
   by time as well as NOPs (1000 NOPs or 20 ms, `pod::NOT_READY_*`),
   that bounds every request's time, which the host's timeout covers
-  at the rate in use (`pod::Workload`; docs/usb-protocol.md).  A host
-  that has not set the rate assumes the floor.
+  at the rate in use (`pod::Workload`; docs/usb-protocol.md).
+- GetClock: the rate in effect, as SetClock's reply gave it.  The pod
+  keeps its rate from one host to the next, so a host asks it at the
+  handshake and times its requests by it, not by the floor: a dead
+  pod or pulled cable is then reported in about a second at any rate.
+  Only GetClock's own exchange is timed at the floor.
 - Every BDM command, refused with NoFreeze unless FREEZE is asserted,
   since its clocks would otherwise be BKPT pulses:
   - ReadRegister, WriteRegister: D0-D7, A0-A7.
@@ -499,8 +503,8 @@ code and no `unsafe`; no USB request, so the protocol is unchanged.
   on a Unix or TCP socket, each message a length byte and the packet,
   for m683xx-emu's virtual BDM cable (`bdm --pod unix:PATH`).  The
   protocol is `docs/usb-protocol.md`; this repo owns it.  `bdm`
-  sends Hello first and stops on another protocol version
-  (`Pod::handshake`).
+  sends Hello first and stops on another protocol version, then asks
+  DSCLK's rate (GetClock) for its timeouts (`Pod::handshake`).
 - `mc683xx-bdm`'s `register`: registers by name, `d0`-`a7`, `sp`, `pc`
   (RPC, the emulator's name) and the system registers, read and
   written through any `Cpu32Target`, and the system registers in
@@ -550,7 +554,8 @@ code and no `unsafe`; no USB request, so the protocol is unchanged.
 - `bdm`: pins, halt, hold, berr, reset (`--run`: ResetRun), resync, bootsel, list, version, go, call, clock, regs, get, set, dump,
   write, xfer, loopback, gdb (Host, gdb), through `PodTarget` (bootsel
   and list excepted).  Halt and reset print the entry
-  source.  Dump and write take `--fc`, default 5 (supervisor data).
+  source.  Clock with a rate sets it (SetClock), without one shows the
+  rate in effect (GetClock).  Dump and write take `--fc`, default 5 (supervisor data).
   Dump with `--output FILE` writes the raw bytes to FILE instead of a
   hex listing.
   Each run restores SFC and DFC before it exits, since the next run

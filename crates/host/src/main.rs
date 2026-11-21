@@ -113,10 +113,10 @@ enum Command {
         #[arg(value_parser = number)]
         address: u32,
     },
-    /// Set DSCLK's rate.
+    /// Set DSCLK's rate, or without one show the rate in effect.
     Clock {
         #[arg(value_parser = number)]
-        hz: u32,
+        hz: Option<u32>,
     },
     /// Every data, address and system register.
     Regs,
@@ -370,7 +370,13 @@ fn execute<T: Transport>(target: &mut PodTarget<T>, command: Command, out: &mut 
         }
         Command::Go => target.go()?,
         Command::Call { address } => target.call(Address(address))?,
-        Command::Clock { hz } => writeln!(out, "DSCLK {} Hz", target.pod().set_clock(hz)?)?,
+        Command::Clock { hz } => {
+            let dsclk_hz = match hz {
+                Some(hz) => target.pod().set_clock(hz)?,
+                None => target.pod().get_clock()?,
+            };
+            writeln!(out, "DSCLK {dsclk_hz} Hz")?;
+        }
         Command::Regs => {
             for register in Register::ALL {
                 writeln!(out, "{register:<5} ${:08x}", target.read_register(register)?)?;
