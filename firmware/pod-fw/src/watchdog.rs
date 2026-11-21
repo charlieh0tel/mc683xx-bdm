@@ -1,5 +1,5 @@
 //! The chip's hardware watchdog (PLAN.md, Firmware, Watchdog), fed from
-//! a task of its own by `pod_proto::watchdog`'s rule: while the pod
+//! a task of its own by `mc683xx_bdm_proto::watchdog`'s rule: while the pod
 //! waits for a request, and while a request makes progress.  A panic
 //! (`panic`) or a request stuck without a link word starves it, and the
 //! chip resets.
@@ -11,7 +11,7 @@ use embassy_rp::watchdog::ResetReason;
 use embassy_rp::watchdog::Watchdog;
 use embassy_time::Duration;
 use embassy_time::Timer;
-use pod_proto::watchdog::Feeder;
+use mc683xx_bdm_proto::watchdog::Feeder;
 use portable_atomic::AtomicBool;
 use portable_atomic::AtomicU32;
 use portable_atomic::Ordering;

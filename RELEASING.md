@@ -3,9 +3,9 @@
 ## Firmware and `bdm`
 
 Released together: the pod and `bdm` refuse each other unless their
-`PROTOCOL_VERSION` (`pod-proto/src/usb.rs`) matches.
+`PROTOCOL_VERSION` (`crates/proto/src/usb.rs`) matches.
 
-1. Bump `version` in `crates/*/Cargo.toml`, `host/*/Cargo.toml` and
+1. Bump `version` in `crates/*/Cargo.toml` and
    `firmware/pod-fw/Cargo.toml`; add a
    `packaging/debian/changelog` entry.  Raise `PROTOCOL_VERSION` and
    `docs/usb-protocol.md` if the wire changed.

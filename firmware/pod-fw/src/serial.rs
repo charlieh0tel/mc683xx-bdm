@@ -1,5 +1,5 @@
 //! The pod's USB serial number: the chip's unique ID in hex
-//! (`pod_proto::usb::serial_number`), so a host can tell pods apart.
+//! (`mc683xx_bdm_proto::usb::serial_number`), so a host can tell pods apart.
 
 use embassy_rp::Peri;
 #[cfg(feature = "rp2040")]
@@ -9,8 +9,8 @@ use embassy_rp::flash::Flash;
 #[cfg(feature = "rp235xa")]
 use embassy_rp::otp;
 use embassy_rp::peripherals::FLASH;
-use pod_proto::usb::SERIAL_NUMBER_CHARS;
-use pod_proto::usb::UNIQUE_ID_BYTES;
+use mc683xx_bdm_proto::usb::SERIAL_NUMBER_CHARS;
+use mc683xx_bdm_proto::usb::UNIQUE_ID_BYTES;
 use static_cell::ConstStaticCell;
 
 /// The Pico's flash, 2 MB: only the driver's type needs it, as the
@@ -24,7 +24,7 @@ const PICO_FLASH_BYTES: usize = 2 * 1024 * 1024;
 pub(crate) fn serial_number(flash: Peri<'static, FLASH>) -> Option<&'static str> {
     static TEXT: ConstStaticCell<[u8; SERIAL_NUMBER_CHARS]> = ConstStaticCell::new([0; SERIAL_NUMBER_CHARS]);
     let id = unique_id(flash)?;
-    Some(pod_proto::usb::serial_number(&id, TEXT.take()))
+    Some(mc683xx_bdm_proto::usb::serial_number(&id, TEXT.take()))
 }
 
 /// The flash chip's unique ID (SPI command 0x4B).

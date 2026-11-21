@@ -21,8 +21,8 @@ use embassy_rp::pio::ShiftConfig;
 use embassy_rp::pio::ShiftDirection;
 use embassy_rp::pio::StateMachine;
 use fixed::FixedU32;
-use pod_proto::dsclk::Divider;
-use pod_proto::session::Link;
+use mc683xx_bdm_proto::dsclk::Divider;
+use mc683xx_bdm_proto::session::Link;
 
 use crate::watchdog::ACTIVITY;
 

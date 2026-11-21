@@ -117,7 +117,7 @@
 - Do not use `unsafe` without asking.
 - When adding dependencies, use `cargo add` to ensure we install the
   latest version of dependencies.  Commit `Cargo.lock`.
-- `pod-fw` (Embassy) and `pod-proto` are `no_std`
+- `pod-fw` (Embassy) and `mc683xx-bdm-proto` are `no_std`
   without allocation; chip-specific code goes in `firmware/pod-fw/`
   only.
 - No blocking in an async task; long work runs in steps between I/O

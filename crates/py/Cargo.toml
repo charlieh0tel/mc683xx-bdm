@@ -1,0 +1,26 @@
+[package]
+name = "mc683xx-bdm-py"
+version = "0.1.0"
+description = "Python bindings for the mc683xx CPU32 BDM pod"
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[lints]
+workspace = true
+
+# The bindings build only with `python`, which maturin enables
+# (pyproject.toml); without it the crate is its Python-free parts, so
+# `cargo test` needs no Python (PLAN.md, Host).
+[features]
+python = ["dep:pyo3"]
+
+[dependencies]
+mc683xx-bdm = { version = "0.1.0", path = "../host" }
+mc683xx-bdm-proto = { version = "0.1.0", path = "../proto" }
+mc683xx-target = "0.6.0"
+pyo3 = { version = "0.30.1", optional = true }
+thiserror = "2.0.21"

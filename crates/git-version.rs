@@ -1,4 +1,4 @@
-// Included by pod-fw's and pod-host's build scripts: the commit a crate
+// Included by pod-fw's and mc683xx-bdm's build scripts: the commit a crate
 // is built from, for the version it reports ("0.1.0 1a2b3c4", "-dirty"
 // with uncommitted changes, "unknown" outside a git checkout).
 

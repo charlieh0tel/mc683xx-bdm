@@ -4,7 +4,7 @@
 
 - Schematic: owner's KiCad pass on the draft (`hardware/mc683xx-pod/`).
 - USB PID from Raspberry Pi (PLAN.md, Open questions); then
-  `pod-proto`'s VID and PID, and the udev rule
+  `mc683xx-bdm-proto`'s VID and PID, and the udev rule
   (`packaging/udev/70-mc683xx-pod.rules`).
 - Carrier release (`jlcpcb-release` skill).
 
@@ -17,12 +17,11 @@
   The step: a pre-build input added to `rust-build-deb` in
   deb-workflows (owner's choice, 2026-11-21).
 - Publish from CI, beside mc683xx's crates and PyPI package (owner,
-  2026-11-21): crates.io `mc683xx-bdm` (today's pod-host: the library
-  and `bdm`) and `mc683xx-bdm-proto` (pod-proto); PyPI `mc683xx-bdm`
-  (import `mc683xx_bdm`, wheels per platform).  bdm-model and pod-py's
-  crate stay unpublished, renamed `mc683xx-bdm-model` and
-  `mc683xx-bdm-py`.  First the renames, then each crate's metadata and
-  the publishing tokens as repository secrets.
+  2026-11-21): crates.io `mc683xx-bdm` (the library and `bdm`) and
+  `mc683xx-bdm-proto`; PyPI `mc683xx-bdm` (import `mc683xx_bdm`, wheels
+  per platform).  `mc683xx-bdm-model` and `mc683xx-bdm-py` stay
+  unpublished.  Each crate's metadata, then the publishing tokens as
+  repository secrets.
 - DSCLK above 4 MHz, once the throughput test measures the margin.
 - From the review, decided (2026-11-21): a request tag the pod echoes,
   so a reply left after a host timeout cannot be taken for the next
@@ -32,9 +31,9 @@
   the slowest target clock).
 - Report a watchdog reset to the host (WATCHDOG's REASON at start,
   say in Pins or Version, and in `bdm pins`): a protocol change, so
-  `PROTOCOL_VERSION`, `docs/usb-protocol.md` and `pod-host` with it.
+  `PROTOCOL_VERSION`, `docs/usb-protocol.md` and `mc683xx-bdm` with it.
 - A `Link` adapter onto m683xx-emu's BDM serial exchange once it
-  lands; then delete `bdm-model`.
+  lands; then delete `mc683xx-bdm-model`.
 - `bdm load` and `bdm init` over m683xx-emu's `mc683xx-debug` once it
   lands (PLAN.md, Host); tests against `bdm-stand-in`.  FRZSW is set
   at reset (SIMCR $60CF), but a program may clear it, and then the
@@ -50,12 +49,12 @@
   cover (docs/bring-up.md, step 5): on the next carrier, U1's enable
   falling before its input (a stronger or faster OE path than GP9's),
   so a power loss, replug or bare watchdog reset cannot glitch BKPT.
-- Python bindings (`pod-py`): `step` (and the scratch area) now that
+- Python bindings (`mc683xx-bdm-py`): `step` (and the scratch area) now that
   `PodTarget::step` is in.
-- `pod-host` integration test against `mc683xx-run --bdm` and its
+- `mc683xx-bdm` integration test against `mc683xx-run --bdm` and its
   example image, once m683xx-emu's virtual cable lands.
 - A second Pico as a stand-in CPU32: a target-side PIO program around
-  `bdm-model`, driving FREEZE and watching BKPT and RESET.
+  `mc683xx-bdm-model`, driving FREEZE and watching BKPT and RESET.
 - Bring-up, what is left (PLAN.md, Bring-up checklist; docs/bring-up.md):
   - Watchdog (docs/bring-up.md, step 1): idle a minute without a
     restart, BOOTSEL staying up past 8 s, a probe-rs halt not reset.
