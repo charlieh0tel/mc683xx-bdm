@@ -36,10 +36,10 @@ recorded in it (`.cargo_vcs_info.json`).
 that they match the root's byte for byte; a change to the license text
 is made at the root and copied.
 
-The wheels are abi3 (Python 3.10 and later), one per platform: Linux
+The wheels are abi3 (Python 3.12 and later), one per platform: Linux
 manylinux x86_64 and aarch64, macOS x86_64 and arm64, Windows x64, and
 an sdist.  Linux x86_64's and macOS arm64's run the Python tests on
-Python 3.10 first, against `bdm-stand-in` on a Unix socket; the
+Python 3.12 first, against `bdm-stand-in` on a Unix socket; the
 cross-built ones and Windows', which has no Unix sockets (`--pod
 unix:PATH` is Unix's), are only built.  The `sdist` job builds a wheel
 from the sdist, as pip does where no wheel fits, and checks it carries
