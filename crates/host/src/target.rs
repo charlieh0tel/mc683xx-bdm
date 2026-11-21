@@ -55,7 +55,8 @@ struct FunctionCodeRegister {
     current: Option<u32>,
 }
 
-/// The target while halted: what it keeps until it resumes.
+/// The target while halted: what it keeps until it resumes, or until a
+/// reply shows it left background mode since.
 #[derive(Debug, Clone, Copy)]
 struct Halted {
     /// The entry source, from ATEMP read first after entry.
@@ -64,11 +65,24 @@ struct Halted {
     sfc: FunctionCodeRegister,
     /// DFC, which WRITE and FILL go through.
     dfc: FunctionCodeRegister,
+    /// FREEZE's edge count, as the pod's reply that showed this stay
+    /// gave it: a reply with another means the CPU left since.
+    freeze_edges: Option<u8>,
+    /// No request has been made since a Hold: a look asks the pod
+    /// before trusting this, since a reset under BKPT low comes back
+    /// in background mode.
+    held: bool,
 }
 
 impl Halted {
-    fn new(entry: Entry) -> Self {
-        Self { entry, sfc: FunctionCodeRegister::default(), dfc: FunctionCodeRegister::default() }
+    fn new(entry: Entry, freeze_edges: Option<u8>) -> Self {
+        Self {
+            entry,
+            sfc: FunctionCodeRegister::default(),
+            dfc: FunctionCodeRegister::default(),
+            freeze_edges,
+            held: false,
+        }
     }
 
     fn register(&mut self, register: SystemRegister) -> Option<&mut FunctionCodeRegister> {
@@ -149,14 +163,19 @@ impl<T: Transport> PodTarget<T> {
         Ok(())
     }
 
-    /// Holds BKPT low until the next request (`Pod::hold`); forgets
-    /// the halted state.
+    /// Holds BKPT low until the next request (`Pod::hold`).  A halted
+    /// state is kept, the program's SFC and DFC with it, until a reply
+    /// shows the target left background mode (a reset under BKPT low
+    /// comes back in it); the next look asks the pod.  Any request,
+    /// restoring SFC or DFC included, releases BKPT.
     ///
     /// # Errors
     /// As [`Error`].
     pub fn hold(&mut self) -> Result<(), Error> {
-        self.halted = None;
-        self.pod.hold()
+        if let Some(halted) = &mut self.halted {
+            halted.held = true;
+        }
+        self.request(Pod::hold)
     }
 
     /// Resets the target to run, background mode off; forgets the
@@ -185,20 +204,39 @@ impl<T: Transport> PodTarget<T> {
             && let Ok(Some(entry)) = entry(atemp)
         {
             let unknown = |state: FunctionCodeRegister| FunctionCodeRegister { current: None, ..state };
-            self.halted = Some(Halted { entry, sfc: unknown(kept.sfc), dfc: unknown(kept.dfc) });
+            self.halted = Some(Halted {
+                sfc: unknown(kept.sfc),
+                dfc: unknown(kept.dfc),
+                ..Halted::new(entry, self.pod.freeze_edges())
+            });
         }
         Ok(atemp)
     }
 
-    /// `call` on the pod, the halted state forgotten if the pod found
-    /// the target running: it left background mode (a reset, say) since
-    /// it was last seen halted.
+    /// `call` on the pod.  The halted state is forgotten if the pod found
+    /// the target running, or if the reply's FREEZE edge count shows it
+    /// left background mode since it was seen halted (a reset, say,
+    /// perhaps back into it): then a call that worked fails with
+    /// [`Error::Reentered`], since it reached a target in a state this
+    /// did not know.  Either way the program's SFC and DFC kept for
+    /// restoring go with it: a CPU that left while halted was reset.
     fn request<R>(&mut self, call: impl FnOnce(&mut Pod<T>) -> Result<R, Error>) -> Result<R, Error> {
         let result = call(&mut self.pod);
-        if matches!(result, Err(Error::Reply(ReplyError::Failed(Status::NoFreeze)))) {
-            self.halted = None;
+        let moved = self.halted.is_some_and(|halted| halted.freeze_edges != self.pod.freeze_edges());
+        if moved || matches!(result, Err(Error::Reply(ReplyError::Failed(Status::NoFreeze)))) {
+            self.forget();
         }
-        result
+        match result {
+            Ok(_) if moved => Err(Error::Reentered),
+            result => result,
+        }
+    }
+
+    /// Forgets the halted state and what scratch RAM held: the target
+    /// left background mode.
+    fn forget(&mut self) {
+        self.halted = None;
+        self.scratch_written = false;
     }
 
     /// SFC's or DFC's state, while the target is halted.
@@ -215,13 +253,29 @@ impl<T: Transport> PodTarget<T> {
     }
 
     /// Why the target is halted, asking the pod if this is the first
-    /// look since it stopped; `None` while it runs.
+    /// look since it stopped or since a Hold; `None` while it runs.
     fn look(&mut self) -> Result<Option<Entry>, Error> {
-        if let Some(halted) = self.halted {
-            return Ok(Some(halted.entry));
+        match self.halted {
+            Some(halted) if !halted.held => Ok(Some(halted.entry)),
+            _ => self.ask(),
         }
-        let Some(entry) = entry(self.pod.pins()?.atemp)? else { return Ok(None) };
-        self.halted = Some(Halted::new(entry));
+    }
+
+    /// Why the target is halted, from the pod's Pins: a halted state
+    /// kept is confirmed if FREEZE is high and its edge count has not
+    /// moved, and replaced by the new stay's if it has.
+    fn ask(&mut self) -> Result<Option<Entry>, Error> {
+        let pins = self.pod.pins()?;
+        let edges = self.pod.freeze_edges();
+        if let Some(halted) = &mut self.halted {
+            if pins.freeze && halted.freeze_edges == edges {
+                halted.held = false;
+                return Ok(Some(halted.entry));
+            }
+            self.forget();
+        }
+        let Some(entry) = entry(pins.atemp)? else { return Ok(None) };
+        self.halted = Some(Halted::new(entry, edges));
         Ok(Some(entry))
     }
 
@@ -238,7 +292,7 @@ impl<T: Transport> PodTarget<T> {
     /// Keeps the entry a halt or reset reported.
     fn halted_at(&mut self, atemp: Atemp) -> Result<Entry, Error> {
         let entry = entry(atemp)?.ok_or(ReplyError::Malformed)?;
-        self.halted = Some(Halted::new(entry));
+        self.halted = Some(Halted::new(entry, self.pod.freeze_edges()));
         Ok(entry)
     }
 
@@ -362,14 +416,14 @@ impl<T: Transport> Cpu32Target for PodTarget<T> {
         self.halted_at(atemp)
     }
 
-    /// A halt already seen is confirmed by FREEZE, so a target that
-    /// left background mode since (a reset) is halted again.
+    /// A halt already seen is confirmed by FREEZE and its edge count, so
+    /// a target that left background mode since (a reset) is halted
+    /// again, or taken in its new stay.
     fn halt(&mut self) -> Result<Entry, Error> {
-        if let Some(halted) = self.halted {
-            if self.pod.pins()?.freeze {
-                return Ok(halted.entry);
-            }
-            self.halted = None;
+        if self.halted.is_some()
+            && let Some(entry) = self.ask()?
+        {
+            return Ok(entry);
         }
         let atemp = self.pod.halt()?;
         self.halted_at(atemp)
@@ -530,6 +584,7 @@ mod tests {
     use crate::script::answering;
     use crate::script::parsed;
     use crate::script::pod;
+    use crate::script::pod_with_edges;
     use crate::step::SR_T1;
     use crate::step::StepError;
     use crate::step::after_stub;
@@ -748,6 +803,82 @@ mod tests {
             target.read_memory(Address(0), FunctionCode::SUPERVISOR_DATA, Size::Byte, &mut data).is_err()
         );
         assert_eq!(target.halted().unwrap(), None);
+    }
+
+    /// A target over a pod giving `replies`, each with FREEZE's edge
+    /// count.
+    fn target_with_edges(replies: &[(u8, &[u8])]) -> PodTarget<Script> {
+        PodTarget::new(pod_with_edges(replies))
+    }
+
+    #[test]
+    fn a_reply_after_a_leave_and_reentry_forgets_the_halt() {
+        let mut target = target_with_edges(&[
+            (1, &halted(Atemp::Fresh(0))), // ResetHalt
+            (1, &value(1)),                // SFC, the program's
+            (1, DONE),                     // SFC = 5
+            (1, &[0, 9]),                  // ReadMemory
+            (3, &value(0x55)),             // D0, after a reset back into BDM
+            (3, &pins(Atemp::Fresh(0))),   // the new stay
+            (3, DONE),                     // Go: nothing to restore
+        ]);
+        target.reset_halted().unwrap();
+        let mut data = [0; 1];
+        target.read_memory(Address(0), FunctionCode::SUPERVISOR_DATA, Size::Byte, &mut data).unwrap();
+        assert!(matches!(target.read_register(Register::D0), Err(Error::Reentered)));
+        assert_eq!(target.halted().unwrap(), Some(Entry::Breakpoint));
+        target.go().unwrap();
+        let sent = requests(target);
+        let sent: Vec<_> = sent.iter().map(|r| parsed(r)).collect();
+        assert_eq!(sent[sent.len() - 3..], [Request::ReadRegister(Register::D0), Request::Pins, Request::Go]);
+    }
+
+    #[test]
+    fn hold_keeps_the_programs_sfc_to_restore() {
+        let mut target = target_with_edges(&[
+            (1, &halted(Atemp::Fresh(0))), // ResetHalt
+            (1, &value(1)),                // SFC, the program's
+            (1, DONE),                     // SFC = 5
+            (1, &[0, 9]),                  // ReadMemory
+            (1, DONE),                     // Hold
+            (1, &pins(Atemp::Fresh(0))),   // still the same stay
+            (1, DONE),                     // SFC = 1, restored
+            (1, DONE),                     // Go
+        ]);
+        target.reset_halted().unwrap();
+        let mut data = [0; 1];
+        target.read_memory(Address(0), FunctionCode::SUPERVISOR_DATA, Size::Byte, &mut data).unwrap();
+        target.hold().unwrap();
+        assert_eq!(target.halted().unwrap(), Some(Entry::Breakpoint), "asks the pod after a hold");
+        target.go().unwrap();
+        let sent = requests(target);
+        let sent: Vec<_> = sent.iter().map(|r| parsed(r)).collect();
+        assert_eq!(
+            sent[sent.len() - 4..],
+            [Request::Hold, Request::Pins, Request::WriteSystemRegister(SystemRegister::Sfc, 1), Request::Go]
+        );
+    }
+
+    #[test]
+    fn a_reset_under_hold_drops_what_was_kept() {
+        let mut target = target_with_edges(&[
+            (1, &halted(Atemp::Fresh(0))), // ResetHalt
+            (1, &value(1)),                // SFC, the program's
+            (1, DONE),                     // SFC = 5
+            (1, &[0, 9]),                  // ReadMemory
+            (1, DONE),                     // Hold
+            (3, &pins(Atemp::Fresh(0))),   // a watchdog reset, back in BDM
+            (3, DONE),                     // Go: no SFC write
+        ]);
+        target.reset_halted().unwrap();
+        let mut data = [0; 1];
+        target.read_memory(Address(0), FunctionCode::SUPERVISOR_DATA, Size::Byte, &mut data).unwrap();
+        target.hold().unwrap();
+        assert_eq!(target.halt().unwrap(), Entry::Breakpoint);
+        target.go().unwrap();
+        let sent = requests(target);
+        let sent: Vec<_> = sent.iter().map(|r| parsed(r)).collect();
+        assert_eq!(sent[sent.len() - 3..], [Request::Hold, Request::Pins, Request::Go]);
     }
 
     #[test]

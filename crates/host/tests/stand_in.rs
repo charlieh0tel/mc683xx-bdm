@@ -243,3 +243,19 @@ fn a_step_needs_scratch_ram() {
     target.set_scratch(Some(Address(SCRATCH + 1)));
     assert!(matches!(target.step(), Err(Error::Step(StepError::OddScratch(_)))));
 }
+
+#[test]
+fn a_reset_back_into_background_mode_is_seen() {
+    let (mut target, pod) = stand_in(true);
+    target.reset_halted().unwrap();
+    {
+        let mut pod = pod.lock().unwrap();
+        let board = pod.board_mut();
+        board.target().reset_running();
+        board.enter_background(Entry::Breakpoint);
+    }
+    // FREEZE high throughout, as the host sees it; the edge count moved.
+    assert!(matches!(target.read_register(Register::D0), Err(Error::Reentered)));
+    assert_eq!(target.halted().unwrap(), Some(Entry::Breakpoint));
+    assert!(target.read_register(Register::D0).is_ok());
+}
