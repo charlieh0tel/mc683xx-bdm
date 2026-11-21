@@ -150,8 +150,8 @@ Response bit 16 (MC68331UM Table 5-6):
 
 Opcodes (b/w/l), CPU32RM 7.2.8.4–7.2.8.15.  RSREG's figure there
 (7.2.8.6) prints `0x2480`, the same as WSREG's: a misprint.  `0x2580`
-is from Pisa's driver documentation (References) and is checked on
-silicon at bring-up (RSREG ATEMP after entry).
+is from Pisa's driver documentation (References), confirmed on silicon
+(Bring-up checklist: RSREG ATEMP after a reset entry).
 
 | Command | Opcode |
 |---|---|
@@ -599,13 +599,14 @@ How to run each item and what to expect: `docs/bring-up.md`.
       4 MHz (1.297 s), 36 words a USB round trip: 1.3 ms a round trip
       at 4 MHz against 0.15 ms on the wire, so USB-limited, about
       28k words/s
-- [ ] Carrier, no target (rev 0.2): USB-flashed, enumerates, inputs
+- [x] Carrier, no target (rev 0.2): USB-flashed, enumerates, inputs
       low.  DS, BERR, FREEZE and RESET each read high with 5 V on
       their J1 pin, low without.  Loopback at J1 (8 to
       10, FREEZE high), unscoped: 3600 words ok at 1 MHz (0.180 s) and
       4 MHz (0.132 s).  VDD sense reads 5.344 V at 5.287 V measured
       (USB 5 V from an FTDI cable), 1.1% high.  BKPT idle at R3's
-      pull-up (5.2 V); U1 driving it needs a load (1 kOhm to GND) to show
+      pull-up (5.2 V).  U1 driving it, into 1 kOhm to GND, on the
+      scope (TODO.md)
 - [x] Reset into BDM; confirm FREEZE asserts (1 MHz DSCLK; docs/58503a/)
 - [x] RSREG ATEMP first (`0x2588`): confirms RSREG's `0x2580`.  ATEMP
       $00000000 after a reset entry
@@ -637,7 +638,6 @@ How to run each item and what to expect: `docs/bring-up.md`.
 
 ## Open questions
 
-- RSREG `0x2580` on silicon (Protocol summary).
 - A VID:PID of the pod's own: Raspberry Pi's PID program under VID
   0x2E8A, for RP2040 and RP2350 products (github.com/raspberrypi/usb-pid,
   request form there); the owner applies.  pid.codes needs a public
