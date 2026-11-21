@@ -62,6 +62,12 @@ pub enum Error {
     /// A step could not be made, or did not end at its stub.
     #[error("step: {0}")]
     Step(#[from] StepError),
+    /// The target left background mode since it was seen halted, as a
+    /// reply's FREEZE edge count shows: a reset, say, perhaps back into
+    /// background mode.  What was kept of the halt is forgotten; look
+    /// or halt again.
+    #[error("the target left background mode since it was halted (a reset?); look again")]
+    Reentered,
 }
 
 /// How long a reply may take: a reset into background mode is the

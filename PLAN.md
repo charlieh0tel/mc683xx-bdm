@@ -477,8 +477,15 @@ code and no `unsafe`; no USB request, so the protocol is unchanged.
   entry source is the pod's ATEMP (Pins, Halt, ResetHalt): fresh
   decodes per Table 7-2, stale is `Entry::Unknown`.  It is kept until
   the target resumes, a request is refused with NoFreeze (the target
-  left background mode, a reset say), or a halt finds FREEZE low: a
-  halt with the entry kept confirms it with Pins.  A memory call sets SFC or DFC to its function
+  left background mode, a reset say), or a reply's FREEZE edge count
+  differs from the one the halt was seen with: the target left, perhaps
+  back into background mode (a reset under Hold), which FREEZE's level
+  hides.  A call whose reply shows that fails with `Error::Reentered`,
+  since it reached a stay this did not know.  A halt with the entry
+  kept confirms it with Pins, and so does the first look after a Hold,
+  which keeps the halted state.  Forgetting it drops the program's SFC
+  and DFC kept for restoring: a halted CPU leaves only through a reset.
+  A memory call sets SFC or DFC to its function
   code, reading the program's value first; SFC/DFC reads and writes
   reach the program's value; go, call and `restore_function_codes` put
   it back.  Resync keeps it, and takes the CPU's as unknown, as after
