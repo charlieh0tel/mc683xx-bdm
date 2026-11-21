@@ -914,7 +914,7 @@ dependencies = [
 name = "mc683xx-bdm-proto"
 version = "0.2.0"
 dependencies = [
- "mc683xx-target",
+ "mc683xx-target 0.7.0",
  "thiserror",
 ]
 
@@ -923,6 +923,15 @@ name = "mc683xx-target"
 version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "eec0f86c3cb65bd0a38e3e529e3ff0e884345da37018f7cf95ada2e59059c539"
+dependencies = [
+ "thiserror",
+]
+
+[[package]]
+name = "mc683xx-target"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e9ef09db084b633b34d918c0e151aac787fe6bbe2ac8fc4b61cdd6debc4d2b6f"
 dependencies = [
  "thiserror",
 ]
@@ -1133,7 +1142,7 @@ dependencies = [
  "embassy-usb",
  "fixed",
  "mc683xx-bdm-proto",
- "mc683xx-target",
+ "mc683xx-target 0.6.0",
  "panic-probe",
  "pio",
  "portable-atomic",

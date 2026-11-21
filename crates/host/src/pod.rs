@@ -2,6 +2,7 @@
 //! over the transport, and decodes the reply.  Memory and raw transfers
 //! longer than a packet go as several requests.
 
+use mc683xx_target::Unsupported;
 use std::time::Duration;
 use std::time::Instant;
 
@@ -72,6 +73,9 @@ pub enum Error {
     /// or halt again.
     #[error("the target left background mode since it was halted (a reset?); look again")]
     Reentered,
+    /// A `Cpu32Target` call this target does not offer.
+    #[error(transparent)]
+    Unsupported(#[from] Unsupported),
 }
 
 /// How long a reply may take beyond its words and not-ready waits
