@@ -22,7 +22,7 @@ panic-halt = "1.0.0"
 panic-probe = { version = "1.0.0", features = ["print-defmt"], optional = true }
 # embassy-rp 0.10 loads pio 0.3 programs.
 pio = "0.3.0"
-pod-proto = { version = "0.1.0", path = "../pod-proto" }
+pod-proto = { version = "0.1.0", path = "../../crates/pod-proto" }
 portable-atomic = { version = "1.15.0", features = ["critical-section"] }
 static_cell = "2.1.1"
 
@@ -46,8 +46,8 @@ rtt = [
     "embassy-usb/defmt",
 ]
 
-# The workspace's lints (../Cargo.toml, ../clippy.toml): this crate is
-# its own workspace.
+# The host workspace's lints (../../Cargo.toml; ../../clippy.toml holds
+# for both): this crate is its own workspace.
 [lints.rust]
 missing_debug_implementations = "warn"
 unsafe_code = "deny"

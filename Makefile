@@ -1,5 +1,6 @@
-# Repository chores.  The firmware and host build with cargo in
-# firmware/; the hardware release is ee_tooling's jlcpcb-release.
+# Repository chores.  The host crates build with cargo at the root, the
+# firmware in firmware/pod-fw; the hardware release is ee_tooling's
+# jlcpcb-release.
 
 .PHONY: deb hooks lint uf2
 
@@ -7,9 +8,9 @@
 UF2 := firmware/pod-fw/target/pod-fw-rp2040.uf2
 
 # The bdm Debian package, as rust-build-deb (deb-workflows) builds it,
-# with the UF2: firmware/target/debian/mc683xx-bdm_*.deb.
+# with the UF2: target/debian/mc683xx-bdm_*.deb.
 deb: uf2
-	cd firmware && cargo deb -p pod-host
+	cargo deb -p pod-host
 
 uf2:
 	cd firmware/pod-fw && cargo build --release --no-default-features -F rp2040
@@ -28,15 +29,15 @@ BUILDS = rp2040:thumbv6m-none-eabi rp235xa:thumbv8m.main-none-eabihf
 # build, warnings as errors, ee_tooling's schematic drawing-rule check,
 # ruff and pytest on hardware/'s own Python, and ruff, pytest, mypy's
 # stubtest of the type stubs against the module and mypy on the tests
-# for the Python bindings (firmware/pod-py), which uv builds with
+# for the Python bindings (host/pod-py), which uv builds with
 # maturin.
 lint:
 	@# No wildcard imports, `use super::*` in tests included (AGENTS.md):
 	@# clippy's wildcard_imports does not report these.
-	@if git grep -nE '^\s*(pub(\([a-z]+\))? )?use [^;]*::\*;' -- 'firmware/*.rs'; then \
+	@if git grep -nE '^\s*(pub(\([a-z]+\))? )?use [^;]*::\*;' -- 'crates/*.rs' 'firmware/*.rs' 'host/*.rs'; then \
 		echo "wildcard imports (above)"; exit 1; fi
-	cd firmware && cargo fmt --check && cargo clippy --all-targets -- -D warnings
-	cd firmware && cargo clippy -p pod-py --all-targets --features python -- -D warnings
+	cargo fmt --check && cargo clippy --all-targets -- -D warnings
+	cargo clippy -p pod-py --all-targets --features python -- -D warnings
 	cd firmware/pod-fw && cargo fmt --check
 	for build in $(BUILDS); do \
 		chip=$${build%%:*}; target=$${build#*:}; \
@@ -47,6 +48,6 @@ lint:
 	done
 	cd hardware && uv run kicad-style-check mc683xx-pod/mc683xx-pod.kicad_sch
 	cd hardware && uv run ruff format --check && uv run ruff check && uv run pytest -q
-	cd firmware/pod-py && uv run ruff format --check && uv run ruff check && uv run pytest -q \
+	cd host/pod-py && uv run ruff format --check && uv run ruff check && uv run pytest -q \
 		&& uv run python -m mypy.stubtest mc683xx_bdm --allowlist stubtest-allowlist.txt \
 		&& uv run mypy tests

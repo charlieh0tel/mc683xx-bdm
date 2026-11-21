@@ -4,7 +4,7 @@ How a host talks to the pod: over USB, or over a stream socket to
 anything that answers as the pod does (m683xx-emu's virtual BDM
 cable).  It is the complete specification: a stand-in written from
 it alone answers as the pod does.  The pod's implementation is
-`firmware/pod-proto/src/usb.rs`; where the two disagree, that is a bug
+`crates/pod-proto/src/usb.rs`; where the two disagree, that is a bug
 in one of them.
 
 Protocol version: **9** (`PROTOCOL_VERSION`), raised on any change to a

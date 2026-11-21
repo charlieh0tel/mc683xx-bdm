@@ -5,6 +5,7 @@ build-backend = "maturin"
 [project]
 name = "mc683xx-bdm"
 description = "The mc683xx CPU32 BDM pod, for Python scripts"
+readme = "../../README.md"
 requires-python = ">=3.10"
 license = "GPL-3.0-only"
 authors = [{ name = "Christopher Hoover", email = "ch@murgatroid.com" }]
@@ -42,11 +43,11 @@ cache-keys = [
     { file = "pyproject.toml" },
     { file = "Cargo.toml" },
     { file = "src/**/*.rs" },
-    { file = "../Cargo.lock" },
+    { file = "../../Cargo.lock" },
     { file = "../pod-host/Cargo.toml" },
     { file = "../pod-host/src/**/*.rs" },
-    { file = "../pod-proto/Cargo.toml" },
-    { file = "../pod-proto/src/**/*.rs" },
+    { file = "../../crates/pod-proto/Cargo.toml" },
+    { file = "../../crates/pod-proto/src/**/*.rs" },
 ]
 
 [tool.ruff]

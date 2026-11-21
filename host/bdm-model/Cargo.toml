@@ -6,7 +6,7 @@ license.workspace = true
 
 [dependencies]
 mc683xx-target = "0.6.0"
-pod-proto = { version = "0.1.0", path = "../pod-proto" }
+pod-proto = { version = "0.1.0", path = "../../crates/pod-proto" }
 
 [lints]
 workspace = true

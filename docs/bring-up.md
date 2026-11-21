@@ -6,7 +6,8 @@ list; this is how to do each item.  Write what each step found into
 `PLAN.md` (a figure, a confirmed or refuted assumption) in the commit
 that records it.
 
-`bdm` below is `cargo run -p pod-host --bin bdm --` from `firmware/`.
+`bdm` below is `cargo run -p pod-host --bin bdm --` from the
+repository's root.
 
 ## Before the hardware
 

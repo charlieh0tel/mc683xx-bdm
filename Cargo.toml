@@ -2,8 +2,8 @@
 # (thumbv6m-none-eabi or thumbv8m.main-none-eabihf, PLAN.md), so it
 # stays out with its own lockfile; it takes the shared crates by path.
 [workspace]
-members = ["bdm-model", "pod-host", "pod-proto", "pod-py"]
-exclude = ["pod-fw"]
+members = ["crates/pod-proto", "host/bdm-model", "host/pod-host", "host/pod-py"]
+exclude = ["firmware/pod-fw"]
 resolver = "3"
 
 [workspace.package]
