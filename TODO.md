@@ -12,12 +12,10 @@
 
 ## Firmware
 
-- Publish from CI, beside mc683xx's crates and PyPI package (owner,
-  2026-11-21): crates.io `mc683xx-bdm` (the library and `bdm`) and
-  `mc683xx-bdm-proto`; PyPI `mc683xx-bdm` (import `mc683xx_bdm`, wheels
-  per platform).  `mc683xx-bdm-model` and `mc683xx-bdm-py` stay
-  unpublished.  Each crate's metadata, then the publishing tokens as
-  repository secrets.
+- Publishing to crates.io and PyPI (owner): once the repository is
+  public, RELEASING.md's Setup (PyPI's pending trusted publisher, the
+  `pypi` and `crates-io` environments), then the first release, its
+  crates by hand, then their crates.io trusted publishers.
 - DSCLK above 4 MHz, once the throughput test measures the margin.
 - Report a watchdog reset to the host (WATCHDOG's REASON at start,
   say in Pins or Version, and in `bdm pins`): a protocol change, so

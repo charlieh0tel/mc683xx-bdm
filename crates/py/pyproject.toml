@@ -8,7 +8,10 @@ description = "The mc683xx CPU32 BDM pod, for Python scripts"
 readme = "README.md"
 requires-python = ">=3.10"
 license = "GPL-3.0-only"
+# A copy of the root's, so the wheel and sdist carry it (RELEASING.md).
+license-files = ["LICENSE"]
 authors = [{ name = "Christopher Hoover", email = "ch@murgatroid.com" }]
+keywords = ["bdm", "cpu32", "m68k", "mc68331", "debugger"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Programming Language :: Python :: 3",
@@ -16,8 +19,14 @@ classifiers = [
     "Topic :: Software Development :: Debuggers",
     "Typing :: Typed",
 ]
-# The crate's version (Cargo.toml).
+# The workspace's version (Cargo.toml), one for the crates and the
+# wheel (RELEASING.md).
 dynamic = ["version"]
+
+[project.urls]
+Repository = "https://github.com/charlieh0tel/mc683xx-bdm"
+Changelog = "https://github.com/charlieh0tel/mc683xx-bdm/releases"
+Documentation = "https://github.com/charlieh0tel/mc683xx-bdm/blob/main/crates/py/README.md"
 
 [dependency-groups]
 dev = [

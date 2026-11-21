@@ -13,19 +13,35 @@ and a loopback through its buffers (`docs/bring-up.md`, steps 1-3).  On
 an MC68331 target it resets into background mode, reads
 registers and SIM registers, and reads 512 KB of flash correctly.
 
+## Install
+
+Once published (RELEASING.md):
+
+```
+cargo install mc683xx-bdm      # bdm, from crates.io
+pip install mc683xx-bdm        # the Python module mc683xx_bdm, from PyPI
+sudo apt install ./mc683xx-bdm_VERSION-1_amd64.deb   # from a GitHub Release: bdm, the udev rule, the UF2
+```
+
+`cargo install` and `pip install` carry no udev rule: on Linux without
+root, install `packaging/udev/70-mc683xx-pod.rules` (Host).  The pod's
+firmware is the release's `pod-fw-rp2040.uf2`, also in the Debian
+package; `bdm bootsel` puts the pod into its bootloader for it.
+
 ## Layout
 
 | Path | What |
 |---|---|
 | `PLAN.md` | the design and why it is the way it is |
 | `TODO.md` | the work list |
-| `RELEASING.md` | cutting a firmware, `bdm` or board release |
+| `RELEASING.md` | cutting a release: firmware, the Debian package, crates.io, PyPI; a board release |
 | `docs/` | the host-pod protocol (`usb-protocol.md`), bring-up steps (`bring-up.md`); `oncore-vp/`, notes on the Motorola Oncore VP's BDM test points; `58503a/`, the HP 58503A's BDM header and reading its flash |
 | `hardware/` | the KiCad carrier board; `ee_tooling/`, the shared tooling (a submodule on ee_tooling's `release/0.2` branch), whose `jlcpcb-release` builds a JLCPCB order into `production/`, each release as ordered; `fastcheck.py`, a report on the BDM link's fast nets (`uv run python fastcheck.py mc683xx-pod/mc683xx-pod.kicad_pcb`) |
 | `Cargo.toml` | the host Rust workspace: `crates/` |
 | `crates/` | `proto/`, `mc683xx-bdm-proto`, shared by the firmware and the host; the host crates: `host/`, `mc683xx-bdm` (library and `bdm` CLI), `py/`, `mc683xx-bdm-py` (Python bindings), `model/`, `mc683xx-bdm-model` (a model CPU32, for tests), `stand-in/`, `mc683xx-bdm-stand-in` (`bdm-stand-in`, a pod on a socket over the model) |
 | `firmware/` | `pod-fw`, the pod's firmware, its own workspace (Pico targets) |
 | `packaging/` | the Debian changelog and the pod's udev rule |
+| `scripts/` | `published-crates.sh`, the crates crates.io already has at this version (RELEASING.md) |
 | `third_party/` | vendor documents and their provenance (`NOTICE`) |
 
 ## Firmware

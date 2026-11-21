@@ -16,6 +16,7 @@ rust-version = "1.99.1"
 authors = ["Christopher Hoover <ch@murgatroid.com>"]
 license = "GPL-3.0-only"
 repository = "https://github.com/charlieh0tel/mc683xx-bdm"
+keywords = ["bdm", "cpu32", "m68k", "mc68331", "debugger"]
 
 # The workspace's crates, as its members depend on them: a path for the
 # workspace and, for the published ones, an exact version for crates.io,

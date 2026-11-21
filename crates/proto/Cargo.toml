@@ -1,11 +1,17 @@
 [package]
 name = "mc683xx-bdm-proto"
+description = "The mc683xx BDM pod's protocol: CPU32 BDM command sequences and the pod's USB requests, shared by its firmware and host; no_std"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 authors.workspace = true
 license.workspace = true
 repository.workspace = true
+readme = "README.md"
+keywords.workspace = true
+categories = ["embedded", "no-std", "hardware-support"]
+# The library, its README and the license text (RELEASING.md).
+include = ["/src", "/README.md", "/LICENSE"]
 
 [dependencies]
 mc683xx-target = "0.6.0"
