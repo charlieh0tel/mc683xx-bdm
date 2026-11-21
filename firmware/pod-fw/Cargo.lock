@@ -912,7 +912,7 @@ dependencies = [
 
 [[package]]
 name = "mc683xx-bdm-proto"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "mc683xx-target 0.7.0",
  "thiserror",
@@ -1128,7 +1128,7 @@ dependencies = [
 
 [[package]]
 name = "pod-fw"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "cortex-m",
  "cortex-m-rt",
