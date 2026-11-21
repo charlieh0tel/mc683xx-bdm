@@ -232,6 +232,11 @@ CSBOOT; CS6 $0005/$7070 and CS7 $0405/$7070 the write selects), the
 flash takes AMD's command words, one per byte lane (2026-11-21, stages
 A-C of smartclock's flash procedure):
 
+- Each chip's WE is its bank's write select (U33 pins 121 CS6 and 122
+  CS7) and its OE the read select (112 CSBOOT, 114 CS1), traced by the
+  owner.  So a write that asserts CSBOOT programs nothing, but drives
+  the chips' outputs against the CPU's: narrow CSBOOT and make it
+  read-only first.
 - Autoselect ($AAAA to base+$AAAA, $5555 to base+$5554, $9090 to
   base+$AAAA): $0101 manufacturer, $2020 device at base and base+2,
   both pairs: four Am29F010s.  Sector protect ($n*8000+4): $0000, all
