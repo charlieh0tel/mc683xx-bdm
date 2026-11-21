@@ -321,8 +321,14 @@ pods apart (`bdm --pod usb:SERIAL`).  Requests:
   the watchdog (Watchdog, below).
 - ATEMP holds the entry source only until the first command after
   entry, and the CPU can enter on its own (BGND, a breakpoint, a double
-  bus fault).  A task watches FREEZE and counts its edges (`freeze.rs`);
-  before each request, if FREEZE is high and the count moved since the
+  bus fault).  A task watches FREEZE and counts its edges (`freeze.rs`):
+  after each edge interrupt, and every 10 ms without one, it reads the
+  pin's edge latches (one per direction) before the next wait's arming
+  clears them, and the level; an edge the latches miss (while arming,
+  or a second one the same way) changes the parity the level shows, so
+  one more is counted (`entry::freeze_edges`).  A quick exit and
+  re-entry (GO onto a BGND) is two latched edges, not lost.  Two missed
+  edges together still are.  Before each request, if FREEZE is high and the count moved since the
   last read, the pod drives DSCLK and DSI and reads ATEMP first
   (`pod-proto`'s `entry`).  It reports it as fresh, or as stale when
   the CPU was halted when the pod started and so may have been
@@ -397,7 +403,7 @@ a link word.
   change (TODO.md).
 
 The firmware's own sizes, release builds (`make size`, also in CI's
-summary): 31328 bytes of text on the RP2040 and 29764 on the RP2350,
+summary): 31536 bytes of text on the RP2040 and 29784 on the RP2350,
 2832 bytes of statics on either.
 
 Handle not-ready retries in firmware; report BERR and illegal-command

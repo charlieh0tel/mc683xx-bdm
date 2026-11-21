@@ -1,7 +1,8 @@
 //! When the pod reads ATEMP: first after each entry into background
 //! mode, before any other command, since the first command after entry
 //! overwrites it (CPU32RM 7.2.3).  The pod counts FREEZE's edges; a
-//! count that moved since the last read means a new entry.
+//! count that moved since the last read means a new entry; how the
+//! firmware counts them is [`freeze_edges`].
 
 use crate::usb::Atemp;
 
@@ -54,10 +55,58 @@ impl EntryWatch {
     }
 }
 
+/// FREEZE's edge latches, one per direction, set since they were last
+/// cleared: the firmware's pin latches.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct FreezeLatches {
+    /// A rising edge: the CPU entered background mode.
+    pub rose: bool,
+    /// A falling edge: the CPU left it.
+    pub fell: bool,
+}
+
+/// FREEZE's edges between two reads of its level, `was_high` then `high`,
+/// from the latches set in between.  A latch holds one edge of its
+/// direction, and an edge while the latches are cleared to arm the next
+/// wait sets none; each such loss changes the count's parity, so where
+/// it disagrees with the levels, one edge more is counted.  Two lost
+/// edges together are not seen.
+#[must_use]
+pub fn freeze_edges(was_high: bool, high: bool, latches: FreezeLatches) -> u32 {
+    let latched = u32::from(latches.rose) + u32::from(latches.fell);
+    if (latched % 2 == 1) == (was_high != high) { latched } else { latched + 1 }
+}
+
 #[cfg(test)]
 mod tests {
     use super::Atemp;
     use super::EntryWatch;
+    use super::FreezeLatches;
+    use super::freeze_edges;
+
+    const NONE: FreezeLatches = FreezeLatches { rose: false, fell: false };
+    const ROSE: FreezeLatches = FreezeLatches { rose: true, fell: false };
+    const FELL: FreezeLatches = FreezeLatches { rose: false, fell: true };
+    const BOTH: FreezeLatches = FreezeLatches { rose: true, fell: true };
+
+    #[test]
+    fn latched_edges_count_as_they_are() {
+        assert_eq!(freeze_edges(false, false, NONE), 0);
+        assert_eq!(freeze_edges(false, true, ROSE), 1);
+        assert_eq!(freeze_edges(true, false, FELL), 1);
+        // GO, then a BGND straight after: left and entered again.
+        assert_eq!(freeze_edges(true, true, BOTH), 2);
+    }
+
+    #[test]
+    fn an_edge_lost_while_arming_is_counted_from_the_level() {
+        assert_eq!(freeze_edges(true, false, NONE), 1);
+        assert_eq!(freeze_edges(false, true, NONE), 1);
+        // Left, latched; entered again while the latches were cleared.
+        assert_eq!(freeze_edges(true, true, FELL), 2);
+        // Left and entered, latched; left again, lost.
+        assert_eq!(freeze_edges(true, false, BOTH), 3);
+    }
 
     #[test]
     fn running_needs_nothing() {
