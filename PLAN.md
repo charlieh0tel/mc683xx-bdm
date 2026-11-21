@@ -517,9 +517,18 @@ code and no `unsafe`; no USB request, so the protocol is unchanged.
     standard error).  `--scratch` is required: Bdm always offers gdb a step,
     and gdb steps over a breakpoint before every continue from it.
     Detach resumes the target, kill leaves it halted; either prints
-    which.  Tested end to end (`pod-host/tests/gdb.rs`): the `bdm`
+    which.  SIGINT or SIGTERM to `bdm` (signal-hook flags, asked
+    between waits as Python's handlers are) ends the session as an
+    error does: mc683xx-gdb halts the target and puts back every word
+    BGND replaced, `bdm` puts back SFC and DFC, and exits 128 plus the
+    signal, so no BGND is left in the program.  A second signal
+    meanwhile exits at once.  gdb's own Ctrl-C is a byte on its
+    connection, a halt for gdb, not this.  Tested end to end
+    (`pod-host/tests/gdb.rs`): the `bdm`
     binary on the model, raw packets on TCP: `?`, `m`, `g`, `s`,
-    `Z0`/`z0` and `c` to the breakpoint, Ctrl-C, `D` and `k`; the same
+    `Z0`/`z0` and `c` to the breakpoint, Ctrl-C, `D` and `k`, SIGINT
+    while running (the breakpoint's word, SFC and DFC back) and SIGTERM
+    waiting for gdb; the same
     from Python (`pod-py/tests/test_gdb.py`), with a signal handler's
     exception waiting for gdb and while running.
   - `step()` is in `Cpu32Target` (mc683xx-target 0.6): from RPC to

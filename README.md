@@ -74,7 +74,11 @@ Without an executable, gdb does not know the CPU32 is big-endian and
 shows every register and word byte-reversed.  `--scratch` names 1026 bytes of RAM, even, that the
 program does not use: a step's exception table and BGND stub.
 Breakpoints are BGND written into memory, so RAM only.  Detach leaves
-the target running, kill leaves it halted.
+the target running, kill leaves it halted.  Ctrl-C in gdb halts the
+target for gdb; Ctrl-C (SIGINT) or SIGTERM to `bdm` ends the session:
+gdb's breakpoints removed, the target halted, SFC and DFC put back, and
+exit status 130 or 143.  A second signal meanwhile exits at once,
+breakpoints or not.
 
 Without root on Linux, the pod needs the udev rule
 `packaging/udev/70-mc683xx-pod.rules`: copy it into
@@ -141,7 +145,9 @@ with mc683xx_bdm.Pod("usb") as pod:
 127.0.0.1:1234 and `ready(port)` is called once it listens.  It blocks
 with the GIL released; Ctrl-C (`KeyboardInterrupt`, or any signal
 handler's exception) ends the session, gdb's breakpoints removed and
-the target halted, and is raised.
+the target halted, and is raised.  Python leaves SIGTERM to its
+default, which ends the process with nothing removed: a script that
+may get one installs a handler that raises.
 
 ### Debian package
 

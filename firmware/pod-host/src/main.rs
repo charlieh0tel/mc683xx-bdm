@@ -1,11 +1,15 @@
 //! `bdm`: the pod from the command line.
 
-use std::convert::Infallible;
+use std::ffi::c_int;
 use std::io::ErrorKind;
 use std::io::Write;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::ExitCode;
+use std::sync::Arc;
+use std::sync::atomic::AtomicBool;
+use std::sync::atomic::AtomicUsize;
+use std::sync::atomic::Ordering;
 
 use anyhow::Context;
 use anyhow::Result;
@@ -21,6 +25,7 @@ use mc683xx_target::register::Register;
 use mc683xx_target::size::Size;
 use pod_host::gdb;
 use pod_host::gdb::Ending;
+use pod_host::gdb::ServeError;
 use pod_host::pod::Pod;
 use pod_host::register::Named;
 use pod_host::register::SYSTEM_REGISTERS;
@@ -35,6 +40,10 @@ use pod_host::transport::reboot_to_bootloader;
 use pod_proto::usb::Atemp;
 use pod_proto::usb::PROTOCOL_VERSION;
 use pod_proto::usb::SERIAL_NUMBER_CHARS;
+use signal_hook::consts::SIGINT;
+use signal_hook::consts::SIGTERM;
+use signal_hook::flag;
+use signal_hook::low_level::signal_name;
 
 /// Bytes per hex dump line.
 const DUMP_LINE: usize = 16;
@@ -170,6 +179,8 @@ enum Command {
     /// target runs on) or kills (it stays halted): `target remote
     /// HOST:PORT` in an m68k gdb.  Breakpoints are BGND written into
     /// RAM; a step traces through an exception table in SCRATCH.
+    /// SIGINT or SIGTERM ends it with the breakpoints removed, the
+    /// target halted, and the exit status 128 plus the signal.
     Gdb {
         /// Where to listen, HOST:PORT; port 0 picks one, which standard
         /// error names.  It gives full control of the target: keep it
@@ -391,15 +402,54 @@ fn execute<T: Transport>(target: &mut PodTarget<T>, command: Command, out: &mut 
     Ok(())
 }
 
+/// The signals that end `bdm gdb` cleanly: gdb's breakpoints removed,
+/// the target halted, SFC and DFC put back.  gdb's own Ctrl-C comes over
+/// its connection, and halts the target for gdb.
+const ENDING_SIGNALS: [c_int; 2] = [SIGINT, SIGTERM];
+
+/// The shell's exit status for a process a signal ended is this plus
+/// the signal's number.
+const SIGNALED_STATUS: c_int = 128;
+
+/// A signal that ended `bdm gdb`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+#[error("{}", signal_name(*.0).unwrap_or("a signal"))]
+struct Signaled(c_int);
+
+impl Signaled {
+    /// The exit status the shell gives a process this signal ended.
+    fn status(self) -> ExitCode {
+        u8::try_from(SIGNALED_STATUS + self.0).map_or(ExitCode::FAILURE, ExitCode::from)
+    }
+}
+
+/// Watches for [`ENDING_SIGNALS`]: the one that arrived, or 0.  A second
+/// one, with the first still being handled, exits at once.
+fn watch_signals() -> Result<Arc<AtomicUsize>> {
+    let signaled = Arc::new(AtomicBool::new(false));
+    let which = Arc::new(AtomicUsize::new(0));
+    for signal in ENDING_SIGNALS {
+        // Registered first, so the first signal finds `signaled` clear.
+        flag::register_conditional_shutdown(signal, SIGNALED_STATUS + signal, Arc::clone(&signaled))?;
+        flag::register(signal, Arc::clone(&signaled))?;
+        flag::register_usize(signal, Arc::clone(&which), usize::try_from(signal)?)?;
+    }
+    Ok(which)
+}
+
 /// Serves one gdb session at `listen` over `target`, with `scratch` for
-/// its steps.
+/// its steps, until gdb ends it or one of [`ENDING_SIGNALS`] does.
 fn gdb<T: Transport>(
     target: &mut PodTarget<T>,
     listen: &str,
     scratch: Address,
     out: &mut impl Write,
 ) -> Result<()> {
-    let check = || Ok::<(), Infallible>(());
+    let which = watch_signals()?;
+    let check = || match which.load(Ordering::SeqCst) {
+        0 => Ok(()),
+        signal => Err(Signaled(c_int::try_from(signal).unwrap_or(c_int::MAX))),
+    };
     let connection = gdb::accept(
         listen,
         |at| {
@@ -407,10 +457,22 @@ fn gdb<T: Transport>(
             Ok(())
         },
         &check,
-    )?;
-    match gdb::serve(target, scratch, connection, &check)? {
-        Ending::Detached => writeln!(out, "gdb detached: running")?,
-        Ending::Killed => writeln!(out, "gdb killed: halted")?,
+    );
+    let connection = match connection {
+        Err(ServeError::Host(signal)) => {
+            writeln!(out, "gdb never connected: {signal}")?;
+            return Err(signal.into());
+        }
+        connection => connection?,
+    };
+    match gdb::serve(target, scratch, connection, &check) {
+        Ok(Ending::Detached) => writeln!(out, "gdb detached: running")?,
+        Ok(Ending::Killed) => writeln!(out, "gdb killed: halted")?,
+        Err(ServeError::Host(signal)) => {
+            writeln!(out, "gdb ended by {signal}: breakpoints removed, halted")?;
+            return Err(signal.into());
+        }
+        Err(error) => return Err(error.into()),
     }
     Ok(())
 }
@@ -428,6 +490,7 @@ fn main() -> ExitCode {
     match run(cli.pod.as_deref(), cli.command) {
         Ok(()) => ExitCode::SUCCESS,
         Err(error) if is_broken_pipe(&error) => ExitCode::SUCCESS,
+        Err(error) if let Some(signaled) = error.downcast_ref::<Signaled>().copied() => signaled.status(),
         Err(error) => {
             eprintln!("bdm: {error:#}");
             ExitCode::FAILURE
@@ -439,7 +502,12 @@ fn main() -> ExitCode {
 mod tests {
     use std::path::PathBuf;
 
+    use std::process::ExitCode;
+
     use super::FunctionCode;
+    use super::SIGINT;
+    use super::SIGTERM;
+    use super::Signaled;
     use super::function_code;
     use super::hex_listing;
     use super::is_broken_pipe;
@@ -542,5 +610,13 @@ mod tests {
         let full = std::io::Error::from(std::io::ErrorKind::StorageFull);
         assert!(!is_broken_pipe(&anyhow::Error::from(full)));
         assert!(!is_broken_pipe(&anyhow::anyhow!("illegal command")));
+    }
+
+    #[test]
+    fn a_signal_is_named_and_exits_as_the_shell_reports_it() {
+        assert_eq!(Signaled(SIGINT).to_string(), "SIGINT");
+        assert_eq!(Signaled(SIGTERM).to_string(), "SIGTERM");
+        assert_eq!(Signaled(SIGINT).status(), ExitCode::from(130));
+        assert_eq!(Signaled(SIGTERM).status(), ExitCode::from(143));
     }
 }

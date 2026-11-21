@@ -14,6 +14,7 @@ mc683xx-gdb = { version = "0.6.0", default-features = false }
 mc683xx-target = "0.6.0"
 nusb = "0.2.9"
 pod-proto = { version = "0.1.0", path = "../pod-proto" }
+signal-hook = "0.4.6"
 thiserror = "2.0.21"
 
 [lints]
