@@ -14,6 +14,12 @@
   deb-workflows' `rust-build-deb`, once it can run a step before
   `cargo deb`: the package ships the UF2 (`make uf2`: pod-fw for
   thumbv6m-none-eabi, then picotool), which it does not build.
+  The step: a pre-build input added to `rust-build-deb` in
+  deb-workflows (owner's choice, 2026-11-21).
+- Publish from CI: `pod-proto` and `pod-host` to crates.io, and the
+  Python module (`host/pod-py`, wheels per platform) to PyPI.  Needs
+  each crate's metadata (description, repository, license) and the
+  publishing tokens as repository secrets.
 - DSCLK above 4 MHz, once the throughput test measures the margin.
 - Report a watchdog reset to the host (WATCHDOG's REASON at start,
   say in Pins or Version, and in `bdm pins`): a protocol change, so
