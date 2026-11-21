@@ -382,7 +382,8 @@ pub fn write_message(stream: &mut impl Write, packet: &[u8]) -> Result<(), Trans
 }
 
 /// Reads one stream message into `packet`, returning its length, or
-/// `None` if the stream ended before a message began.
+/// `None` if the stream ended before a message began.  A read a signal
+/// interrupts is made again, as `read_exact` makes its own.
 ///
 /// # Errors
 /// A length byte of 0 or more than [`PACKET`], or the stream failed.
@@ -391,7 +392,13 @@ pub fn read_message(
     packet: &mut [u8; PACKET],
 ) -> Result<Option<usize>, TransportError> {
     let mut length = [0];
-    if stream.read(&mut length)? == 0 {
+    let read = loop {
+        match stream.read(&mut length) {
+            Err(error) if error.kind() == std::io::ErrorKind::Interrupted => {}
+            read => break read?,
+        }
+    };
+    if read == 0 {
         return Ok(None);
     }
     let length = usize::from(length[0]);
@@ -416,6 +423,7 @@ mod tests {
     use super::Transport;
     use super::TransportError;
     use super::location;
+    use super::read_message;
     use super::select;
 
     const A: &str = "E6613852833B2A2F";
@@ -425,6 +433,29 @@ mod tests {
     fn one_pod_is_chosen_unnamed() {
         assert_eq!(select(&[Some(A)], None).unwrap(), 0);
         assert_eq!(select(&[None], None).unwrap(), 0);
+    }
+
+    /// A stream whose first read a signal interrupts.
+    struct Interrupted<'a> {
+        first: bool,
+        rest: &'a [u8],
+    }
+
+    impl Read for Interrupted<'_> {
+        fn read(&mut self, buffer: &mut [u8]) -> std::io::Result<usize> {
+            if std::mem::take(&mut self.first) {
+                return Err(std::io::ErrorKind::Interrupted.into());
+            }
+            self.rest.read(buffer)
+        }
+    }
+
+    #[test]
+    fn a_read_a_signal_interrupts_is_made_again() {
+        let mut stream = Interrupted { first: true, rest: &[2, 0xAB, 0xCD] };
+        let mut packet = [0; PACKET];
+        assert_eq!(read_message(&mut stream, &mut packet).unwrap(), Some(2));
+        assert_eq!(packet[..2], [0xAB, 0xCD]);
     }
 
     #[test]
