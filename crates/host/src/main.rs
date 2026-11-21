@@ -319,8 +319,28 @@ fn run(pod: Option<&str>, command: Command) -> Result<()> {
     // The next bdm starts knowing nothing: leave the program's SFC and
     // DFC, whether or not the command worked.
     let restored = target.restore_function_codes();
-    done?;
-    Ok(restored?)
+    finish(done, restored)
+}
+
+/// A command failed, and putting back SFC and DFC after it failed too:
+/// both are reported, as a gdb session's failure and its cleanup's.
+#[derive(Debug, thiserror::Error)]
+#[error("{}; restoring SFC and DFC: {cleanup}", message(.error))]
+struct Unrestored {
+    /// The command's failure.
+    error: anyhow::Error,
+    /// Restoring's.
+    cleanup: mc683xx_bdm::pod::Error,
+}
+
+/// A run's outcome from its command's and from restoring SFC and DFC
+/// after it: the first failure, or both.
+fn finish(done: Result<()>, restored: Result<(), mc683xx_bdm::pod::Error>) -> Result<()> {
+    match (done, restored) {
+        (Err(error), Err(cleanup)) => Err(Unrestored { error, cleanup }.into()),
+        (Err(error), Ok(())) => Err(error),
+        (Ok(()), restored) => Ok(restored?),
+    }
 }
 
 fn execute<T: Transport>(target: &mut PodTarget<T>, command: Command, out: &mut impl Write) -> Result<()> {
@@ -511,7 +531,10 @@ fn main() -> ExitCode {
         Err(error) if let Some(signaled) = error.downcast_ref::<Signaled>().copied() => signaled.status(),
         Err(error) => {
             eprintln!("bdm: {}", message(&error));
-            ExitCode::FAILURE
+            // A signal's exit status even when restoring failed after it.
+            let signaled =
+                error.downcast_ref::<Unrestored>().and_then(|u| u.error.downcast_ref::<Signaled>());
+            signaled.map_or(ExitCode::FAILURE, |signaled| signaled.status())
         }
     }
 }
@@ -519,7 +542,8 @@ fn main() -> ExitCode {
 /// What `bdm` says of a pod's `BdmDisabled`: in its own terms.
 const BDM_DISABLED: &str = "background mode is off since bdm reset --run; use bdm reset";
 
-/// `error` as `bdm` reports it.
+/// `error` as `bdm` reports it: `{:#}`, its causes too, but a pod's
+/// `BdmDisabled` as [`BDM_DISABLED`].
 fn message(error: &anyhow::Error) -> String {
     let disabled = error.chain().any(|cause| {
         matches!(
@@ -543,6 +567,7 @@ mod tests {
     use super::SIGINT;
     use super::SIGTERM;
     use super::Signaled;
+    use super::finish;
     use super::function_code;
     use super::hex_listing;
     use super::is_broken_pipe;
@@ -646,6 +671,22 @@ mod tests {
         let full = std::io::Error::from(std::io::ErrorKind::StorageFull);
         assert!(!is_broken_pipe(&anyhow::Error::from(full)));
         assert!(!is_broken_pipe(&anyhow::anyhow!("illegal command")));
+    }
+
+    #[test]
+    fn a_failed_restore_after_a_failed_command_reports_both() {
+        let no_freeze = || mc683xx_bdm::pod::Error::Reply(ReplyError::Failed(Status::NoFreeze));
+        let illegal = mc683xx_bdm::pod::Error::Reply(ReplyError::Failed(Status::Illegal));
+        let both = finish(Err(anyhow::Error::from(illegal).context("dump")), Err(no_freeze())).unwrap_err();
+        assert_eq!(
+            message(&both),
+            "dump: illegal command; restoring SFC and DFC: target not in background mode"
+        );
+        let restore_only = finish(Ok(()), Err(no_freeze())).unwrap_err();
+        assert_eq!(message(&restore_only), "target not in background mode");
+        let command_only = finish(Err(anyhow::anyhow!("dump")), Ok(())).unwrap_err();
+        assert_eq!(message(&command_only), "dump");
+        assert!(finish(Ok(()), Ok(())).is_ok());
     }
 
     #[test]
