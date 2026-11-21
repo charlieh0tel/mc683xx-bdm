@@ -268,6 +268,7 @@ mc683xx-bdm/
 ├── firmware/
 │   └── pod-fw/          # Pico / Pico 2 firmware, embassy-rp, PIO; its own workspace
 ├── packaging/           # Debian changelog, udev rule
+├── scripts/             # published-crates.sh, for the release workflow
 ├── third_party/         # vendor manuals + NOTICE
 ├── Cargo.toml           # the host workspace
 ├── rust-toolchain.toml  # the toolchain, for both workspaces
@@ -596,6 +597,12 @@ code and no `unsafe`; no USB request, so the protocol is unchanged.
   elf2uf2-rs, byte for byte picotool's UF2 (RP2040 family ID), since
   no runner image carries picotool 2.
   `bdm-stand-in` is a test aid and does not ship.
+- crates.io and PyPI, beside mc683xx's crates and Python package, and
+  as mc683xx publishes them (RELEASING.md): `mc683xx-bdm-proto` and
+  `mc683xx-bdm` (the library and `bdm`), and the Python package
+  `mc683xx-bdm` (abi3 wheels for Linux, macOS and Windows, and an
+  sdist), from a `v*` tag by trusted publishing (OIDC), no stored
+  token.  One version for all of them, the workspace's.
 - Bootloader knock: picotool's reset interface (interface 1), not a
   pod request, so `picotool -f` works too and a pod whose protocol
   differs from `bdm`'s can still be reflashed.  `bdm bootsel` sends it

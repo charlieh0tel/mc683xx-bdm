@@ -1,12 +1,19 @@
 [package]
 name = "mc683xx-bdm"
-description = "Host command line for the mc683xx CPU32 BDM pod"
+description = "The host side of the mc683xx BDM pod, a USB debugger for CPU32 (683xx) microcontrollers: a library and the `bdm` command line, with a gdb server"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 authors.workspace = true
 license.workspace = true
 repository.workspace = true
+readme = "README.md"
+keywords.workspace = true
+categories = ["embedded", "hardware-support", "development-tools::debugging", "command-line-utilities"]
+# The library, `bdm`, the build script and what it includes, the README
+# and the license text: the tests need the path-only
+# mc683xx-bdm-model, which a package drops (RELEASING.md).
+include = ["/src", "/build.rs", "/git-version.rs", "/README.md", "/LICENSE"]
 
 [dependencies]
 anyhow = "1.0.104"

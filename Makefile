@@ -61,12 +61,16 @@ size:
 # ruff and pytest on hardware/'s own Python, and ruff, pytest, mypy's
 # stubtest of the type stubs against the module and mypy on the tests
 # for the Python bindings (crates/py), which uv builds with
-# maturin.
+# maturin; and the published packages' license texts, copies of the
+# root's (RELEASING.md).
+LICENSED_CRATES = proto host py
+
 lint:
 	@# No wildcard imports, `use super::*` in tests included (AGENTS.md):
 	@# clippy's wildcard_imports does not report these.
 	@if git grep -nE '^\s*(pub(\([a-z]+\))? )?use [^;]*::\*;' -- 'crates/*.rs' 'firmware/*.rs'; then \
 		echo "wildcard imports (above)"; exit 1; fi
+	@for crate in $(LICENSED_CRATES); do cmp LICENSE crates/$$crate/LICENSE || exit 1; done
 	cargo fmt --check && cargo clippy --locked --all-targets -- -D warnings
 	cargo clippy --locked -p mc683xx-bdm-py --all-targets --features python -- -D warnings
 	cd firmware/pod-fw && cargo fmt --check
