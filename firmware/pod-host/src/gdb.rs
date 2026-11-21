@@ -256,7 +256,8 @@ pub fn accept<'c, E: fmt::Debug, C: Fn() -> Result<(), E>>(
 
 /// Serves gdb on `connection` over `target` until gdb detaches (the
 /// target resumed) or kills it (left halted), with `scratch` for its
-/// steps ([`PodTarget::set_scratch`]).  `check` is asked whenever the
+/// steps ([`PodTarget::set_scratch`], cleared when the session ends).
+/// `check` is asked whenever the
 /// session waits on gdb or looks at the target running.
 ///
 /// # Errors
@@ -271,8 +272,10 @@ pub fn serve<T: Transport, E: std::error::Error, C: Fn() -> Result<(), E>>(
     check: &C,
 ) -> Result<Ending, ServeError<E>> {
     target.set_scratch(Some(scratch));
-    let mut checked = Checked { target, check };
-    match mc683xx_gdb::serve(&mut Bdm(&mut checked), connection.0)? {
+    let served = mc683xx_gdb::serve(&mut Bdm(&mut Checked { target: &mut *target, check }), connection.0);
+    // The scratch is this session's: a later step must name its own.
+    target.set_scratch(None);
+    match served? {
         mc683xx_gdb::Ending::Detached => Ok(Ending::Detached),
         mc683xx_gdb::Ending::Killed => Ok(Ending::Killed),
         other => Err(ServeError::Unknown(format!("{other:?}"))),

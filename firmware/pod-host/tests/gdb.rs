@@ -2,27 +2,37 @@
 //! model CPU32, driven by gdb's remote serial protocol on TCP, packet
 //! by packet, as gdb would; and ended by a signal.
 
+use std::convert::Infallible;
 use std::io::BufRead;
 use std::io::BufReader;
 use std::io::Read;
 use std::io::Write;
 use std::net::TcpStream;
 use std::os::unix::net::UnixListener;
+use std::os::unix::net::UnixStream;
 use std::process::Child;
 use std::process::Command;
 use std::process::Stdio;
 use std::sync::Arc;
 use std::sync::Mutex;
+use std::sync::mpsc;
 use std::thread;
 use std::time::Duration;
 use std::time::Instant;
 
 use bdm_model::Target;
 use bdm_model::board::ModelBoard;
+use mc683xx_target::Cpu32Target;
 use mc683xx_target::address::Address;
 use mc683xx_target::register::Register;
 use mc683xx_target::register::SystemRegister;
+use pod_host::gdb;
+use pod_host::pod::Error;
+use pod_host::pod::Pod;
 use pod_host::stand_in::serve;
+use pod_host::step::StepError;
+use pod_host::target::PodTarget;
+use pod_host::transport::StreamTransport;
 
 const RAM_BASE: u32 = 0x0010_0000;
 const RAM: usize = 4096;
@@ -268,4 +278,30 @@ fn sigterm_while_waiting_for_gdb_leaves_the_target_alone() {
     assert_eq!(status, Some(SIGNALED_STATUS + SIGTERM));
     assert_eq!(printed, "gdb never connected: SIGTERM\n");
     assert_eq!(function_codes(&pod), (USER_DATA, USER_DATA));
+}
+
+#[test]
+fn a_session_clears_its_scratch() {
+    let (ours, theirs) = UnixStream::pair().unwrap();
+    let mut model = Target::<RAM>::new(Address(RAM_BASE));
+    model.set_register(Register::A7, STACK);
+    let pod = Arc::new(Mutex::new(ModelPod::new(ModelBoard::new(model, true))));
+    let served = Arc::clone(&pod);
+    thread::spawn(move || serve(theirs, &served).unwrap());
+    let mut target = PodTarget::new(Pod::new(StreamTransport::new(ours)));
+    target.reset_halted().unwrap();
+    let (tell, listening) = mpsc::channel();
+    let client = thread::spawn(move || {
+        let mut gdb = Gdb { stream: BufReader::new(TcpStream::connect(listening.recv().unwrap()).unwrap()) };
+        gdb.send("k");
+    });
+    let check = || Ok::<(), Infallible>(());
+    let ready = |at| {
+        tell.send(at).unwrap();
+        Ok(())
+    };
+    let connection = gdb::accept("127.0.0.1:0", ready, &check).unwrap();
+    gdb::serve(&mut target, Address(SCRATCH), connection, &check).unwrap();
+    client.join().unwrap();
+    assert!(matches!(target.step(), Err(Error::Step(StepError::NoScratch))));
 }
