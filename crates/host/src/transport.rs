@@ -22,10 +22,15 @@ use nusb::transfer::Direction;
 use nusb::transfer::In;
 use nusb::transfer::Out;
 use nusb::transfer::Recipient;
+use nusb::transfer::TransferError;
 
-/// How long a reply may take: a reset into background mode is the
-/// longest, about 110 ms (`pod-fw`'s RESET pulse and FREEZE timeout).
-const TIMEOUT: Duration = Duration::from_secs(1);
+/// How long a request packet may wait for the pod to take it, and the
+/// bootloader knock for its answer.
+const SEND_TIMEOUT: Duration = Duration::from_secs(1);
+
+/// The shortest read timeout a socket is given: a zero timeout is an
+/// error to the OS.
+const MIN_READ_TIMEOUT: Duration = Duration::from_millis(1);
 
 /// The pod's request interface (`pod-fw`'s first vendor function).
 const INTERFACE: u8 = 0;
@@ -42,18 +47,30 @@ const BOOTLOADER_PIDS: [u16; 2] = [0x0003, 0x000F];
 const BOOTLOADER_WAIT: Duration = Duration::from_secs(5);
 const BOOTLOADER_POLL: Duration = Duration::from_millis(100);
 
-/// Carries one request packet out and its reply packet back.
+/// Carries request packets out and reply packets back, each in order.
 pub trait Transport {
-    /// Sends `request` and fills `reply`, returning the reply's length.
+    /// Sends `request`.
     ///
     /// # Errors
-    /// The request or reply did not get through.
-    fn exchange(&mut self, request: &[u8], reply: &mut [u8; PACKET]) -> Result<usize, TransportError>;
+    /// The request did not get through.
+    fn send(&mut self, request: &[u8]) -> Result<(), TransportError>;
+
+    /// Waits up to `timeout` for the next reply packet and fills `reply`
+    /// with it, returning its length.
+    ///
+    /// # Errors
+    /// [`TransportError::NoReply`] when none came in time, or the reply
+    /// did not get through.
+    fn receive(&mut self, reply: &mut [u8; PACKET], timeout: Duration) -> Result<usize, TransportError>;
 }
 
 impl<T: Transport + ?Sized> Transport for Box<T> {
-    fn exchange(&mut self, request: &[u8], reply: &mut [u8; PACKET]) -> Result<usize, TransportError> {
-        (**self).exchange(request, reply)
+    fn send(&mut self, request: &[u8]) -> Result<(), TransportError> {
+        (**self).send(request)
+    }
+
+    fn receive(&mut self, reply: &mut [u8; PACKET], timeout: Duration) -> Result<usize, TransportError> {
+        (**self).receive(reply, timeout)
     }
 }
 
@@ -71,7 +88,10 @@ pub enum TransportError {
     NoEndpoint(Direction),
     /// A transfer failed or timed out.
     #[error("USB transfer failed")]
-    Transfer(#[from] nusb::transfer::TransferError),
+    Transfer(#[from] TransferError),
+    /// No reply came in time.
+    #[error("no reply from the pod within {0:?}")]
+    NoReply(Duration),
     /// The socket failed.
     #[error("socket failed")]
     Socket(#[from] std::io::Error),
@@ -319,7 +339,7 @@ pub fn reboot_to_bootloader(serial: Option<&str>) -> Result<(), TransportError> 
     };
     // The pod leaves the bus before it can answer, so the transfer's
     // own status says nothing: a new bootloader appearing is the answer.
-    let sent = interface.control_out(request, TIMEOUT).wait();
+    let sent = interface.control_out(request, SEND_TIMEOUT).wait();
     let started = std::time::Instant::now();
     while started.elapsed() < BOOTLOADER_WAIT {
         if appeared(&before, &bootloaders()?) {
@@ -332,12 +352,18 @@ pub fn reboot_to_bootloader(serial: Option<&str>) -> Result<(), TransportError> 
 }
 
 impl Transport for UsbTransport {
-    fn exchange(&mut self, request: &[u8], reply: &mut [u8; PACKET]) -> Result<usize, TransportError> {
+    fn send(&mut self, request: &[u8]) -> Result<(), TransportError> {
         let mut out = Buffer::new(request.len());
         out.extend_from_slice(request);
-        self.to_pod.transfer_blocking(out, TIMEOUT).status?;
-        let done = self.from_pod.transfer_blocking(Buffer::new(PACKET), TIMEOUT);
-        done.status?;
+        Ok(self.to_pod.transfer_blocking(out, SEND_TIMEOUT).status?)
+    }
+
+    fn receive(&mut self, reply: &mut [u8; PACKET], timeout: Duration) -> Result<usize, TransportError> {
+        let done = self.from_pod.transfer_blocking(Buffer::new(PACKET), timeout);
+        match done.status {
+            Err(TransferError::Cancelled) => return Err(TransportError::NoReply(timeout)),
+            status => status?,
+        }
         let length = done.actual_len.min(PACKET);
         reply[..length].copy_from_slice(&done.buffer[..length]);
         Ok(length)
@@ -358,9 +384,7 @@ impl StreamTransport<UnixStream> {
     /// # Errors
     /// The socket cannot be connected.
     pub fn unix(path: &str) -> Result<Self, TransportError> {
-        let stream = UnixStream::connect(path)?;
-        stream.set_read_timeout(Some(TIMEOUT))?;
-        Ok(Self::new(stream))
+        Ok(Self::new(UnixStream::connect(path)?))
     }
 }
 
@@ -371,7 +395,6 @@ impl StreamTransport<TcpStream> {
     /// The socket cannot be connected.
     pub fn tcp(address: &str) -> Result<Self, TransportError> {
         let stream = TcpStream::connect(address)?;
-        stream.set_read_timeout(Some(TIMEOUT))?;
         stream.set_nodelay(true)?;
         Ok(Self::new(stream))
     }
@@ -384,11 +407,42 @@ impl<S> StreamTransport<S> {
     }
 }
 
-impl<S: Read + Write> Transport for StreamTransport<S> {
-    fn exchange(&mut self, request: &[u8], reply: &mut [u8; PACKET]) -> Result<usize, TransportError> {
-        write_message(&mut self.stream, request)?;
-        read_message(&mut self.stream, reply)?
-            .ok_or_else(|| std::io::Error::from(std::io::ErrorKind::UnexpectedEof).into())
+/// A stream whose reads can time out: a socket.
+pub trait TimedStream: Read + Write {
+    /// Makes a read that waits longer than `timeout` fail.
+    ///
+    /// # Errors
+    /// The socket's own.
+    fn time_reads_out(&self, timeout: Duration) -> std::io::Result<()>;
+}
+
+impl TimedStream for UnixStream {
+    fn time_reads_out(&self, timeout: Duration) -> std::io::Result<()> {
+        self.set_read_timeout(Some(timeout.max(MIN_READ_TIMEOUT)))
+    }
+}
+
+impl TimedStream for TcpStream {
+    fn time_reads_out(&self, timeout: Duration) -> std::io::Result<()> {
+        self.set_read_timeout(Some(timeout.max(MIN_READ_TIMEOUT)))
+    }
+}
+
+impl<S: TimedStream> Transport for StreamTransport<S> {
+    fn send(&mut self, request: &[u8]) -> Result<(), TransportError> {
+        write_message(&mut self.stream, request)
+    }
+
+    /// A timeout before a message's length byte is [`TransportError::NoReply`];
+    /// one inside a message breaks the stream, a socket error.
+    fn receive(&mut self, reply: &mut [u8; PACKET], timeout: Duration) -> Result<usize, TransportError> {
+        self.stream.time_reads_out(timeout)?;
+        match read_message(&mut self.stream, reply) {
+            Ok(Some(length)) => Ok(length),
+            Ok(None) => Err(std::io::Error::from(std::io::ErrorKind::UnexpectedEof).into()),
+            Err(TransportError::NoReply(_)) => Err(TransportError::NoReply(timeout)),
+            Err(error) => Err(error),
+        }
     }
 }
 
@@ -412,7 +466,9 @@ pub fn write_message(stream: &mut impl Write, packet: &[u8]) -> Result<(), Trans
 /// interrupts is made again, as `read_exact` makes its own.
 ///
 /// # Errors
-/// A length byte of 0 or more than [`PACKET`], or the stream failed.
+/// [`TransportError::NoReply`] if a read timeout ran out before the
+/// length byte, a length byte of 0 or more than [`PACKET`], or the
+/// stream failed.
 pub fn read_message(
     stream: &mut impl Read,
     packet: &mut [u8; PACKET],
@@ -421,6 +477,11 @@ pub fn read_message(
     let read = loop {
         match stream.read(&mut length) {
             Err(error) if error.kind() == std::io::ErrorKind::Interrupted => {}
+            Err(error)
+                if matches!(error.kind(), std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut) =>
+            {
+                return Err(TransportError::NoReply(Duration::ZERO));
+            }
             read => break read?,
         }
     };
@@ -441,6 +502,7 @@ mod tests {
     use std::io::Write;
     use std::os::unix::net::UnixStream;
     use std::thread;
+    use std::time::Duration;
 
     use mc683xx_bdm_proto::usb::PACKET;
 
@@ -454,7 +516,11 @@ mod tests {
     use super::read_message;
     use super::select;
 
+    /// Long against a test's socket round trip.
+    const TIMEOUT: Duration = Duration::from_secs(5);
+
     const A: &str = "E6613852833B2A2F";
+
     const B: &str = "E66138528361572C";
 
     /// A boot ROM device at `address` on bus 1.
@@ -576,7 +642,8 @@ mod tests {
         });
         let mut transport = StreamTransport::new(host);
         let mut reply = [0; PACKET];
-        assert_eq!(transport.exchange(&[0x0E], &mut reply).unwrap(), 5);
+        transport.send(&[0x0E]).unwrap();
+        assert_eq!(transport.receive(&mut reply, TIMEOUT).unwrap(), 5);
         assert_eq!(&reply[..5], &[0, 1, 0, 0, 0]);
         assert_eq!(server.join().unwrap(), [0x0E]);
     }
@@ -586,8 +653,23 @@ mod tests {
         let (host, mut pod) = UnixStream::pair().unwrap();
         let mut transport = StreamTransport::new(host);
         let mut reply = [0; PACKET];
-        assert!(matches!(transport.exchange(&[], &mut reply), Err(TransportError::MessageLength(0))));
+        assert!(matches!(transport.send(&[]), Err(TransportError::MessageLength(0))));
         pod.write_all(&[0]).unwrap();
-        assert!(matches!(transport.exchange(&[0x02], &mut reply), Err(TransportError::MessageLength(0))));
+        transport.send(&[0x02]).unwrap();
+        assert!(matches!(transport.receive(&mut reply, TIMEOUT), Err(TransportError::MessageLength(0))));
+    }
+
+    #[test]
+    fn no_reply_in_time_is_no_reply_and_the_next_one_still_comes() {
+        let (host, mut pod) = UnixStream::pair().unwrap();
+        let mut transport = StreamTransport::new(host);
+        let mut reply = [0; PACKET];
+        let short = Duration::from_millis(10);
+        assert!(
+            matches!(transport.receive(&mut reply, short), Err(TransportError::NoReply(timeout)) if timeout == short)
+        );
+        pod.write_all(&[1, 0x42]).unwrap();
+        assert_eq!(transport.receive(&mut reply, TIMEOUT).unwrap(), 1);
+        assert_eq!(reply[0], 0x42);
     }
 }

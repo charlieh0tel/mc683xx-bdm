@@ -2,7 +2,10 @@
 //! over the transport, and decodes the reply.  Memory and raw transfers
 //! longer than a packet go as several requests.
 
+use std::time::Duration;
+
 use mc683xx_bdm_proto::bdm::byte_count;
+
 use mc683xx_bdm_proto::usb::Atemp;
 use mc683xx_bdm_proto::usb::MAX_MEMORY_BYTES;
 use mc683xx_bdm_proto::usb::MAX_TRANSFER_WORDS;
@@ -55,6 +58,10 @@ pub enum Error {
     #[error("step: {0}")]
     Step(#[from] StepError),
 }
+
+/// How long a reply may take: a reset into background mode is the
+/// longest, about 110 ms (`pod-fw`'s RESET pulse and FREEZE timeout).
+const TIMEOUT: Duration = Duration::from_secs(1);
 
 /// The function code `bits` gives, if it fits FC\[2:0\].
 #[must_use]
@@ -312,7 +319,8 @@ impl<T: Transport> Pod<T> {
     }
 
     fn exchange<'r>(&mut self, packet: &[u8], reply: &'r mut [u8; PACKET]) -> Result<&'r [u8], Error> {
-        let length = self.transport.exchange(packet, reply)?;
+        self.transport.send(packet)?;
+        let length = self.transport.receive(reply, TIMEOUT)?;
         Ok(parse_reply(&reply[..length])?)
     }
 }

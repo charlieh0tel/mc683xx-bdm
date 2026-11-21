@@ -434,9 +434,9 @@ code and no `unsafe`; no USB request, so the protocol is unchanged.
 
 ## Host (Rust)
 
-- `mc683xx-bdm`'s `transport`: a `Transport` trait, one request packet
-  out and one reply back; `UsbTransport` over `nusb`, blocking, 1 s
-  timeout, the device with the pod's VID:PID and the serial number
+- `mc683xx-bdm`'s `transport`: a `Transport` trait, request packets
+  sent and reply packets received, each in order, a receive with its
+  own timeout; `UsbTransport` over `nusb`, blocking, the device with the pod's VID:PID and the serial number
   asked for (case ignored), or with none asked for the only one: more
   than one is an error listing their serial numbers, never a guess.
   `PodAddress` is `--pod`'s text (`usb`, `usb:SERIAL`, `unix:PATH`,
