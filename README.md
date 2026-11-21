@@ -21,7 +21,7 @@ registers and SIM registers, and reads 512 KB of flash correctly.
 | `TODO.md` | the work list |
 | `RELEASING.md` | cutting a firmware, `bdm` or board release |
 | `docs/` | the host-pod protocol (`usb-protocol.md`), bring-up steps (`bring-up.md`); `oncore-vp/`, notes on the Motorola Oncore VP's BDM test points; `58503a/`, the HP 58503A's BDM header and reading its flash |
-| `hardware/` | the KiCad carrier board; `ee_tooling/`, the shared tooling (a submodule pinned at 318c266, which built rev 0.2; not updated), whose `jlcpcb-release` builds a JLCPCB order into `production/`, each release as ordered; `fastcheck.py`, a report on the BDM link's fast nets (`uv run python fastcheck.py mc683xx-pod/mc683xx-pod.kicad_pcb`) |
+| `hardware/` | the KiCad carrier board; `ee_tooling/`, the shared tooling (a submodule on ee_tooling's `release/0.2` branch), whose `jlcpcb-release` builds a JLCPCB order into `production/`, each release as ordered; `fastcheck.py`, a report on the BDM link's fast nets (`uv run python fastcheck.py mc683xx-pod/mc683xx-pod.kicad_pcb`) |
 | `Cargo.toml` | the host Rust workspace: `host/` and `crates/` |
 | `host/` | the host crates: `pod-host` (library and `bdm` CLI), `pod-py` (Python bindings), `bdm-model` (a model CPU32, for tests) |
 | `crates/` | `pod-proto`, shared by the firmware and the host |

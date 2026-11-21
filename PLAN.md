@@ -244,7 +244,7 @@ mc683xx-bdm/
 ├── hardware/
 │   ├── mc683xx-pod/      # KiCad schematic + board
 │   ├── production/       # each release as ordered
-│   └── ee_tooling/      # shared KiCad tooling and house style (submodule, pinned)
+│   └── ee_tooling/      # shared KiCad tooling and house style (submodule, release/0.2)
 ├── crates/
 │   ├── pod-proto/       # BDM words and command sequences; USB commands; no_std
 │   └── git-version.rs   # the git commit in pod-fw's and pod-host's versions

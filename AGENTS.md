@@ -13,8 +13,9 @@
   with KiCad closed.
 - Bump REV in both title blocks before a release.  `hardware/production/` holds
   what was ordered; do not change it afterwards.
-- `hardware/ee_tooling` is pinned at 318c266, which built rev 0.2: board work
-  is finished.  Do not update it, whatever the ee_tooling section below says.
+- `hardware/ee_tooling` follows ee_tooling's `release/0.2` branch (the
+  0.2 line, fixes only; the ee_tooling section below): board work is
+  finished.
 
 ## Critical Rules
 
@@ -176,10 +177,12 @@
 
 - Read `hardware/ee_tooling/docs/kicad-style.md` (schematic drawing, board
   layout, silkscreen) before touching a board.
-- `hardware/ee_tooling` is the ee_tooling submodule, following its `main`:
-  its tools, house style and agent skills.  Change it there and push
-  there, then `git submodule update --remote hardware/ee_tooling`,
-  `hardware/ee_tooling/adopt --yes`, and commit the new pointer here.
+- `hardware/ee_tooling` is the ee_tooling submodule, kept on ee_tooling's
+  `release/0.2` branch (supported): its tools, house style and agent
+  skills.  Change it there and push there, then
+  `git submodule update --remote hardware/ee_tooling`,
+  `hardware/ee_tooling/adopt --yes`, and commit the new pointer here.  Moving
+  it to `main` is a migration and the owner's decision; do not move it.
 - `hardware/`'s venv is made with `uv venv --system-site-packages
   --python /usr/bin/python3`, for KiCad's pcbnew.
 - Before writing new tooling here (a script, a checker, a skill, a
