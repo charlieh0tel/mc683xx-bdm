@@ -91,8 +91,13 @@ impl<'d> PicoBoard<'d> {
     }
 
     fn bkpt_low(&mut self) {
-        self.dsclk_enable.set_high();
+        self.enable_dsclk();
         self.link.set_dsclk(Level::Low);
+    }
+
+    /// Turns U1's BKPT/DSCLK output on, at DSCLK's level as it is.
+    fn enable_dsclk(&mut self) {
+        self.dsclk_enable.set_high();
     }
 
     /// Runs `first`, then waits for FREEZE, all within
@@ -167,7 +172,7 @@ impl Board for PicoBoard<'_> {
     fn drive_link(&mut self) {
         if self.dsclk_enable.is_set_low() {
             self.link.set_dsclk(Level::High);
-            self.dsclk_enable.set_high();
+            self.enable_dsclk();
         }
         self.link.set_dsi_enabled(true);
     }
@@ -195,7 +200,7 @@ impl Board for PicoBoard<'_> {
     async fn reset_run(&mut self) -> bool {
         self.link.set_dsi_enabled(false);
         self.link.set_dsclk(Level::High);
-        self.dsclk_enable.set_high();
+        self.enable_dsclk();
         self.reset_drive.set_high();
         Timer::after(RESET_PULSE).await;
         self.reset_drive.set_low();
