@@ -531,7 +531,9 @@ code and no `unsafe`; no USB request, so the protocol is unchanged.
   (`crates/host/tests/stand_in.rs`).  The model's FREEZE is its state, VDD
   5 V; a halt or reset enters with a breakpoint, and a reset keeps
   registers and memory.  Not the emulator: once resumed the model runs
-  only NOP, MOVEQ, BRA.S, TRAP #n, ILLEGAL and BGND from its RAM, with
+  only NOP, MOVEQ, BRA.S, TRAP #n, ILLEGAL, BGND, MOVE/ANDI/ORI/EORI
+  #imm to SR and RTE from a $0 or $2 frame (the SR writers privileged)
+  from its RAM, with
   T1/T0 trace, exception frames $0 and $2 through VBR, a requested
   interrupt, and A7 as SSP or USP by SR's S (`mc683xx-bdm-model`'s `program`);
   any other instruction, an access outside RAM or 1000 instructions
@@ -661,7 +663,10 @@ code and no `unsafe`; no USB request, so the protocol is unchanged.
     frames from A7 down to the first not returning to the stub, then
     unwinds: the step's trace frame removed, the frame above it (an
     interrupt's) given its SR and PC; the program's trace bits back in
-    the frame stacked from the program; every PC still the stub made
+    the frame stacked from the program, unless that frame is the trace's
+    and the instruction writes SR: then its own (MOVE to SR, RTE, STOP,
+    LPSTOP: what it left; ANDI, ORI, EORI to SR: the program's bits so
+    combined), read from RPC before the step; every PC still the stub made
     the program's vector for the exception below it; RPC the program's
     handler for the last one, or the traced PC.  With the program's own
     T1 set the trace frame is its own and is kept.  Then VBR back, and
@@ -681,7 +686,8 @@ code and no `unsafe`; no USB request, so the protocol is unchanged.
     2026-11-20, from mc683xx PLAN.md's `Cpu32Target` row).
   - Tested against `bdm-stand-in`'s model (`crates/host/tests/stand_in.rs`):
     one instruction, user mode, TRAP, an interrupt pending, BGND, no
-    stop, no scratch; the unwinding itself on frames
+    stop, no scratch, MOVE to SR setting and clearing T1, ORI to SR,
+    RTE popping T1, a privilege violation; the unwinding itself on frames
     (`step.rs`'s tests), an interrupt above the trace among them.
     On silicon not yet.
 

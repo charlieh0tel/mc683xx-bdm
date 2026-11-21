@@ -259,3 +259,88 @@ fn a_reset_back_into_background_mode_is_seen() {
     assert_eq!(target.halted().unwrap(), Some(Entry::Breakpoint));
     assert!(target.read_register(Register::D0).is_ok());
 }
+
+/// SR's T1, and opcodes that write SR (CPU32RM 4): `move #imm,sr`, `ori
+/// #imm,sr`, RTE.
+const T1: u32 = 0x8000;
+const MOVE_TO_SR: u16 = 0x46FC;
+const ORI_TO_SR: u16 = 0x007C;
+const RTE: u16 = 0x4E73;
+/// The trace and privilege violation vectors (CPU32RM Table 6-1), and
+/// where the program's handlers for them are.
+const TRACE: u32 = 9;
+const PRIVILEGE: u32 = 8;
+const TRACE_HANDLER: u32 = RAM_BASE + 0x200;
+const PRIVILEGE_HANDLER: u32 = RAM_BASE + 0x280;
+
+/// Points the program's vector `vector` at `handler`.
+fn set_vector(target: &mut StandIn, vector: u32, handler: u32) {
+    let address = Address(TABLE + vector * VECTOR_BYTES);
+    target.write_memory(address, FunctionCode::SUPERVISOR_DATA, Size::Long, &handler.to_be_bytes()).unwrap();
+}
+
+#[test]
+fn a_stepped_move_to_sr_keeps_the_t1_it_sets() {
+    let (mut target, pod) = stepping(&[MOVE_TO_SR, 0xA000, NOP]);
+    assert_eq!(target.step().unwrap(), Entry::Breakpoint);
+    assert_eq!(target.read_system_register(SystemRegister::Sr).unwrap(), SUPERVISOR | T1);
+    assert_eq!(target.read_system_register(SystemRegister::Rpc).unwrap(), PROGRAM + 4);
+    assert_eq!(target.read_register(Register::A7).unwrap(), STACK);
+    clean(&pod);
+}
+
+#[test]
+fn a_stepped_move_to_sr_keeps_the_t1_it_clears() {
+    let (mut target, pod) = stepping(&[MOVE_TO_SR, 0x2000, NOP]);
+    set_vector(&mut target, TRACE, TRACE_HANDLER);
+    target.write_system_register(SystemRegister::Sr, SUPERVISOR | T1).unwrap();
+    // The program traced the instruction itself: its trace handler is
+    // next, the frame holding the SR the instruction loaded.
+    assert_eq!(target.step().unwrap(), Entry::Breakpoint);
+    assert_eq!(target.read_system_register(SystemRegister::Rpc).unwrap(), TRACE_HANDLER);
+    let sp = target.read_register(Register::A7).unwrap();
+    assert_eq!(sp, STACK - 12, "the program's own six-word trace frame");
+    assert_eq!(long(&mut target, sp) >> 16, SUPERVISOR, "T1 cleared by the instruction");
+    clean(&pod);
+}
+
+#[test]
+fn a_stepped_ori_to_sr_sets_t1() {
+    let (mut target, pod) = stepping(&[ORI_TO_SR, 0x8000, NOP]);
+    assert_eq!(target.step().unwrap(), Entry::Breakpoint);
+    assert_eq!(target.read_system_register(SystemRegister::Sr).unwrap(), SUPERVISOR | T1);
+    assert_eq!(target.read_system_register(SystemRegister::Rpc).unwrap(), PROGRAM + 4);
+    clean(&pod);
+}
+
+#[test]
+fn a_stepped_rte_keeps_the_trace_bits_it_pops() {
+    let back = PROGRAM + 0x40;
+    let (mut target, pod) = stepping(&[RTE]);
+    // A four-word frame: SR with T1, the return address, format $0.
+    let mut frame = Vec::new();
+    frame.extend_from_slice(&u16::try_from(SUPERVISOR | T1).unwrap().to_be_bytes());
+    frame.extend_from_slice(&back.to_be_bytes());
+    frame.extend_from_slice(&[0, 0]);
+    target.write_memory(Address(STACK - 8), FunctionCode::SUPERVISOR_DATA, Size::Word, &frame).unwrap();
+    target.write_register(Register::A7, STACK - 8).unwrap();
+    assert_eq!(target.step().unwrap(), Entry::Breakpoint);
+    assert_eq!(target.read_system_register(SystemRegister::Sr).unwrap(), SUPERVISOR | T1);
+    assert_eq!(target.read_system_register(SystemRegister::Rpc).unwrap(), back);
+    assert_eq!(target.read_register(Register::A7).unwrap(), STACK, "the frame popped");
+    clean(&pod);
+}
+
+#[test]
+fn a_privileged_sr_write_in_user_mode_is_a_privilege_violation() {
+    let user_stack = RAM_BASE + 0x300;
+    let (mut target, pod) = stepping(&[MOVE_TO_SR, 0xA000]);
+    set_vector(&mut target, PRIVILEGE, PRIVILEGE_HANDLER);
+    target.write_system_register(SystemRegister::Usp, user_stack).unwrap();
+    target.write_system_register(SystemRegister::Sr, 0).unwrap();
+    assert_eq!(target.step().unwrap(), Entry::Breakpoint);
+    assert_eq!(target.read_system_register(SystemRegister::Rpc).unwrap(), PRIVILEGE_HANDLER);
+    let sp = target.read_register(Register::A7).unwrap();
+    assert_eq!(long(&mut target, sp) >> 16, 0, "the program's SR, no T1: the instruction did not run");
+    clean(&pod);
+}

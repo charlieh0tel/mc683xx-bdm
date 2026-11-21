@@ -24,9 +24,11 @@ use crate::pod::Pod;
 use crate::step::FRAME_HEAD;
 use crate::step::Frame;
 use crate::step::MAX_FRAMES;
+use crate::step::SR_S;
 use crate::step::SR_T1;
 use crate::step::SR_TRACE;
 use crate::step::StepError;
+use crate::step::TraceEffect;
 use crate::step::after_stub;
 use crate::step::frame_bytes;
 use crate::step::scratch_image;
@@ -43,6 +45,9 @@ const STEP_TIMEOUT: Duration = Duration::from_millis(100);
 /// The supervisor data space, where the step's table, stub and frames
 /// are read and written, as the CPU stacks and fetches vectors.
 const SUPERVISOR_DATA: FunctionCode = FunctionCode::SUPERVISOR_DATA;
+/// The program spaces a stepped instruction is read from, by SR's S.
+const SUPERVISOR_PROGRAM: FunctionCode = FunctionCode::SUPERVISOR_PROGRAM;
+const USER_PROGRAM: FunctionCode = FunctionCode::USER_PROGRAM;
 
 /// One of SFC and DFC: the program's value, and what the CPU holds now.
 /// Both `None` until read or written; they differ only after a memory
@@ -320,7 +325,13 @@ impl<T: Transport> PodTarget<T> {
     /// After a step that reached the stub: reads the frames stacked on
     /// the way, unwinds them into the program's table's state, and
     /// writes that back with the program's VBR.
-    fn unwind(&mut self, stub: Address, program_sr: u16, program_vbr: u32) -> Result<(), Error> {
+    fn unwind(
+        &mut self,
+        stub: Address,
+        program_sr: u16,
+        program_vbr: u32,
+        effect: TraceEffect,
+    ) -> Result<(), Error> {
         let sp = self.read_register(Register::A7)?;
         let sr = self.read_system_register(SystemRegister::Sr)? as u16;
         let mut chain = vec![Frame::cpu(sr, stub.0)];
@@ -340,7 +351,7 @@ impl<T: Transport> PodTarget<T> {
             at = at.offset(bytes as u32);
         }
         let bottom = at;
-        let chain = unwind(chain, stub, program_sr, |vector| {
+        let chain = unwind(chain, stub, program_sr, effect, |vector| {
             let mut handler = [0; 4];
             let address = vector_address(Address(program_vbr), vector);
             self.read_memory(address, SUPERVISOR_DATA, Size::Word, &mut handler)?;
@@ -360,9 +371,37 @@ impl<T: Transport> PodTarget<T> {
         self.write_system_register(SystemRegister::Sr, u32::from(cpu.sr))
     }
 
+    /// What the instruction at RPC does to SR's trace bits, read from
+    /// the program space SR's S selects.  One that cannot be read (a
+    /// bus error) is no SR writer: the step faults on its fetch first.
+    fn trace_effect(&mut self, program_sr: u32) -> Result<TraceEffect, Error> {
+        let pc = self.read_system_register(SystemRegister::Rpc)?;
+        let space = if program_sr & SR_S != 0 { SUPERVISOR_PROGRAM } else { USER_PROGRAM };
+        let word = |target: &mut Self, at: u32| {
+            let mut bytes = [0; 2];
+            match target.read_memory(Address(at), space, Size::Word, &mut bytes) {
+                Ok(()) => Ok(Some(u16::from_be_bytes(bytes))),
+                Err(Error::Reply(ReplyError::Failed(Status::BusError))) => Ok(None),
+                Err(error) => Err(error),
+            }
+        };
+        let Some(opcode) = word(self, pc)? else { return Ok(TraceEffect::Kept) };
+        if !TraceEffect::needs_immediate(opcode) {
+            return Ok(TraceEffect::of(opcode, 0));
+        }
+        let Some(immediate) = word(self, pc.wrapping_add(2))? else { return Ok(TraceEffect::Kept) };
+        Ok(TraceEffect::of(opcode, immediate))
+    }
+
     /// The step from VBR at the stub's table on: SR's T1 set, GO, and
     /// the stop worked out.
-    fn trace(&mut self, scratch: Address, program_sr: u32, program_vbr: u32) -> Result<Entry, Error> {
+    fn trace(
+        &mut self,
+        scratch: Address,
+        program_sr: u32,
+        program_vbr: u32,
+        effect: TraceEffect,
+    ) -> Result<Entry, Error> {
         self.write_system_register(SystemRegister::Vbr, scratch.0)?;
         self.write_system_register(SystemRegister::Sr, (program_sr & !SR_TRACE) | SR_T1)?;
         self.leave()?;
@@ -373,7 +412,7 @@ impl<T: Transport> PodTarget<T> {
         // out and the halt found the target already there.
         let at_stub = pc == after_stub(scratch).0 && entry.is_none_or(|entry| entry == Entry::Background);
         if at_stub {
-            self.unwind(stub(scratch), program_sr as u16, program_vbr)?;
+            self.unwind(stub(scratch), program_sr as u16, program_vbr, effect)?;
             return Ok(Entry::Breakpoint);
         }
         self.untrace(program_sr, program_vbr)?;
@@ -461,11 +500,12 @@ impl<T: Transport> Cpu32Target for PodTarget<T> {
         self.halted_state()?;
         let program_sr = self.read_system_register(SystemRegister::Sr)?;
         let program_vbr = self.read_system_register(SystemRegister::Vbr)?;
+        let effect = self.trace_effect(program_sr)?;
         if !self.scratch_written {
             self.write_memory(scratch, SUPERVISOR_DATA, Size::Word, &scratch_image(scratch))?;
             self.scratch_written = true;
         }
-        let stepped = self.trace(scratch, program_sr, program_vbr);
+        let stepped = self.trace(scratch, program_sr, program_vbr, effect);
         if let Err(error) = &stepped
             && !matches!(error, Error::Step(StepError::NotStopped(_)))
         {
@@ -637,6 +677,8 @@ mod tests {
     const TRACED_PC: u32 = 0x2002;
     /// The trace frame: format $2, vector 9, the stepped SR with T1.
     const TRACE_FRAME: [u8; 12] = [0xA0, 0x00, 0, 0, 0x20, 0x02, 0x20, 0x24, 0, 0, 0x12, 0x34];
+    /// NOP's opcode (CPU32RM 4).
+    const NOP: [u8; 2] = [0x4E, 0x71];
 
     /// The pod's reply to `request` in a step that reaches the stub with
     /// the trace frame alone stacked.
@@ -654,6 +696,8 @@ mod tests {
             Request::ReadMemory { address: Address(address), .. } if address == STACK + 8 => {
                 memory(&TRACE_FRAME[8..])
             }
+            // The instruction stepped, at RPC: a NOP.
+            Request::ReadMemory { length: 2, .. } => memory(&NOP),
             _ => DONE.to_vec(),
         }
     }

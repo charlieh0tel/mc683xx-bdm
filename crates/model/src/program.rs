@@ -1,6 +1,9 @@
 //! The instructions the model runs once resumed, and the exceptions
 //! they and an interrupt raise (CPU32RM 4, 6): NOP, MOVEQ, BRA.S, TRAP,
-//! ILLEGAL and BGND, with T1 and T0 tracing.  Another instruction, a
+//! ILLEGAL and BGND; the SR writers MOVE #imm,SR, ANDI, ORI and EORI
+//! #imm,SR and RTE from a format $0 or $2 frame, privileged; with T1
+//! and T0 tracing.  Another instruction (MOVE to SR from anything but
+//! an immediate, RTE from another format), a
 //! fetch, stacking or vector read outside RAM, or a run past
 //! [`RUN_LIMIT`] instructions is a program the model cannot follow: it
 //! is left running, as a CPU running code no one watches.
@@ -35,6 +38,7 @@ const NONMASKABLE: u8 = 7;
 
 /// Exception vectors (CPU32RM Table 6-1).
 const ILLEGAL_VECTOR: u32 = 4;
+const PRIVILEGE_VECTOR: u32 = 8;
 const TRACE_VECTOR: u32 = 9;
 const TRAP_VECTOR: u32 = 32;
 
@@ -60,6 +64,20 @@ const MOVEQ: u16 = 0x7000;
 const MOVEQ_MASK: u16 = 0xF100;
 const BRA_SHORT: u16 = 0x6000;
 const BRA_MASK: u16 = 0xFF00;
+/// `move #imm,sr`, and `andi`, `ori` and `eori` `#imm,sr`, each with an
+/// immediate word; and RTE.
+const MOVE_TO_SR_IMMEDIATE: u16 = 0x46FC;
+const ANDI_TO_SR: u16 = 0x027C;
+const ORI_TO_SR: u16 = 0x007C;
+const EORI_TO_SR: u16 = 0x0A7C;
+const RTE: u16 = 0x4E73;
+/// SR's bits that exist on the CPU32 (CPU32RM 2.3.3): T1, T0, S, the
+/// mask and the condition codes.
+const SR_IMPLEMENTED: u32 = 0xE71F;
+/// Bytes in a frame's head (SR, PC, format/vector), and in a format $2
+/// frame's instruction address after it.
+const FRAME_HEAD_BYTES: u32 = 8;
+const SIX_WORD_EXTRA_BYTES: u32 = 4;
 /// BRA's 8-bit displacements that announce a 16- or 32-bit one.
 const BRA_WORD: u8 = 0x00;
 const BRA_LONG: u8 = 0xFF;
@@ -154,6 +172,27 @@ impl<const RAM: usize> Target<RAM> {
                 self.set_pc(next.wrapping_add(displacement));
                 changed_flow = true;
             }
+            MOVE_TO_SR_IMMEDIATE | ANDI_TO_SR | ORI_TO_SR | EORI_TO_SR | RTE if self.sr() & SR_S == 0 => {
+                // privileged, so not executed and not traced
+                self.exception(PRIVILEGE_VECTOR, start, None)?;
+                return Ok(Flow::Next);
+            }
+            MOVE_TO_SR_IMMEDIATE | ANDI_TO_SR | ORI_TO_SR | EORI_TO_SR => {
+                let immediate = u32::from(self.fetch(next)?);
+                let sr = self.sr();
+                let sr = match opcode {
+                    MOVE_TO_SR_IMMEDIATE => immediate,
+                    ANDI_TO_SR => sr & immediate,
+                    ORI_TO_SR => sr | immediate,
+                    _ => sr ^ immediate,
+                };
+                self.set_system_register(SystemRegister::Sr, sr & SR_IMPLEMENTED);
+                self.set_pc(next.wrapping_add(WORD_BYTES));
+            }
+            RTE => {
+                self.return_from_exception()?;
+                changed_flow = true;
+            }
             _ => return Err(Lost),
         }
         if tracing & SR_T1 != 0 || (tracing & SR_T0 != 0 && changed_flow) {
@@ -182,6 +221,25 @@ impl<const RAM: usize> Target<RAM> {
         let table = self.system_register(SystemRegister::Vbr);
         let handler = self.load(Size::Long, table.wrapping_add(vector * VECTOR_BYTES)).map_err(|()| Lost)?;
         self.set_pc(handler);
+        Ok(())
+    }
+
+    /// RTE (CPU32RM 4, RTE; 6.4): SR, PC and the format/vector word off
+    /// the supervisor stack, and the rest of a format $2 frame; SR last,
+    /// so an S it clears makes USP A7 after SSP has moved.
+    fn return_from_exception(&mut self) -> Result<(), Lost> {
+        let sp = self.register(Register::A7);
+        let sr = self.load(Size::Word, sp).map_err(|()| Lost)?;
+        let pc = self.load(Size::Long, sp.wrapping_add(2)).map_err(|()| Lost)?;
+        let format_vector = self.load(Size::Word, sp.wrapping_add(6)).map_err(|()| Lost)?;
+        let bytes = match (format_vector >> FORMAT_SHIFT) as u16 {
+            FORMAT_FOUR_WORD => FRAME_HEAD_BYTES,
+            FORMAT_SIX_WORD => FRAME_HEAD_BYTES + SIX_WORD_EXTRA_BYTES,
+            _ => return Err(Lost),
+        };
+        self.set_register(Register::A7, sp.wrapping_add(bytes));
+        self.set_system_register(SystemRegister::Sr, sr & SR_IMPLEMENTED);
+        self.set_pc(pc);
         Ok(())
     }
 
