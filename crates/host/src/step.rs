@@ -11,6 +11,9 @@ use mc683xx_target::address::Address;
 /// changes of flow.
 pub(crate) const SR_T1: u32 = 0x8000;
 pub(crate) const SR_TRACE: u32 = 0xC000;
+/// SR's supervisor bit: the program space a stepped instruction is read
+/// from.
+pub(crate) const SR_S: u32 = 0x2000;
 
 /// BGND (CPU32RM 4, BGND), the stub every vector points at.
 pub(crate) const BGND: [u8; 2] = [0x4A, 0xFA];
@@ -38,6 +41,70 @@ const VECTOR_OFFSET_MASK: u16 = 0x0FFF;
 const FOUR_WORD: (u16, usize) = (0x0, 8);
 const SIX_WORD: (u16, usize) = (0x2, 12);
 const BUS_ERROR: (u16, usize) = (0xC, 24);
+
+/// Opcodes that write the whole SR (CPU32RM 4), T1 and T0 with it:
+/// `move <ea>,sr`, by its mask, and `andi`, `ori` and `eori` `#imm,sr`,
+/// RTE, STOP and LPSTOP's first word.
+const MOVE_TO_SR: (u16, u16) = (0xFFC0, 0x46C0);
+const ANDI_TO_SR: u16 = 0x027C;
+const ORI_TO_SR: u16 = 0x007C;
+const EORI_TO_SR: u16 = 0x0A7C;
+const RTE: u16 = 0x4E73;
+const STOP: u16 = 0x4E72;
+const LPSTOP: u16 = 0xF800;
+
+/// What the stepped instruction does to SR's trace bits, as it leaves
+/// them for the next instruction.  The step sets T1 (T0 clear) for
+/// itself, so where the instruction keeps the bits the program's go
+/// back, and where it writes them its own stay.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum TraceEffect {
+    /// Not an SR writer: the program's bits.
+    Kept,
+    /// Loads SR whole (MOVE to SR, RTE, STOP, LPSTOP): what it left.
+    Loaded,
+    /// ANDs, ORs or EORs SR with an immediate: the program's bits so
+    /// combined.
+    Combined {
+        /// `andi`, `ori` or `eori` `#imm,sr`'s opcode.
+        opcode: u16,
+        /// The immediate.
+        immediate: u16,
+    },
+}
+
+impl TraceEffect {
+    /// Whether `opcode` combines SR with an immediate word that follows
+    /// it, which [`TraceEffect::of`] then needs.
+    pub(crate) const fn needs_immediate(opcode: u16) -> bool {
+        matches!(opcode, ANDI_TO_SR | ORI_TO_SR | EORI_TO_SR)
+    }
+
+    /// The effect of the instruction whose first word is `opcode`, and
+    /// whose second, for an immediate SR op, is `immediate`.
+    pub(crate) const fn of(opcode: u16, immediate: u16) -> Self {
+        match opcode {
+            ANDI_TO_SR | ORI_TO_SR | EORI_TO_SR => Self::Combined { opcode, immediate },
+            RTE | STOP | LPSTOP => Self::Loaded,
+            _ if opcode & MOVE_TO_SR.0 == MOVE_TO_SR.1 => Self::Loaded,
+            _ => Self::Kept,
+        }
+    }
+
+    /// SR's trace bits after the instruction, from the program's SR
+    /// before it and the SR it left with the step's T1.
+    pub(crate) const fn trace_bits(self, program_sr: u16, left_sr: u16) -> u16 {
+        let trace = SR_TRACE as u16;
+        let bits = match self {
+            Self::Kept => program_sr,
+            Self::Loaded => left_sr,
+            Self::Combined { opcode: ANDI_TO_SR, immediate } => program_sr & immediate,
+            Self::Combined { opcode: ORI_TO_SR, immediate } => program_sr | immediate,
+            Self::Combined { immediate, .. } => program_sr ^ immediate,
+        };
+        bits & trace
+    }
+}
 
 /// The most frames one step can stack: the instruction's exception, the
 /// trace, and interrupts on top, each of a higher level.  More is a
@@ -161,12 +228,16 @@ impl Frame {
 /// stub: the frame stacked from the program, with its SR's trace bits
 /// the step's.  `program_sr` is the SR the program had; with T1 set
 /// the trace is its own and is kept like any other exception.
+/// `effect` is the stepped instruction's on the trace bits.
 /// `vector(n)` reads the program's vector `n`.
 ///
 /// Returns the chain as the program's table would have left it: the
 /// step's trace frame gone, the frame above it given its SR and PC,
-/// the program's trace bits back in the frame stacked from it, and
-/// every PC that was the stub the handler of the exception below.
+/// the trace bits in the frame stacked from the program put right (the
+/// instruction's own if that frame is the trace's, so it ran; the
+/// program's if another exception stacked it before the instruction
+/// ran), and every PC that was the stub the handler of the exception
+/// below.
 ///
 /// # Errors
 /// `vector`'s.
@@ -174,11 +245,15 @@ pub(crate) fn unwind<E>(
     mut chain: Vec<Frame>,
     stub: Address,
     program_sr: u16,
+    effect: TraceEffect,
     mut vector: impl FnMut(u32) -> Result<u32, E>,
 ) -> Result<Vec<Frame>, E> {
     let trace_bits = SR_TRACE as u16;
+    let frames = chain.len();
     if let Some(bottom) = chain.last_mut() {
-        bottom.sr = (bottom.sr & !trace_bits) | (program_sr & trace_bits);
+        let ran = frames > 1 && bottom.vector() == TRACE_VECTOR;
+        let effect = if ran { effect } else { TraceEffect::Kept };
+        bottom.sr = (bottom.sr & !trace_bits) | effect.trace_bits(program_sr, bottom.sr);
     }
     let program_traces = u32::from(program_sr) & SR_T1 != 0;
     let ours = chain.iter().skip(1).position(|frame| frame.vector() == TRACE_VECTOR).map(|at| at + 1);
@@ -205,6 +280,7 @@ mod tests {
     use super::Frame;
     use super::SCRATCH_BYTES;
     use super::StepError;
+    use super::TraceEffect;
     use super::frame_bytes;
     use super::scratch_image;
     use super::stub;
@@ -255,7 +331,7 @@ mod tests {
     #[test]
     fn a_plain_step_drops_the_trace_frame() {
         let chain = vec![Frame::cpu(HANDLER_SR, STUB), frame(2, 9, TRACED_SR, 0x2002)];
-        let unwound = unwind(chain, Address(STUB), PROGRAM_SR, program_vector).unwrap();
+        let unwound = unwind(chain, Address(STUB), PROGRAM_SR, TraceEffect::Kept, program_vector).unwrap();
         assert_eq!(unwound, [Frame::cpu(PROGRAM_SR, 0x2002)]);
     }
 
@@ -266,7 +342,7 @@ mod tests {
             frame(2, 9, HANDLER_SR, STUB),
             frame(0, 33, TRACED_SR, 0x2002),
         ];
-        let unwound = unwind(chain, Address(STUB), PROGRAM_SR, program_vector).unwrap();
+        let unwound = unwind(chain, Address(STUB), PROGRAM_SR, TraceEffect::Kept, program_vector).unwrap();
         assert_eq!(unwound, [Frame::cpu(HANDLER_SR, 0x1210), frame(0, 33, PROGRAM_SR, 0x2002)]);
     }
 
@@ -278,21 +354,21 @@ mod tests {
             frame(0, 64, HANDLER_SR, STUB),
             frame(2, 9, TRACED_SR, 0x2002),
         ];
-        let unwound = unwind(chain, Address(STUB), PROGRAM_SR, program_vector).unwrap();
+        let unwound = unwind(chain, Address(STUB), PROGRAM_SR, TraceEffect::Kept, program_vector).unwrap();
         assert_eq!(unwound, [Frame::cpu(interrupt_sr, 0x1400), frame(0, 64, PROGRAM_SR, 0x2002)]);
     }
 
     #[test]
     fn an_interrupt_at_the_start_is_taken_untraced() {
         let chain = vec![Frame::cpu(0x2500, STUB), frame(0, 70, TRACED_SR | 0x0004, 0x2000)];
-        let unwound = unwind(chain, Address(STUB), PROGRAM_SR, program_vector).unwrap();
+        let unwound = unwind(chain, Address(STUB), PROGRAM_SR, TraceEffect::Kept, program_vector).unwrap();
         assert_eq!(unwound, [Frame::cpu(0x2500, 0x1460), frame(0, 70, PROGRAM_SR | 0x0004, 0x2000)]);
     }
 
     #[test]
     fn a_program_tracing_itself_keeps_its_trace() {
         let chain = vec![Frame::cpu(HANDLER_SR, STUB), frame(2, 9, TRACED_SR, 0x2002)];
-        let unwound = unwind(chain, Address(STUB), TRACED_SR, program_vector).unwrap();
+        let unwound = unwind(chain, Address(STUB), TRACED_SR, TraceEffect::Kept, program_vector).unwrap();
         assert_eq!(unwound, [Frame::cpu(HANDLER_SR, 0x1090), frame(2, 9, TRACED_SR, 0x2002)]);
     }
 
@@ -300,8 +376,65 @@ mod tests {
     fn a_program_tracing_changes_of_flow_gets_its_t0_back() {
         let t0 = 0x6000;
         let chain = vec![Frame::cpu(HANDLER_SR, STUB), frame(2, 9, TRACED_SR, 0x2002)];
-        let unwound = unwind(chain, Address(STUB), t0, program_vector).unwrap();
+        let unwound = unwind(chain, Address(STUB), t0, TraceEffect::Kept, program_vector).unwrap();
         assert_eq!(unwound, [Frame::cpu(t0, 0x2002)]);
+    }
+
+    /// `move #$a000,sr` and `move #$2000,sr`'s effect.
+    const LOADED: TraceEffect = TraceEffect::Loaded;
+
+    #[test]
+    fn a_stepped_move_to_sr_keeps_the_t1_it_set() {
+        let chain = vec![Frame::cpu(HANDLER_SR, STUB), frame(2, 9, TRACED_SR, 0x2004)];
+        let unwound = unwind(chain, Address(STUB), PROGRAM_SR, LOADED, program_vector).unwrap();
+        assert_eq!(unwound, [Frame::cpu(TRACED_SR, 0x2004)]);
+    }
+
+    #[test]
+    fn a_stepped_move_to_sr_keeps_the_t1_it_cleared() {
+        // The program traced itself, so its trace is taken; the frame
+        // carries the SR the instruction loaded.
+        let chain = vec![Frame::cpu(HANDLER_SR, STUB), frame(2, 9, PROGRAM_SR, 0x2004)];
+        let unwound = unwind(chain, Address(STUB), TRACED_SR, LOADED, program_vector).unwrap();
+        assert_eq!(unwound, [Frame::cpu(HANDLER_SR, 0x1090), frame(2, 9, PROGRAM_SR, 0x2004)]);
+    }
+
+    #[test]
+    fn immediate_sr_ops_combine_with_the_programs_bits() {
+        let t1 = 0x8000;
+        for (opcode, immediate, left, expected) in [
+            (0x007C, t1, TRACED_SR, TRACED_SR),       // ori: T1 set
+            (0x0A7C, t1, PROGRAM_SR, TRACED_SR),      // eori: T1 toggled on, not off
+            (0x027C, 0x7FFF, PROGRAM_SR, PROGRAM_SR), // andi: T1 cleared
+            (0x027C, 0xFFFF, TRACED_SR, PROGRAM_SR),  // andi: the step's T1 not kept
+        ] {
+            let effect = TraceEffect::of(opcode, immediate);
+            assert!(TraceEffect::needs_immediate(opcode));
+            let chain = vec![Frame::cpu(HANDLER_SR, STUB), frame(2, 9, left, 0x2004)];
+            let unwound = unwind(chain, Address(STUB), PROGRAM_SR, effect, program_vector).unwrap();
+            assert_eq!(unwound, [Frame::cpu(expected, 0x2004)], "{opcode:04x} #{immediate:04x}");
+        }
+    }
+
+    #[test]
+    fn an_sr_writer_that_did_not_run_leaves_the_programs_bits() {
+        // An interrupt taken before it: the frame stacked from the
+        // program is the interrupt's, with the step's T1.
+        let chain = vec![Frame::cpu(0x2500, STUB), frame(0, 70, TRACED_SR, 0x2000)];
+        let unwound = unwind(chain, Address(STUB), PROGRAM_SR, LOADED, program_vector).unwrap();
+        assert_eq!(unwound, [Frame::cpu(0x2500, 0x1460), frame(0, 70, PROGRAM_SR, 0x2000)]);
+    }
+
+    #[test]
+    fn sr_writers_are_known_by_their_opcodes() {
+        for opcode in [0x46FC, 0x46C0, 0x46D7, 0x4E73, 0x4E72, 0xF800] {
+            assert_eq!(TraceEffect::of(opcode, 0), TraceEffect::Loaded, "{opcode:04x}");
+        }
+        // NOP, MOVE to CCR, ORI to CCR, MOVE from SR: not SR writers.
+        for opcode in [0x4E71, 0x44FC, 0x003C, 0x40C0] {
+            assert_eq!(TraceEffect::of(opcode, 0), TraceEffect::Kept, "{opcode:04x}");
+            assert!(!TraceEffect::needs_immediate(opcode));
+        }
     }
 
     #[test]
