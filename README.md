@@ -10,7 +10,7 @@ Status: the rev 0.2 carrier (`hardware/mc683xx-pod/`, 68 x 59 mm, 4
 layers; `hardware/production/20261102-0.2/`, assembled with the Pico,
 J2 not fitted) passes its checks without a target: inputs, VDD sense
 and a loopback through its buffers (`docs/bring-up.md`, steps 1-3).  On
-an MC68331 (an HP 58503A) it resets into background mode, reads
+an MC68331 target it resets into background mode, reads
 registers and SIM registers, and reads 512 KB of flash correctly.
 
 ## Layout

@@ -21,11 +21,11 @@
   lands; then delete `bdm-model`.
 - `bdm load` and `bdm init` over m683xx-emu's `mc683xx-debug` once it
   lands (PLAN.md, Host); tests against `bdm-stand-in`.  FRZSW is set
-  at reset (SIMCR $60CF), but a program may clear it (the 58503A's
-  does), and then the watchdog runs while the CPU is halted: an init
-  script sets it again.
+  at reset (SIMCR $60CF), but a program may clear it, and then the
+  watchdog runs while the CPU is halted: an init script sets it
+  again.
 - `bdm gdb` on silicon with a real m68k gdb: registers, memory and
-  disassembly work (58503A, 2026-11-20); still to try: breakpoints, continue,
+  disassembly work (docs/58503a/); still to try: breakpoints, continue,
   Ctrl-C, and `PodTarget::step` on a TRAP, an interrupt, user mode,
   code in ROM (PLAN.md, Host, gdb).
 - `monitor init` and `monitor load` in `bdm gdb`, once `mc683xx-debug`
@@ -56,8 +56,6 @@
   - Silicon questions for m683xx-emu: PCC after a reset double bus
     fault, BKPT out of LPSTOP, the halt monitor on a double fault in
     BDM.
-  - The 58503A's halt-monitor reset (RSR $10) after GO and a halt
-    (docs/58503a/README.md).
   - USB serial number: `bdm list` and `lsusb -v` against `picotool
     info -d` on a Pico and a Pico 2 (byte order of the RP2350's chip
     ID); two pods at once, `--pod usb:SERIAL` and `bdm bootsel` on

@@ -73,9 +73,40 @@ halt monitor resets the CPU, and BKPT, still held low, enables
 background mode at that reset.  `bdm go` straight after `bdm reset` also starts
 it from the reset vector.
 
+## The firmware's SIM settings
+
+The boot code at $550 (read over BDM with gdb) writes SYPCR $CC, which
+turns the halt monitor on, and the chip selects in the table above.
+The running firmware writes SIMCR $014A, clearing FRZSW and FRZBM, so
+its software watchdog (about 8 s) keeps counting while the CPU is
+halted (smartclock's reading of the 3704 image).  At a reset entry
+SIMCR is still $60CF.  So: halt from a reset entry, or keep a halt
+after the firmware has run under about 5 s, or set FRZSW first.
+
+## Pod restarts
+
+A pod restarted while the CPU is halted can glitch BKPT
+(docs/bring-up.md, step 5).  Here that left the CPU refusing RSREG
+ATEMP (illegal, then $0001) until `bdm reset`; nine seconds of idle
+halt without a restart did not.  A restart by `bdm bootsel`, which
+turns U1 off first, left it answering (2026-11-20).
+
+## gdb
+
+`bdm gdb` from a reset entry, gdb-multiarch with `set architecture
+m68k:cpu32` and `set endian big`: registers, memory and disassembly of
+the boot code at $550 work; `detach` lets the firmware boot.  Steps and
+RAM breakpoints need the RAM chip selects (CS0, CS2, CS3) and a scratch
+block the firmware does not use: not yet chosen.
+
+## Throughput
+
+DUMP at 1 MHz DSCLK: 512 KB of longs in 18.9 s, about 28 KB/s.
+
 ## To check
 
 - After `bdm go` and a halt with the firmware's map set, the CPU left
   background mode on its own within a few commands; RSR then read $10,
   a halt monitor reset (MC68331UM D.3.4).  Reading from a reset entry,
-  as above, avoids it.
+  as above, avoids it.  The boot code's SYPCR $CC enabling the halt
+  monitor fits.

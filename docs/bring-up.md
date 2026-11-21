@@ -164,11 +164,11 @@ address 0 (initial SSP, then initial PC).
 
 A pod restarted while the target is halted can glitch BKPT: as the
 Pico resets, GP9 (U1's input) falls before GP10 turns U1 off, and the
-halted CPU takes the pulse as a DSCLK clock.  On the 58503A that left
+halted CPU takes the pulse as a DSCLK clock.  On a target that left
 the CPU refusing commands (RSREG ATEMP illegal) until `bdm reset`;
 idle time alone does not.  `bdm bootsel` turns U1 off before its
-reboot, and a restart that way leaves the CPU answering (58503A,
-2026-11-20).  A power loss, replug, panic or watchdog reset still
+reboot, and a restart that way leaves the CPU answering
+(docs/58503a/).  A power loss, replug, panic or watchdog reset still
 can.  After such a restart: `bdm reset` (or
 `bdm resync`, if only the link's framing is off).  A watchdog reset
 of the pod should be rare (PLAN.md, Firmware, Watchdog).
@@ -244,9 +244,8 @@ bdm dump RAM 4 --size byte                 # 01 02 03 04
 ```
 
 FRZSW is set at reset (SIMCR $60CF on an MC68331), so the watchdog
-stops while the CPU is halted.  A program may clear it (the 58503A's
-writes SIMCR $014A): after GO and a halt, set FRZSW again, or the
-watchdog resets the CPU.
+stops while the CPU is halted.  A program may clear it: after GO and
+a halt, set FRZSW again, or the watchdog resets the CPU.
 
 ## 11. A self-entry: BGND
 

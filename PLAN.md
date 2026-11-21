@@ -291,7 +291,7 @@ pods apart (`bdm --pod usb:SERIAL`).  Requests:
   ATEMP read, so a link out of frame cannot stop them.
 - Resync: NOP pairs, and a lone DSCLK edge after each pair whose second
   NOP does not read "command complete", until one does (at most 17).
-  On request only: on the 58503A a pod restart left the link in frame
+  On request only: on a target a pod restart left the link in frame
   but the CPU refusing commands, which only a reset cleared, so an
   automatic resync bought nothing (docs/bring-up.md, step 5).
 - Bootsel turns U1 off (GP10 low, then 10 us) before the boot ROM's
@@ -564,9 +564,9 @@ How to run each item and what to expect: `docs/bring-up.md`.
       4 MHz (0.132 s).  VDD sense reads 5.344 V at 5.287 V measured
       (USB 5 V from an FTDI cable), 1.1% high.  BKPT idle at R3's
       pull-up (5.2 V); U1 driving it needs a load (1 kOhm to GND) to show
-- [x] Reset into BDM; confirm FREEZE asserts (58503A, 1 MHz DSCLK)
+- [x] Reset into BDM; confirm FREEZE asserts (1 MHz DSCLK; docs/58503a/)
 - [x] RSREG ATEMP first (`0x2588`): confirms RSREG's `0x2580`.  ATEMP
-      $00000000 after a reset entry (58503A)
+      $00000000 after a reset entry
 - [ ] BGND and a breakpoint after GO: `bdm pins` reports a fresh ATEMP
       of 1 and 0; DSI driven again
 - [ ] Silicon questions the manuals leave open (from m683xx-emu's
@@ -576,19 +576,18 @@ How to run each item and what to expect: `docs/bring-up.md`.
   - BKPT on a CPU in STOP or LPSTOP: enters background mode or not
   - A double bus fault with BDM enabled: whether the SIM halt monitor
     still resets
-  - PCC after a reset entry, no fault: $FFFFFFFF (58503A)
+  - PCC after a reset entry, no fault: $FFFFFFFF (docs/58503a/)
 - [ ] NOP / not-ready handling
-- [x] RDREG D0; RSREG RPC: `bdm regs` on a 58503A, RPC the reset
-      vector's $00000550
+- [x] RDREG D0; RSREG RPC: `bdm regs`, RPC the reset vector's PC
 - [x] Read SIMCR (0xFFFA00) and other SIM regs; compare to reset
       values: after a reset entry SIMCR $60CF (FRZSW and FRZBM set),
-      SYNCR $3F08, CSBARBT $0007, CSORBT $7B70 (58503A)
+      CSBARBT $0007, CSORBT $7B70 (docs/58503a/)
 - [ ] Write chip-select init; read/write external RAM.  Chip selects
-      written and read through (58503A CSBOOT and CS1, the whole
-      512 KB flash identical to smartclock's 3704 image); RAM not yet
+      written and read through (CSBOOT and CS1: a 512 KB flash read
+      back identical to a known image; docs/58503a/); RAM not yet
 - [ ] Block DUMP/FILL throughput test; raise DSCLK until it fails,
       back off.  DUMP at 1 MHz: 512 KB of longs in 18.9 s, about
-      28 KB/s (58503A)
+      28 KB/s
 - [ ] Load and run a test program from RAM
 - [ ] Flash programming (target-resident algorithm)
 - [ ] `Cpu32Target` shared with emulator; run smartclock harness on
