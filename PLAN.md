@@ -325,7 +325,10 @@ pods apart (`bdm --pod usb:SERIAL`).  Requests:
   (`pod-proto`'s `entry`).  It reports it as fresh, or as stale when
   the CPU was halted when the pod started and so may have been
   commanded before.  This also turns DSI on after a self-entry: GO
-  turned it off.
+  turned it off.  Every sequenced command, memory block, BerrPulse and
+  Resync drives DSCLK and DSI as well, once FREEZE is checked (no DSCLK
+  edge), so none clocks with the link undriven: after the pod's boot,
+  or a GO the CPU did not take, with no entry read since.
 - SetClock: DSCLK's rate; the reply gives the rate set, never faster
   than asked and at most 4 MHz until the throughput test measures the
   margin (`pod-proto`'s `dsclk::MAX_HZ` has the arithmetic).

@@ -4,7 +4,9 @@
 //! a resumed model runs its program at once (`program`), so a BGND it
 //! reaches has FREEZE back up before the pod's next request;
 //! VDD is fixed; a halt or reset puts the model in background mode with
-//! a breakpoint entry.  A reset keeps registers and memory: the model
+//! a breakpoint entry.  Words clocked with the link not driven (as at
+//! the pod's boot, or after GO dropped DSI) do not reach the model: DSO
+//! reads high, "illegal".  A reset keeps registers and memory: the model
 //! has no reset vectors to fetch.
 
 use core::convert::Infallible;
@@ -41,13 +43,16 @@ pub struct ModelBoard<const RAM: usize> {
     /// Bits the CPU's serial frame is ahead of the pod's, 0 in frame:
     /// an idle CPU's "command complete" then reads rotated.
     skew: u32,
+    /// BKPT/DSCLK and DSI driven (`Board::drive_link`): off at boot, and
+    /// DSI dropped by GO's and CALL's last word and by a reset to run.
+    driven: bool,
 }
 
 impl<const RAM: usize> ModelBoard<RAM> {
     /// A board around `target`, its BDM enabled or not.
     #[must_use]
     pub const fn new(target: Target<RAM>, bdm_enabled: bool) -> Self {
-        Self { target, edges: 0, bdm_enabled, dso_high: false, skew: 0 }
+        Self { target, edges: 0, bdm_enabled, dso_high: false, skew: 0, driven: false }
     }
 
     /// The model, for what a test checks or sets.
@@ -79,6 +84,12 @@ impl<const RAM: usize> ModelBoard<RAM> {
     /// Exchanges a word, counting FREEZE's fall if it ends background
     /// mode.
     fn exchange(&mut self, word: u16, exit: bool) -> u32 {
+        if !self.driven {
+            return DSO_HIGH;
+        }
+        // The link drops DSI as an exit word ends, whether or not the CPU
+        // leaves.
+        self.driven = !exit;
         if self.skew != 0 {
             return if word == NOP { DSO_HIGH & !(1 << (self.skew - 1)) } else { DSO_HIGH };
         }
@@ -132,11 +143,14 @@ impl<const RAM: usize> Board for ModelBoard<RAM> {
         Ok(VDD_MV)
     }
 
-    fn drive_link(&mut self) {}
+    fn drive_link(&mut self) {
+        self.driven = true;
+    }
 
     async fn halt(&mut self) -> bool {
         if self.bdm_enabled {
             self.enter_background(Entry::Breakpoint);
+            self.driven = true;
         }
         self.bdm_enabled
     }
@@ -148,6 +162,7 @@ impl<const RAM: usize> Board for ModelBoard<RAM> {
         self.bdm_enabled = true;
         self.edges = self.edges.wrapping_add(1);
         self.target.enter_background(Entry::Breakpoint);
+        self.driven = true;
         true
     }
 
@@ -160,6 +175,7 @@ impl<const RAM: usize> Board for ModelBoard<RAM> {
             self.edges = self.edges.wrapping_add(1);
         }
         self.bdm_enabled = false;
+        self.driven = false;
         self.target.reset_running();
     }
 
