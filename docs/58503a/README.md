@@ -166,7 +166,9 @@ SR $2600, SP $10FCF8); the next two stepped inside it; VBR was back at
 $10000 and `detach` let the firmware run on.  With SIMCR $614A the
 second step hung: FRZBM stops the bus monitor, so a stray access
 (likely past the top of RAM, $10FFFF) never ends.  Use $414A (FRZSW
-only) for gdb.
+only) for gdb.  Since the pod's BERR abort, such a hang ends in a bus
+error instead: with SIMCR $614A, a read of $110000 (unmapped) replied
+"target bus error" in 43 ms and the CPU took commands after.
 
 ## Throughput
 
