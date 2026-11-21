@@ -289,11 +289,34 @@ impl<T: Transport> PodTarget<T> {
         if !stacked.is_empty() {
             self.write_memory(sp, SUPERVISOR_DATA, Size::Word, &stacked)?;
         }
-        // A7 while S is set, so SSP; an SR clearing S then makes USP A7
+        // A7 while S is set, so SSP; an SR clearing S then makes USP A7.
+        // SR last: until it is written a failure's `untrace` is right.
         self.write_register(Register::A7, sp.0)?;
-        self.write_system_register(SystemRegister::Sr, u32::from(cpu.sr))?;
         self.write_system_register(SystemRegister::Rpc, cpu.pc)?;
-        self.write_system_register(SystemRegister::Vbr, program_vbr)
+        self.write_system_register(SystemRegister::Vbr, program_vbr)?;
+        self.write_system_register(SystemRegister::Sr, u32::from(cpu.sr))
+    }
+
+    /// The step from VBR at the stub's table on: SR's T1 set, GO, and
+    /// the stop worked out.
+    fn trace(&mut self, scratch: Address, program_sr: u32, program_vbr: u32) -> Result<Entry, Error> {
+        self.write_system_register(SystemRegister::Vbr, scratch.0)?;
+        self.write_system_register(SystemRegister::Sr, (program_sr & !SR_TRACE) | SR_T1)?;
+        self.leave()?;
+        self.pod.go()?;
+        let Some(entry) = self.stop_stepping()? else {
+            self.untrace(program_sr, program_vbr)?;
+            let pc = self.read_system_register(SystemRegister::Rpc)?;
+            return Err(StepError::NotStopped(Address(pc)).into());
+        };
+        let at_stub = entry == Entry::Background
+            && self.read_system_register(SystemRegister::Rpc)? == after_stub(scratch).0;
+        if at_stub {
+            self.unwind(stub(scratch), program_sr as u16, program_vbr)?;
+            return Ok(Entry::Breakpoint);
+        }
+        self.untrace(program_sr, program_vbr)?;
+        Ok(entry)
     }
 
     /// Sets SFC or DFC to `function_code` for a memory call, reading the
@@ -358,7 +381,9 @@ impl<T: Transport> Cpu32Target for PodTarget<T> {
     /// put back.  A step that stops elsewhere (a BGND stepped, a double
     /// bus fault) gets VBR and the program's trace bits back.  The
     /// program's T0 is not honored: its trace on a change of flow is
-    /// not taken.
+    /// not taken.  A step that fails once VBR is changed gets VBR and
+    /// the trace bits back, best effort; frames it had begun to unwind
+    /// stay as they were left.
     ///
     /// # Errors
     /// [`StepError`]: no scratch RAM, a step that did not stop (it is
@@ -376,23 +401,15 @@ impl<T: Transport> Cpu32Target for PodTarget<T> {
             self.write_memory(scratch, SUPERVISOR_DATA, Size::Word, &scratch_image(scratch))?;
             self.scratch_written = true;
         }
-        self.write_system_register(SystemRegister::Vbr, scratch.0)?;
-        self.write_system_register(SystemRegister::Sr, (program_sr & !SR_TRACE) | SR_T1)?;
-        self.leave()?;
-        self.pod.go()?;
-        let Some(entry) = self.stop_stepping()? else {
-            self.untrace(program_sr, program_vbr)?;
-            let pc = self.read_system_register(SystemRegister::Rpc)?;
-            return Err(StepError::NotStopped(Address(pc)).into());
-        };
-        let at_stub = entry == Entry::Background
-            && self.read_system_register(SystemRegister::Rpc)? == after_stub(scratch).0;
-        if at_stub {
-            self.unwind(stub(scratch), program_sr as u16, program_vbr)?;
-            return Ok(Entry::Breakpoint);
+        let stepped = self.trace(scratch, program_sr, program_vbr);
+        if let Err(error) = &stepped
+            && !matches!(error, Error::Step(StepError::NotStopped(_)))
+        {
+            // Best effort, and the step's error is the one reported: a
+            // target that runs or a link that failed refuses this too.
+            self.untrace(program_sr, program_vbr).ok();
         }
-        self.untrace(program_sr, program_vbr)?;
-        Ok(entry)
+        stepped
     }
 
     fn read_register(&mut self, register: Register) -> Result<u32, Error> {
@@ -496,9 +513,15 @@ mod tests {
 
     use super::PodTarget;
     use crate::pod::Error;
+    use crate::script::Answers;
     use crate::script::Script;
+    use crate::script::answering;
     use crate::script::parsed;
     use crate::script::pod;
+    use crate::step::SR_T1;
+    use crate::step::StepError;
+    use crate::step::after_stub;
+    use crate::transport::Transport;
 
     /// A reply carrying a u32.
     fn value(value: u32) -> Vec<u8> {
@@ -531,6 +554,105 @@ mod tests {
 
     fn requests(target: PodTarget<Script>) -> Vec<Vec<u8>> {
         target.pod.into_transport().requests
+    }
+
+    /// A step's scratch RAM, the program's SR and VBR, and A7 at the
+    /// stub, with the trace frame on top.
+    const SCRATCH: Address = Address(0x0010_0000);
+    const PROGRAM_SR: u32 = 0x2000;
+    const PROGRAM_VBR: u32 = 0;
+    const STACK: u32 = 0x3000;
+    /// The trace frame's PC, the instruction after the one stepped.
+    const TRACED_PC: u32 = 0x2002;
+    /// The trace frame: format $2, vector 9, the stepped SR with T1.
+    const TRACE_FRAME: [u8; 12] = [0xA0, 0x00, 0, 0, 0x20, 0x02, 0x20, 0x24, 0, 0, 0x12, 0x34];
+
+    /// The pod's reply to `request` in a step that reaches the stub with
+    /// the trace frame alone stacked.
+    fn stepping(request: Request<'_>) -> Vec<u8> {
+        let memory = |bytes: &[u8]| std::iter::once(0).chain(bytes.iter().copied()).collect();
+        match request {
+            Request::Halt => halted(Atemp::Fresh(1)),
+            Request::Pins => pins(Atemp::Fresh(1)),
+            Request::ReadSystemRegister(SystemRegister::Sr) => value(PROGRAM_SR),
+            Request::ReadSystemRegister(SystemRegister::Vbr) => value(PROGRAM_VBR),
+            Request::ReadSystemRegister(SystemRegister::Sfc) => value(5),
+            Request::ReadSystemRegister(SystemRegister::Rpc) => value(after_stub(SCRATCH).0),
+            Request::ReadRegister(Register::A7) => value(STACK),
+            Request::ReadMemory { address: Address(STACK), .. } => memory(&TRACE_FRAME[..8]),
+            Request::ReadMemory { address: Address(address), .. } if address == STACK + 8 => {
+                memory(&TRACE_FRAME[8..])
+            }
+            _ => DONE.to_vec(),
+        }
+    }
+
+    /// A halted target over `pod`, with scratch RAM already written.
+    fn halted_for_a_step<T: Transport>(pod: crate::pod::Pod<T>) -> PodTarget<T> {
+        let mut target = PodTarget::new(pod);
+        target.set_scratch(Some(SCRATCH));
+        target.scratch_written = true;
+        target.halt().unwrap();
+        target
+    }
+
+    /// The requests `target` sent.
+    fn answered<F: FnMut(Request<'_>) -> Vec<u8>>(target: PodTarget<Answers<F>>) -> Vec<Vec<u8>> {
+        target.pod.into_transport().requests
+    }
+
+    /// What a failed step does last: the program's trace bits and VBR
+    /// back.
+    fn untraced() -> [Request<'static>; 3] {
+        [
+            Request::ReadSystemRegister(SystemRegister::Sr),
+            Request::WriteSystemRegister(SystemRegister::Sr, PROGRAM_SR),
+            Request::WriteSystemRegister(SystemRegister::Vbr, PROGRAM_VBR),
+        ]
+    }
+
+    #[test]
+    fn a_step_to_the_stub_unwinds_and_writes_sr_last() {
+        let mut target = halted_for_a_step(answering(stepping));
+        assert_eq!(target.step().unwrap(), Entry::Breakpoint);
+        let sent = answered(target);
+        let sent: Vec<_> = sent.iter().map(|r| parsed(r)).collect();
+        assert_eq!(
+            sent[sent.len() - 4..],
+            [
+                Request::WriteRegister(Register::A7, STACK + TRACE_FRAME.len() as u32),
+                Request::WriteSystemRegister(SystemRegister::Rpc, TRACED_PC),
+                Request::WriteSystemRegister(SystemRegister::Vbr, PROGRAM_VBR),
+                Request::WriteSystemRegister(SystemRegister::Sr, PROGRAM_SR),
+            ]
+        );
+    }
+
+    #[test]
+    fn a_step_failing_before_go_gets_vbr_and_trace_back() {
+        let mut target = halted_for_a_step(answering(|request| match request {
+            Request::WriteSystemRegister(SystemRegister::Sr, sr) if sr & SR_T1 != 0 => {
+                vec![Status::Illegal as u8]
+            }
+            request => stepping(request),
+        }));
+        assert!(matches!(target.step(), Err(Error::Reply(ReplyError::Failed(Status::Illegal)))));
+        let sent = answered(target);
+        let sent: Vec<_> = sent.iter().map(|r| parsed(r)).collect();
+        assert!(!sent.contains(&Request::Go));
+        assert_eq!(sent[sent.len() - 3..], untraced());
+    }
+
+    #[test]
+    fn a_step_whose_frames_do_not_parse_gets_vbr_and_trace_back() {
+        let mut target = halted_for_a_step(answering(|request| match request {
+            Request::ReadMemory { address: Address(STACK), .. } => vec![0, 0x20, 0, 0, 0, 0, 0, 0x10, 0x24],
+            request => stepping(request),
+        }));
+        assert!(matches!(target.step(), Err(Error::Step(StepError::Format { format: 1, .. }))));
+        let sent = answered(target);
+        let sent: Vec<_> = sent.iter().map(|r| parsed(r)).collect();
+        assert_eq!(sent[sent.len() - 3..], untraced());
     }
 
     #[test]

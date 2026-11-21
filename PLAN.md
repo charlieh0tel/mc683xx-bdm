@@ -570,8 +570,10 @@ code and no `unsafe`; no USB request, so the protocol is unchanged.
     the frame stacked from the program; every PC still the stub made
     the program's vector for the exception below it; RPC the program's
     handler for the last one, or the traced PC.  With the program's own
-    T1 set the trace frame is its own and is kept.  Then VBR back.
-    Stopped elsewhere (a stepped BGND, a double bus fault): VBR and
+    T1 set the trace frame is its own and is kept.  Then VBR back, and
+    SR last.  A step that fails once VBR is changed (a refused write,
+    frames that do not parse) gets VBR and SR's trace bits back, best
+    effort, and reports its own error.  Stopped elsewhere (a stepped BGND, a double bus fault): VBR and
     SR's trace bits back, and the entry reported.  Not at the stub in
     100 ms: halted, and an error with RPC.  The program's T0 is not
     honored (its change-of-flow trace is lost), and what the contract
