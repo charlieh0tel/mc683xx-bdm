@@ -3,12 +3,14 @@
 //! waits on the pod.
 
 use std::fmt;
+use std::net::SocketAddr;
 use std::sync::Mutex;
 use std::sync::PoisonError;
 
 use mc683xx_target::Cpu32Target;
 use mc683xx_target::address::Address;
 use mc683xx_target::register::Register;
+use pod_host::gdb;
 use pod_host::pod;
 use pod_host::pod::Pod;
 use pod_host::register::Named;
@@ -18,7 +20,9 @@ use pod_host::transport::PodAddress;
 use pod_host::transport::Transport;
 use pod_proto::bdm::byte_count;
 use pyo3::Bound;
+use pyo3::Py;
 use pyo3::PyAny;
+use pyo3::PyErr;
 use pyo3::PyResult;
 use pyo3::Python;
 use pyo3::pybacked::PyBackedBytes;
@@ -30,7 +34,9 @@ use pyo3::types::PyDictMethods;
 
 use crate::access;
 use crate::error::Error;
+use crate::python::served;
 use crate::types::Atemp;
+use crate::types::Ending;
 use crate::types::Entry;
 use crate::types::Pins;
 
@@ -311,6 +317,39 @@ impl PodView {
     /// them, without resuming.
     fn restore_function_codes(&mut self, py: Python<'_>) -> Result<(), Error> {
         self.with(py, |target| Ok(target.restore_function_codes()?))
+    }
+
+    /// Serves one gdb session at `address` (`HOST:PORT`, port 0 picks
+    /// one) over this pod, as `bdm gdb` does, until gdb detaches (the
+    /// target runs on) or kills the target (it stays halted), and
+    /// returns which.  Breakpoints are BGND written into memory, so RAM
+    /// only; a step traces through an exception table and BGND stub in
+    /// `scratch`, 1026 bytes of RAM at an even address the program does
+    /// not use.  `ready(port)` is called once it listens, before gdb
+    /// connects.  The GIL is released while it waits on gdb or the pod;
+    /// an exception from a signal's handler (Ctrl-C's
+    /// `KeyboardInterrupt`) ends the session, gdb's breakpoints removed
+    /// and the target halted, and is raised.  `ready` must not call this
+    /// pod, which the session holds.
+    #[pyo3(signature = (address = gdb::LISTEN, ready = None, *, scratch))]
+    fn serve_gdb(
+        &mut self,
+        py: Python<'_>,
+        address: &str,
+        ready: Option<Py<PyAny>>,
+        scratch: u32,
+    ) -> PyResult<Ending> {
+        let target = self.target.get_mut().unwrap_or_else(PoisonError::into_inner);
+        let target = target.as_mut().ok_or(Error::Closed)?;
+        let check = || Python::attach(|py| py.check_signals());
+        let ready = |at: SocketAddr| -> PyResult<()> {
+            ready.map_or(Ok(()), |ready| Python::attach(|py| ready.call1(py, (at.port(),)).map(drop)))
+        };
+        let ending = py.detach(|| -> Result<gdb::Ending, gdb::ServeError<PyErr>> {
+            let connection = gdb::accept(address, ready, &check)?;
+            gdb::serve(target, Address(scratch), connection, &check)
+        });
+        Ok(ending.map_err(served)?.into())
     }
 
     /// Raw serial words, each answered with the 17 bits shifted in.

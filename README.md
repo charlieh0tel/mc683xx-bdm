@@ -126,6 +126,23 @@ program's SFC and DFC, as `bdm` does.  Exceptions: `TransportError`
 `ValueError` for a bad name, size or function code.  Types:
 `python/mc683xx_bdm/__init__.pyi`.
 
+`serve_gdb` serves one gdb session over the open pod, as `bdm gdb`
+does, after a script has set the target up (chip selects, say), and
+returns `Ending.DETACHED` (running) or `Ending.KILLED` (halted):
+
+```python
+with mc683xx_bdm.Pod("usb") as pod:
+    pod.reset_with_breakpoint()
+    ...                                     # the board's own setup
+    ending = pod.serve_gdb("127.0.0.1:1234", ready=print, scratch=0x100800)
+```
+
+`scratch` is required, as `bdm gdb --scratch`; the address defaults to
+127.0.0.1:1234 and `ready(port)` is called once it listens.  It blocks
+with the GIL released; Ctrl-C (`KeyboardInterrupt`, or any signal
+handler's exception) ends the session, gdb's breakpoints removed and
+the target halted, and is raised.
+
 ### Debian package
 
 `make deb` builds `mc683xx-bdm`: `bdm`, the udev rule and the pod's

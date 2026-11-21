@@ -460,6 +460,14 @@ code and no `unsafe`; no USB request, so the protocol is unchanged.
   Python, abi3 from 3.10, stubs in `python/`), but in a uv project
   (AGENTS.md, Python) rather than a Makefile's venv.  `make lint` runs
   clippy with `python`, ruff and pytest against `bdm-stand-in`.
+  `Pod.serve_gdb(address="127.0.0.1:1234", ready=None, *, scratch)`
+  is `bdm gdb` from a script (Host, gdb): cpu32-py's `serve_gdb`
+  signature, with `scratch` added and keyword-only, since the pod has
+  no native step; it returns `Ending.DETACHED` or `Ending.KILLED`.  The
+  session runs with the GIL released; Python's signal handlers run
+  between waits (every 20 ms waiting on gdb, every poll of a running
+  target), so Ctrl-C ends it, cleaned up, and is raised.  No board
+  setup in it or in `bdm`: a script does that before serving.
 - Linux needs a udev rule for access without root
   (`packaging/udev/70-mc683xx-pod.rules`, README.md): uaccess for the
   user at the seat, and group plugdev, mode 0660, for a login over
@@ -503,7 +511,7 @@ code and no `unsafe`; no USB request, so the protocol is unchanged.
   - `bdm gdb [--listen HOST:PORT] --scratch ADDRESS`: mc683xx-gdb
     (crates.io, default features off, so no chip or board crates)
     serving its `bdm::Bdm` over `PodTarget`, one session (`pod-host`'s
-    `gdb`, the session for every host).  Listens on
+    `gdb`, the session for `bdm` and `Pod.serve_gdb` alike).  Listens on
     127.0.0.1:1234 by default (mc683xx's `serve_gdb` default; localhost,
     since the session controls the target; port 0 picks one, named on
     standard error).  `--scratch` is required: Bdm always offers gdb a step,
@@ -511,7 +519,9 @@ code and no `unsafe`; no USB request, so the protocol is unchanged.
     Detach resumes the target, kill leaves it halted; either prints
     which.  Tested end to end (`pod-host/tests/gdb.rs`): the `bdm`
     binary on the model, raw packets on TCP: `?`, `m`, `g`, `s`,
-    `Z0`/`z0` and `c` to the breakpoint, Ctrl-C, `D` and `k`.
+    `Z0`/`z0` and `c` to the breakpoint, Ctrl-C, `D` and `k`; the same
+    from Python (`pod-py/tests/test_gdb.py`), with a signal handler's
+    exception waiting for gdb and while running.
   - `step()` is in `Cpu32Target` (mc683xx-target 0.6): from RPC to
     where T1 would trap, before any handler's first instruction, the
     exceptions the instruction raised and an interrupt pending taken

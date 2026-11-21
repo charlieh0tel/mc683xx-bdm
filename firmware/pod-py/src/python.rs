@@ -1,6 +1,7 @@
 //! The Python module `mc683xx_bdm`, and the bindings' errors as Python
 //! exceptions.
 
+use pod_host::gdb::ServeError;
 use pod_host::pod;
 use pod_host::transport;
 use pod_proto::usb::PROTOCOL_VERSION;
@@ -21,6 +22,7 @@ use crate::error::Error;
 use crate::error::message;
 use crate::pod::PodView;
 use crate::types::Atemp;
+use crate::types::Ending;
 use crate::types::Entry;
 use crate::types::Pins;
 
@@ -88,6 +90,19 @@ impl From<Error> for PyErr {
     }
 }
 
+/// A gdb session's error as Python's: the host's own exception (Ctrl-C's
+/// `KeyboardInterrupt`, `ready`'s) raised again, the pod's as any call's,
+/// a listener that cannot be bound an `OSError`, the rest `TargetError`.
+pub(crate) fn served(error: ServeError<PyErr>) -> PyErr {
+    let text = message(&error);
+    match error {
+        ServeError::Host(error) => error,
+        ServeError::Target(error) => Error::Pod(error).into(),
+        ServeError::Listen { .. } => PyOSError::new_err(text),
+        _ => TargetError::new_err(text),
+    }
+}
+
 /// The mc683xx CPU32 BDM pod, for Python scripts: one open pod across
 /// calls (`Pod`).
 #[pymodule]
@@ -96,6 +111,7 @@ fn mc683xx_bdm(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<Entry>()?;
     module.add_class::<Atemp>()?;
     module.add_class::<Pins>()?;
+    module.add_class::<Ending>()?;
     module.add("BusError", module.py().get_type::<BusError>())?;
     module.add("TargetError", module.py().get_type::<TargetError>())?;
     module.add("TransportError", module.py().get_type::<TransportError>())?;

@@ -1,7 +1,8 @@
 //! What the pod reports, as Python values: the entry source, ATEMP as
-//! the pod read it, and the target's pins.
+//! the pod read it, the target's pins, and how a gdb session ended.
 
 use mc683xx_target::entry;
+use pod_host::gdb;
 use pod_proto::usb;
 use pyo3::pyclass;
 use pyo3::pymethods;
@@ -156,5 +157,25 @@ impl Pins {
             title(berr),
             atemp.__repr__()
         )
+    }
+}
+
+/// How a gdb session ended, as `serve_gdb` returns it; as the
+/// emulator's `mc683xx.Ending`.
+#[pyclass(module = "mc683xx_bdm", eq, eq_int, hash, frozen, rename_all = "SCREAMING_SNAKE_CASE")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub(crate) enum Ending {
+    /// gdb detached: the target runs on.
+    Detached,
+    /// gdb killed the target: it stays halted.
+    Killed,
+}
+
+impl From<gdb::Ending> for Ending {
+    fn from(ending: gdb::Ending) -> Self {
+        match ending {
+            gdb::Ending::Detached => Self::Detached,
+            gdb::Ending::Killed => Self::Killed,
+        }
     }
 }

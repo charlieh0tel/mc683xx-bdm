@@ -1,8 +1,9 @@
 """The mc683xx CPU32 BDM pod, for Python scripts: one open pod across
 calls (PLAN.md, Host)."""
 
+from collections.abc import Callable
 from types import TracebackType
-from typing import final
+from typing import ClassVar, final
 
 PROTOCOL_VERSION: int
 
@@ -114,6 +115,16 @@ class Pins:
     def atemp(self) -> Atemp: ...
 
 @final
+class Ending:
+    """How a gdb session ended, as `serve_gdb` returns it; as the
+    emulator's mc683xx.Ending."""
+
+    DETACHED: ClassVar[Ending]
+    KILLED: ClassVar[Ending]
+    def __hash__(self) -> int: ...
+    def __int__(self) -> int: ...
+
+@final
 class Pod:
     """The pod, open from construction until close.  One thread at a
     time."""
@@ -158,4 +169,11 @@ class Pod:
     def bus_read(self, address: int, size: int, function_code: int = 5) -> int: ...
     def bus_write(self, address: int, size: int, value: int, function_code: int = 5) -> None: ...
     def restore_function_codes(self) -> None: ...
+    def serve_gdb(
+        self,
+        address: str = "127.0.0.1:1234",
+        ready: Callable[[int], object] | None = None,
+        *,
+        scratch: int,
+    ) -> Ending: ...
     def transfer(self, words: list[int]) -> list[int]: ...
