@@ -1,8 +1,8 @@
 //! The chip's hardware watchdog (PLAN.md, Firmware, Watchdog), fed from
 //! a task of its own by `pod_proto::watchdog`'s rule: while the pod
 //! waits for a request, and while a request makes progress.  A panic
-//! (panic-halt) or a request stuck without a link word starves it, and
-//! the chip resets.
+//! (`panic`) or a request stuck without a link word starves it, and the
+//! chip resets.
 
 use embassy_rp::Peri;
 use embassy_rp::peripherals::WATCHDOG;

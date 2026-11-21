@@ -316,7 +316,9 @@ pods apart (`bdm --pod usb:SERIAL`).  Requests:
   automatic resync bought nothing (docs/bring-up.md, step 5).
 - Bootsel turns U1 off (GP10 low, then 10 us) before the boot ROM's
   reboot, so a resetting Pico cannot glitch BKPT low; this needs
-  embassy-rp's `unstable-pac` for the one register write.
+  embassy-rp's `unstable-pac` for the one register write.  The
+  production build's panic handler does the same before it waits for
+  the watchdog (Watchdog, below).
 - ATEMP holds the entry source only until the first command after
   entry, and the CPU can enter on its own (BGND, a breakpoint, a double
   bus fault).  A task watches FREEZE and counts its edges (`freeze.rs`);
@@ -358,7 +360,7 @@ and feeds it while the serve loop waits for a request, however long
 the host is idle, and while the request it is carrying out makes
 progress: a word over the link (each PIO word counts) or the request's
 end.  So the chip resets when the executor stops (a loop without an
-await, panic-halt's loop, a hard fault) or a request goes 8 s without
+await, the panic handler's loop, a hard fault) or a request goes 8 s without
 a link word.
 - Not a free-running ticker: that feeds through a request stuck on an
   await that never ends.  Not fed by the serve loop alone: it sleeps
@@ -374,11 +376,18 @@ a link word.
   serial link out of frame and loses the kept ATEMP (`docs/bring-up.md`,
   step 5).  So the timeout is generous and the reset rare: recovery from
   a firmware fault in place of a replug, not part of normal running.
-- Panics: panic-halt spins and starves it, a reset 8 s later.  With
-  `rtt`, panic-probe faults the core; the watchdog pauses while a
-  debugger halts the core (CTRL's PAUSE_DBG0/1 and PAUSE_JTAG), so
-  under probe-rs the panic stays for inspection; with no probe attached
-  it resets as panic-halt does.
+- Panics: the production build's handler (`panic.rs`) disables
+  interrupts, turns U1 off as bootsel does (GP10 low, then 10 us), and
+  spins, starving it: a reset 8 s later with BKPT held high by R3.  With
+  `rtt`, panic-probe faults the core, U1 left as it was; the watchdog
+  pauses while a debugger halts the core (CTRL's PAUSE_DBG0/1 and
+  PAUSE_JTAG), so under probe-rs the panic stays for inspection; with
+  no probe attached it resets as the production build does, but can
+  glitch BKPT.
+- A watchdog reset with no panic (a loop without an await, a hard
+  fault, a request stuck without a link word) is not covered: no
+  software runs before it, so it can still glitch BKPT
+  (`docs/bring-up.md`, step 5).
 - `bdm bootsel`: the boot ROM's `reset_to_usb_boot` reprograms the
   watchdog for its own reboot into BOOTSEL (RP2040 datasheet 2.8.3.1.5,
   Table 168).  The boot ROM's device staying up past the timeout is a
@@ -388,7 +397,7 @@ a link word.
   change (TODO.md).
 
 The firmware's own sizes, release builds (`make size`, also in CI's
-summary): 31300 bytes of text on the RP2040 and 29572 on the RP2350,
+summary): 31328 bytes of text on the RP2040 and 29764 on the RP2350,
 2832 bytes of statics on either.
 
 Handle not-ready retries in firmware; report BERR and illegal-command

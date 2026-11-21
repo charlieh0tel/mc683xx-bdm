@@ -46,11 +46,10 @@
   code in ROM (PLAN.md, Host, gdb).
 - `monitor init` and `monitor load` in `bdm gdb`, once `mc683xx-debug`
   is in (PLAN.md, Host, Loading and init).
-- BKPT glitch on the reboots bootsel does not cover (docs/bring-up.md,
-  step 5): a panic handler that turns U1 off (GP10 low) before it
-  waits for the watchdog; on the next carrier, U1's enable falling
-  before its input (a stronger or faster OE path than GP9's), so a
-  power loss or replug cannot glitch BKPT either.
+- BKPT glitch on the reboots bootsel and the panic handler do not
+  cover (docs/bring-up.md, step 5): on the next carrier, U1's enable
+  falling before its input (a stronger or faster OE path than GP9's),
+  so a power loss, replug or bare watchdog reset cannot glitch BKPT.
 - Python bindings (`pod-py`): `step` (and the scratch area) now that
   `PodTarget::step` is in.
 - `pod-host` integration test against `mc683xx-run --bdm` and its
