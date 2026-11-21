@@ -30,13 +30,26 @@ uf2:
 	fi
 
 # The carrier board's 3D render for the README, from its KiCad file
-# (kicad-cli, KiCad 9 or later).  Rerun after a board change.
-BOARD := hardware/mc683xx-pod/mc683xx-pod.kicad_pcb
+# (kicad-cli, KiCad 9 or later; GNU sed).  Rerun after a board change.
+# The stackup names no colors, so the render sets the boards' own, green
+# mask and white silk, in a copy under target/: KiCad's named "Green" is
+# translucent and the ground pour shows through it olive.
+BOARD_DIR := hardware/mc683xx-pod
+BOARD := mc683xx-pod.kicad_pcb
+RENDER_COPY := target/render
 RENDER := docs/images/mc683xx-pod-top.png
+MASK_COLOR := \#146B2EF2
+SILK_COLOR := White
+RENDER_VIEW := --perspective --rotate -20,0,-20 --zoom 0.8
 
 render:
-	mkdir -p $(dir $(RENDER))
-	kicad-cli pcb render --side top --width 1200 --height 900 --quality high -o $(RENDER) $(BOARD)
+	mkdir -p $(dir $(RENDER)) $(RENDER_COPY)
+	cp -r $(BOARD_DIR)/. $(RENDER_COPY)
+	sed -i -e '/(type "\(Top\|Bottom\) Solder Mask")/a (color "$(MASK_COLOR)")' \
+		-e '/(type "\(Top\|Bottom\) Silk Screen")/a (color "$(SILK_COLOR)")' $(RENDER_COPY)/$(BOARD)
+	kicad-cli pcb render --side top --width 1200 --height 900 --quality high \
+		--use-board-stackup-colors --background opaque $(RENDER_VIEW) \
+		-o $(RENDER) $(RENDER_COPY)/$(BOARD)
 
 # Use the repository's git hooks (.githooks/), once per clone.
 hooks:
