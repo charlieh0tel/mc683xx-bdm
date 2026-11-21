@@ -532,7 +532,9 @@ code and no `unsafe`; no USB request, so the protocol is unchanged.
   `mc683xx-bdm` publishes without the model, which it takes for its
   tests only (a path-only dev-dependency, which a package drops).
   `bdm --pod unix:PATH` is Unix's: elsewhere (Windows) it fails, and
-  `tcp:HOST:PORT` reaches a stand-in.
+  `tcp:HOST:PORT` reaches a stand-in.  CI builds `bdm` on macOS and
+  Windows and runs its tests on macOS; the tests use Unix sockets, so
+  not on Windows.
   `bdm` and `PodTarget` run end to end against it with no hardware
   (`crates/host/tests/stand_in.rs`).  The model's FREEZE is its state, VDD
   5 V; a halt or reset enters with a breakpoint, and a reset keeps
@@ -595,7 +597,9 @@ code and no `unsafe`; no USB request, so the protocol is unchanged.
   The release workflow builds the UF2 in a job of its own and hands it
   to `rust-build-deb` as its `prebuilt-artifact`; there it is made by
   elf2uf2-rs, byte for byte picotool's UF2 (RP2040 family ID), since
-  no runner image carries picotool 2.
+  no runner image carries picotool 2.  `rust-build-deb` takes no
+  dependency of its own, so on a tag the job that calls it waits for
+  `gate`: a tag that fails `gate` publishes nothing anywhere.
   `bdm-stand-in` is a test aid and does not ship.
 - crates.io and PyPI, beside mc683xx's crates and Python package, and
   as mc683xx publishes them (RELEASING.md): `mc683xx-bdm-proto` and

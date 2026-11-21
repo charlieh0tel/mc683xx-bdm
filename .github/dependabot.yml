@@ -1,0 +1,15 @@
+# Actions only, as smartclock's: every third-party action is pinned to
+# a commit with its version in a trailing comment, the form Dependabot
+# reads, so it bumps the SHA and the comment together.  deb-workflows'
+# rust-build-deb@v1 is a tag maintained to move, which it leaves alone.
+# Cargo and uv are left out: advisories come from Dependabot alerts,
+# and version bumps alone are noise.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]
