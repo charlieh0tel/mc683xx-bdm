@@ -98,7 +98,6 @@ async fn main(_spawner: Spawner) {
         ds: Input::new(p.PIN_6, Pull::None),
         berr: Input::new(p.PIN_8, Pull::None),
     };
-    let freeze = Input::new(p.PIN_5, Pull::Down);
     let _led = Output::new(p.PIN_25, Level::High);
 
     let Pio { mut common, sm0, .. } = Pio::new(p.PIO0, Irqs);
@@ -144,7 +143,7 @@ async fn main(_spawner: Spawner) {
     defmt::info!("mc683xx-pod up");
     // The watcher first, so FREEZE's level is in before a request.
     join4(
-        freeze::watch(freeze),
+        freeze::watch(p.PIN_5),
         watchdog::feed(p.WATCHDOG),
         usb.run(),
         serve(&mut pod, &mut from_host, &mut to_host),
