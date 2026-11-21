@@ -448,8 +448,8 @@ a link word.
   change (TODO.md).
 
 The firmware's own sizes, release builds (`make size`, also in CI's
-summary): 31536 bytes of text on the RP2040 and 29784 on the RP2350,
-2832 bytes of statics on either.
+summary): 32248 bytes of text on the RP2040 and 30520 on the RP2350,
+2896 bytes of statics on either.
 
 Handle not-ready retries in firmware; report BERR and illegal-command
 errors to the host.  `mc683xx-bdm-proto`'s `session` does both, over a `Link`
