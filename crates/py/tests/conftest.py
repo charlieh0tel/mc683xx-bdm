@@ -4,6 +4,7 @@ socket, a model CPU32 behind it, built once per session with cargo."""
 import json
 import subprocess
 import sys
+import tempfile
 import time
 from collections.abc import Callable, Iterator
 from pathlib import Path
@@ -17,6 +18,18 @@ RAM_BYTES = 64 * 1024
 # How long the stand-in may take to listen, and how often to look.
 LISTEN_TIMEOUT_S = 10.0
 LISTEN_POLL_S = 0.01
+# Where the tests' Unix sockets go: a socket's path is at most 104 bytes
+# on macOS (SUN_LEN), shorter than its per-user temporary directory's
+# tmp_path.
+SOCKET_ROOT = "/tmp"
+
+
+@pytest.fixture
+def socket_dir() -> Iterator[Path]:
+    """A directory, removed after the test, for Unix sockets: short
+    enough for a socket's path on every Unix."""
+    with tempfile.TemporaryDirectory(prefix="bdm-", dir=SOCKET_ROOT) as name:
+        yield Path(name)
 
 
 @pytest.fixture(scope="session")
@@ -61,13 +74,13 @@ def launch(binary: Path, socket: Path, *options: str) -> subprocess.Popen[bytes]
 
 
 @pytest.fixture
-def stand_in(stand_in_binary: Path, tmp_path: Path) -> Iterator[Callable[..., str]]:
+def stand_in(stand_in_binary: Path, socket_dir: Path) -> Iterator[Callable[..., str]]:
     """Starts a stand-in with bdm-stand-in's options; returns its pod
     name, `unix:PATH`.  Each is stopped when the test ends."""
     processes: list[subprocess.Popen[bytes]] = []
 
     def start(*options: str) -> str:
-        socket = tmp_path / f"pod{len(processes)}.sock"
+        socket = socket_dir / f"pod{len(processes)}.sock"
         processes.append(launch(stand_in_binary, socket, *options))
         return f"unix:{socket}"
 

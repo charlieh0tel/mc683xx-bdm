@@ -233,8 +233,8 @@ def test_a_signal_while_running_removes_the_breakpoints(pod):
     assert pod.read_memory(UNREACHED, 2, size=2) == UNREACHED_WORD, "BGND gone"
 
 
-def test_a_signal_whose_clean_up_fails_is_raised(stand_in_binary, tmp_path):
-    socket = tmp_path / "pod.sock"
+def test_a_signal_whose_clean_up_fails_is_raised(stand_in_binary, socket_dir):
+    socket = socket_dir / "pod.sock"
     process = launch(stand_in_binary, socket)
 
     def lose_the_pod() -> None:
