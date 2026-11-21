@@ -89,6 +89,16 @@ of smartclock's checklist; halt under 1 s, then GO): ATEMP $0000
 $CF88, RPC $000120FC, PCC $000120F8, RSR $80 (the last reset was the
 pod's), the firmware's watchdog countdown at $100B90 7.
 
+## S1, the switch byte at $302000
+
+S1 (8 positions) reads at $302000 (CS5, CSBAR5 $3003, CSOR5 $7B30):
+position n is bit n-1, ON 0 and OFF 1; all ON reads $00.  Turning one
+position OFF at a time set exactly its bit, read twice, with the
+firmware running between halts (2026-11-21, step R1 of smartclock's
+checklist).  No position changed the flash longs at $3FFFC ($5E4A146A),
+$7FFFC ($BCAE0C74) or $10000 ($0010FFFE): S1 does not gate flash
+reads.
+
 ## Pod restarts
 
 A pod restarted while the CPU is halted can glitch BKPT
