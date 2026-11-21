@@ -7,10 +7,6 @@
 
 ## Firmware
 
-- Publishing to crates.io and PyPI (owner): once the repository is
-  public, RELEASING.md's Setup (PyPI's pending trusted publisher, the
-  `pypi` and `crates-io` environments), then the first release, its
-  crates by hand, then their crates.io trusted publishers.
 - DSCLK above 4 MHz, once the throughput test measures the margin.
 - Report a watchdog reset to the host (WATCHDOG's REASON at start,
   say in Pins or Version, and in `bdm pins`): a protocol change, so

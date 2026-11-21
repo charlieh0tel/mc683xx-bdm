@@ -10,17 +10,76 @@ are Rust.
 
 ![A rev 0.2 pod on its ribbon cable, plugged into a target's BDM header](docs/images/mc683xx-pod-photo.jpg)
 
-Status: the rev 0.2 carrier (`hardware/mc683xx-pod/`, 68 x 59 mm, 4
-layers; `hardware/production/20261102-0.2/`, assembled with the Pico,
-J2 not fitted; its silkscreen reads rev 0.1, `hardware/README.md`)
-passes its checks without a target: inputs, VDD sense
-and a loopback through its buffers (`docs/bring-up.md`, steps 1-3).  On
-an MC68331 target it resets into background mode, reads
-registers and SIM registers, and reads 512 KB of flash correctly.
+## Quickstart
+
+1. Install `bdm`, the udev rule and the firmware: from the APT
+   repository (Install), or a GitHub Release's `.deb`:
+
+   ```
+   sudo apt install ./mc683xx-bdm_VERSION-1_amd64.deb
+   ```
+
+   Or `cargo install mc683xx-bdm`, then the udev rule by hand:
+   `sudo cp packaging/udev/70-mc683xx-pod.rules /etc/udev/rules.d/`.
+
+2. Flash the firmware: plug in the pod, put it into its bootloader
+   (a blank Pico is there already: skip `bdm bootsel`), and copy the
+   UF2 onto the RPI-RP2 drive it mounts:
+
+   ```
+   bdm bootsel
+   cp /usr/share/mc683xx-bdm/pod-fw-rp2040.uf2 /media/$USER/RPI-RP2/
+   ```
+
+   The UF2 is also in each GitHub Release.
+
+3. Cable the pod's J1 to the target's 10-pin BDM header, and power the
+   target.
+
+4. Read the pins: FREEZE, RESET and DS levels, and target VDD (about
+   5 V).
+
+   ```
+   bdm pins
+   ```
+
+5. Reset the target into background mode and read its registers:
+
+   ```
+   bdm reset
+   bdm regs
+   ```
+
+## Status
+
+Works, on an MC68331 target: reset into background mode, halt and go,
+registers, memory and SIM register reads, a 512 KB flash read, writes,
+and gdb (registers, memory, disassembly).
+
+Not yet tried on silicon (`TODO.md`): gdb breakpoints, continue and
+step; a flash-programming command (flash has been programmed with
+`bdm write` sequences); the Pico 2 (RP2350) build; DSCLK
+above 4 MHz.
+
+Known limit: a pod restart (a USB replug, say) during `bdm hold` or in
+the middle of a request can disturb a halted target until `bdm reset`.
+A restart between requests is safe (`docs/bring-up.md`, step 5).  The
+fix is planned for the next carrier revision (`hardware/README.md`,
+Next revision).
+
+The carrier is rev 0.2 (`hardware/mc683xx-pod/`, 68 x 59 mm, 4
+layers); its silkscreen reads rev 0.1 (`hardware/README.md`).
+
+## Getting a board
+
+There is no kit or store.  `hardware/production/20261102-0.2/` holds
+the JLCPCB order files for the latest revision (Gerbers and drill,
+BOM, placement), assembled with the Pico, J2 (SWD) not fitted;
+RELEASING.md, Carrier board, has how a release is made.  The carrier
+takes a Pico or a Pico 2; the released UF2 is for the Pico (RP2040),
+and a Pico 2 needs its own build (Firmware).
 
 ## Install
-
-Once published (RELEASING.md):
 
 ```
 cargo install mc683xx-bdm      # bdm, from crates.io
