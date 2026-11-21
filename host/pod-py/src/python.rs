@@ -10,6 +10,7 @@ use pod_proto::usb::Status;
 use pyo3::Bound;
 use pyo3::PyErr;
 use pyo3::PyResult;
+use pyo3::Python;
 use pyo3::exceptions::PyException;
 use pyo3::exceptions::PyOSError;
 use pyo3::exceptions::PyRuntimeError;
@@ -91,12 +92,18 @@ impl From<Error> for PyErr {
 }
 
 /// A gdb session's error as Python's: the host's own exception (Ctrl-C's
-/// `KeyboardInterrupt`, `ready`'s) raised again, the pod's as any call's,
-/// a listener that cannot be bound an `OSError`, the rest `TargetError`.
-pub(crate) fn served(error: ServeError<PyErr>) -> PyErr {
+/// `KeyboardInterrupt`, `ready`'s) raised again, with a failure cleaning
+/// up after it as its `__cause__`; the pod's as any call's, a listener
+/// that cannot be bound an `OSError`, the rest `TargetError`.
+pub(crate) fn served(py: Python<'_>, error: ServeError<PyErr>) -> PyErr {
     let text = message(&error);
     match error {
         ServeError::Host(error) => error,
+        ServeError::Uncleaned { error, cleanup } if matches!(*error, ServeError::Host(_)) => {
+            let host = served(py, *error);
+            host.set_cause(py, Some(served(py, *cleanup)));
+            host
+        }
         ServeError::Target(error) => Error::Pod(error).into(),
         ServeError::Listen { .. } => PyOSError::new_err(text),
         _ => TargetError::new_err(text),
