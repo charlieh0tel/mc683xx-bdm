@@ -123,9 +123,10 @@ Fields:
 Semantics:
 
 - Order of checks: the request is parsed (BadRequest); then, except
-  for ResetHalt, ResetRun, Resync, Version, Hold and BerrPulse, the ATEMP read below, whose failure is the reply's status (once: the
-  pod keeps kind 3 and does not read again until FREEZE moves, so
-  Pins, Transfer and ResetHalt still work); then the
+  for Hello, Version, SetClock, ResetHalt, ResetRun, Resync, Hold and
+  BerrPulse, the ATEMP read below, whose failure is the reply's status
+  (once: the pod keeps kind 3 and does not read again until FREEZE
+  moves, so Pins, Transfer and ResetHalt still work); then the
   request's own checks (NoTarget, then NoFreeze); then the command.
 - Transfer is raw: the words go out as given, with no guard and no DSI
   release, whether or not the target is in background mode.  Every

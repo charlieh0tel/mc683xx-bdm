@@ -232,6 +232,19 @@ fn a_pod_started_under_a_halted_cpu_out_of_frame_needs_a_resync() {
 }
 
 #[test]
+fn requests_that_need_no_target_skip_the_entry_read() {
+    // A host's Hello, then Resync, on a link out of frame: the first
+    // run works, and nothing is clocked before the Resync.
+    let mut pod = pod_on_halted();
+    pod.board_mut().put_out_of_frame(9);
+    assert_eq!(parse_value(status(&send(&mut pod, &Request::Hello)).unwrap()), Ok(PROTOCOL_VERSION));
+    assert!(status(&send(&mut pod, &Request::Version)).is_ok());
+    assert!(status(&send(&mut pod, &Request::SetClock { dsclk_hz: 1_000_000 })).is_ok());
+    let atemp = parse_atemp(status(&send(&mut pod, &Request::Resync)).unwrap());
+    assert!(matches!(atemp, Ok(Atemp::Stale(_))), "{atemp:?}");
+}
+
+#[test]
 fn version_is_the_boards_and_needs_no_target() {
     let mut pod = pod(false);
     let reply = send(&mut pod, &Request::Version);

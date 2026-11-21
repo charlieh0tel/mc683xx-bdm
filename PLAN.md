@@ -299,7 +299,9 @@ pods apart (`bdm --pod usb:SERIAL`).  Requests:
   ATEMP.  Halt on a CPU already in background mode only returns it.
 - ResetRun: RESET pulsed with BKPT high, so the CPU runs with
   background mode off; refused without VDD.  It and ResetHalt skip the
-  ATEMP read, so a link out of frame cannot stop them.
+  ATEMP read, so a link out of frame cannot stop them; so do Hello,
+  Version and SetClock, which touch no target, so the Hello a host
+  sends first cannot stop them either.
 - Hold: BKPT low with no ATEMP read, so nothing releases it until the
   next request: the CPU halts and stays in, or comes back to,
   background mode through a reset the pod did not make (a watchdog's).

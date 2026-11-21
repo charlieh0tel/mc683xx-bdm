@@ -139,6 +139,26 @@ enum Answer {
     Responses(usize),
 }
 
+/// Whether `request` waits on the ATEMP read after an entry.  Not those
+/// that touch no target (`Hello`, `Version`, `SetClock`), so a host's
+/// `Hello` works over a link out of frame; not a reset, which makes the
+/// entry moot, nor `Resync`, which a link out of frame must not stop;
+/// not `Hold`, whose words would release BKPT, nor `BerrPulse`, for a
+/// CPU that cannot answer the read.
+const fn reads_entry_first(request: &Request<'_>) -> bool {
+    !matches!(
+        request,
+        Request::Hello
+            | Request::Version
+            | Request::SetClock { .. }
+            | Request::ResetHalt
+            | Request::ResetRun
+            | Request::Resync
+            | Request::Hold
+            | Request::BerrPulse
+    )
+}
+
 /// The pod: requests in, replies out, over a board.
 #[derive(Debug)]
 pub struct Pod<B> {
@@ -164,17 +184,8 @@ impl<B: Board> Pod<B> {
         let Ok(request) = Request::parse(packet) else {
             return encode_status(Status::BadRequest, reply);
         };
-        // A reset makes the entry moot, and a link out of frame must not
-        // stop the reset that frames it again.
-        if !matches!(
-            request,
-            Request::ResetHalt
-                | Request::ResetRun
-                | Request::Resync
-                | Request::Version
-                | Request::Hold
-                | Request::BerrPulse
-        ) && let Err(status) = self.read_entry().await
+        if reads_entry_first(&request)
+            && let Err(status) = self.read_entry().await
         {
             let status = self.unstick(status).await;
             return encode_status(status, reply);
