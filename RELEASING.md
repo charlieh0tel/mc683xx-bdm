@@ -44,11 +44,14 @@ unix:PATH` is Unix's), are only built.  The `sdist` job builds a wheel
 from the sdist, as pip does where no wheel fits, and checks it carries
 the stubs and `py.typed`.
 
-A pull request or a push to main runs every build (`firmware`, `deb`,
-`package`, `wheels`, `sdist`) and publishes nothing; `package` is
-`cargo publish --workspace --dry-run`, which builds `mc683xx-bdm`
-against the packaged `mc683xx-bdm-proto` before either is on
-crates.io.
+A push to main runs every build (`firmware`, `deb`, `package`,
+`wheels`, `wheels-macos-windows`, `sdist`) and publishes nothing; a
+pull request runs them all but `wheels-macos-windows`, so it builds
+Linux's wheels only (and tests Linux x86_64's).  `package` is `cargo
+publish --workspace --dry-run`, which builds `mc683xx-bdm` against the
+packaged `mc683xx-bdm-proto` before either is on crates.io.  `CI`
+(`.github/workflows/ci.yml`) builds `bdm` on macOS and Windows on every
+push and pull request, and runs `mc683xx-bdm`'s tests on macOS.
 
 ## Setup
 
@@ -103,15 +106,16 @@ matches.
 6. On a target: `docs/bring-up.md` steps 5-12.
 7. Commit as "Release X.Y.Z", merge it to `main`, and wait for `CI`
    to pass on the merged commit.
-8. Tag that commit `vX.Y.Z`, annotated, and push the tag.  `release`
-   builds the UF2, then `rust-build-deb` builds, tests and audits
-   `mc683xx-bdm` for amd64 and arm64 and publishes a GitHub Release of
-   both packages; the UF2 is attached to it.  Its `gate` job checks
-   that the tagged commit is on `main`, that the tag names both
-   versions, and, through the GitHub API, that `CI`'s latest run of
-   that commit's push to `main` succeeded; a tag whose `gate` failed
-   for a `CI` run still going is re-run (Actions, Re-run jobs) once
-   `CI` has passed.  The `pypi` job uploads the wheels and sdist only
+8. Tag that commit `vX.Y.Z`, annotated, and push the tag.  `release`'s
+   `gate` job checks that the tagged commit is on `main`, that the tag
+   names both versions, and, through the GitHub API, that `CI`'s latest
+   run of that commit's push to `main` succeeded; a tag whose `gate`
+   failed for a `CI` run still going is re-run (Actions, Re-run jobs)
+   once `CI` has passed.  A tag that fails `gate` publishes nothing
+   anywhere.  `release` builds the UF2, then, once `gate` has passed,
+   `rust-build-deb` builds, tests and audits `mc683xx-bdm` for amd64
+   and arm64 and publishes a GitHub Release of both packages; the UF2
+   is attached to it.  The `pypi` job uploads the wheels and sdist only
    once `gate` and the builds have passed.  A release that failed
    partway is finished by re-running its failed jobs: each publishing
    job skips what its registry already has.

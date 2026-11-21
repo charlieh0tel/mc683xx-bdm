@@ -4,21 +4,25 @@
 # UV_LOCKED).  The commit-message and identity checks are
 # ee-tooling.yml's.  The toolchain and its targets come from
 # rust-toolchain.toml, at the root, for the host workspace and
-# firmware/pod-fw alike.
+# firmware/pod-fw alike.  The `bdm` job builds `bdm` on macOS and
+# Windows.
 name: CI
 
 on:
   push:
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           submodules: true
-      - uses: astral-sh/setup-uv@v6
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
       - name: Toolchain
         run: rustup toolchain install
       - name: Tests
@@ -34,3 +38,25 @@ jobs:
           make size > "$RUNNER_TEMP/size.txt"
           cat "$RUNNER_TEMP/size.txt"
           { echo '### Firmware sizes (bytes)'; echo '```'; cat "$RUNNER_TEMP/size.txt"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+
+  bdm:
+    # `bdm` (crates/host) on the other hosts it is meant to run on.
+    # macOS has Unix sockets, so its tests run there, against the
+    # stand-in; Windows has none (`--pod unix:PATH` is Unix's, and the
+    # tests use Unix sockets), so there it is only built.  The compiler
+    # is the one rust-toolchain.toml names, which rustup, already on
+    # the runner, installs on the first cargo call.
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: macos-latest, test: true }
+          - { os: windows-latest, test: false }
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Build
+        run: cargo build --locked -p mc683xx-bdm --bin bdm
+      - name: Tests
+        if: matrix.test
+        run: cargo test --locked -p mc683xx-bdm
