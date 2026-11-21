@@ -4,16 +4,21 @@
 
 .PHONY: deb hooks lint uf2
 
+# cargo runs here with --locked and uv with UV_LOCKED: a Cargo.lock or
+# uv.lock that does not match its manifests is an error, not quietly
+# re-resolved.
+export UV_LOCKED := 1
+
 # The pod's firmware as a UF2 (RP2040, the Pico), which the package ships.
 UF2 := firmware/pod-fw/target/pod-fw-rp2040.uf2
 
 # The bdm Debian package, as rust-build-deb (deb-workflows) builds it,
 # with the UF2: target/debian/mc683xx-bdm_*.deb.
 deb: uf2
-	cargo deb -p pod-host
+	cargo deb --locked -p pod-host
 
 uf2:
-	cd firmware/pod-fw && cargo build --release --no-default-features -F rp2040
+	cd firmware/pod-fw && cargo build --locked --release --no-default-features -F rp2040
 	picotool uf2 convert -t elf firmware/pod-fw/target/thumbv6m-none-eabi/release/pod-fw $(UF2)
 
 # Use the repository's git hooks (.githooks/), once per clone.
@@ -36,13 +41,13 @@ lint:
 	@# clippy's wildcard_imports does not report these.
 	@if git grep -nE '^\s*(pub(\([a-z]+\))? )?use [^;]*::\*;' -- 'crates/*.rs' 'firmware/*.rs' 'host/*.rs'; then \
 		echo "wildcard imports (above)"; exit 1; fi
-	cargo fmt --check && cargo clippy --all-targets -- -D warnings
-	cargo clippy -p pod-py --all-targets --features python -- -D warnings
+	cargo fmt --check && cargo clippy --locked --all-targets -- -D warnings
+	cargo clippy --locked -p pod-py --all-targets --features python -- -D warnings
 	cd firmware/pod-fw && cargo fmt --check
 	for build in $(BUILDS); do \
 		chip=$${build%%:*}; target=$${build#*:}; \
 		for extra in "" ,rtt; do \
-			(cd firmware/pod-fw && cargo clippy --release --no-default-features \
+			(cd firmware/pod-fw && cargo clippy --locked --release --no-default-features \
 				-F $$chip$$extra --target $$target --bins -- -D warnings) || exit 1; \
 		done; \
 	done
