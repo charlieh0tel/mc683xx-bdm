@@ -120,6 +120,15 @@ and the firmware ran on after SIMCR $014A and GO (2026-11-21, step W0
 of smartclock's checklist).  With FRZBM set an access nothing answers
 hangs instead of taking a bus error: no unmapped addresses then.
 
+## A watchdog reset
+
+A halt of the running firmware without the freeze above ended in a
+watchdog reset about 8 s in (SYPCR $CC: 2^18 / 32.768 kHz), and the
+firmware restarted by itself (2026-11-21, step W5 of smartclock's
+checklist).  BKPT was high at that reset, so background mode is off
+afterwards: a halt then is a breakpoint exception.  RSR and warm_start
+after it are read through the firmware's console, not BDM.
+
 ## Pod restarts
 
 A pod restarted while the CPU is halted can glitch BKPT
