@@ -158,14 +158,13 @@ may get one installs a handler that raises.
 ### Debian package
 
 `make deb` builds `mc683xx-bdm`: `bdm`, the udev rule and the pod's
-firmware (`/usr/share/mc683xx-bdm/pod-fw-rp2040.uf2`, needs picotool
-to build), with
+firmware (`/usr/share/mc683xx-bdm/pod-fw-rp2040.uf2`, built with
+picotool 2, else elf2uf2-rs), with
 cargo-deb 3.8.0 (deb-workflows' `rust-build-deb` pin):
 `target/debian/mc683xx-bdm_VERSION-1_ARCH.deb`.  Metadata:
 `[package.metadata.deb]` in `crates/host/Cargo.toml`; changelog:
-`packaging/debian/changelog`.  No release workflow yet (TODO.md):
-`rust-build-deb` has no step before `cargo deb` to build the UF2 the
-package ships.
+`packaging/debian/changelog`.  Released from a `v*` tag by
+`.github/workflows/release.yml` (RELEASING.md).
 
 ## License
 

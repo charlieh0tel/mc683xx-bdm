@@ -10,15 +10,17 @@ Released together: the pod and `bdm` refuse each other unless their
    `packaging/debian/changelog` entry.  Raise `PROTOCOL_VERSION` and
    `docs/usb-protocol.md` if the wire changed.
 2. `make lint`, `cargo test --locked`.
-3. `make deb`: the UF2 (`firmware/pod-fw/target/pod-fw-rp2040.uf2`)
-   and the package, which ships it.
+3. `make deb`: the UF2 (`firmware/pod-fw/target/pod-fw-rp2040.uf2`;
+   picotool 2, else elf2uf2-rs) and the package, which ships it.
 4. Report flash, RAM and stack peak (AGENTS.md, Stack and RAM).  `bdm
    version` names the commit for both; neither may say `-dirty`.
 5. On a target: `docs/bring-up.md` steps 5-12.
-6. Tag `vX.Y.Z`; `gh release create vX.Y.Z` with the UF2 and
-   `target/debian/mc683xx-bdm_X.Y.Z-1_amd64.deb`.
-
-No release workflow yet (TODO.md).
+6. Tag `vX.Y.Z` and push the tag.  `.github/workflows/release.yml`
+   builds the UF2 (elf2uf2-rs), then deb-workflows' `rust-build-deb`
+   builds, tests and audits `mc683xx-bdm` for amd64 and arm64 and
+   publishes a GitHub Release of both packages; the UF2 is attached to
+   it.  A pull request or a push to main runs the same build and
+   publishes nothing.
 
 ## Carrier board
 

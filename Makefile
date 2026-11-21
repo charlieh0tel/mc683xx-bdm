@@ -17,9 +17,17 @@ UF2 := firmware/pod-fw/target/pod-fw-rp2040.uf2
 deb: uf2
 	cargo deb --locked -p mc683xx-bdm
 
+# picotool 2's `uf2 convert` where it is installed, else elf2uf2-rs
+# (the release workflow's): both write the RP2040's family ID.
+POD_FW_ELF := firmware/pod-fw/target/thumbv6m-none-eabi/release/pod-fw
+
 uf2:
 	cd firmware/pod-fw && cargo build --locked --release --no-default-features -F rp2040
-	picotool uf2 convert -t elf firmware/pod-fw/target/thumbv6m-none-eabi/release/pod-fw $(UF2)
+	if command -v picotool > /dev/null; then \
+		picotool uf2 convert -t elf $(POD_FW_ELF) $(UF2); \
+	else \
+		elf2uf2-rs $(POD_FW_ELF) $(UF2); \
+	fi
 
 # Use the repository's git hooks (.githooks/), once per clone.
 hooks:

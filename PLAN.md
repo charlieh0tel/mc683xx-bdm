@@ -523,6 +523,10 @@ code and no `unsafe`; no USB request, so the protocol is unchanged.
   ssh, which uaccess does not reach.
 - Debian package `mc683xx-bdm` (`make deb`): `bdm`, the udev rule and
   the RP2040 UF2, built by cargo-deb as deb-workflows' `rust-build-deb` builds it.
+  The release workflow builds the UF2 in a job of its own and hands it
+  to `rust-build-deb` as its `prebuilt-artifact`; there it is made by
+  elf2uf2-rs, byte for byte picotool's UF2 (RP2040 family ID), since
+  no runner image carries picotool 2.
   `bdm-stand-in` is a test aid and does not ship.
 - Bootloader knock: picotool's reset interface (interface 1), not a
   pod request, so `picotool -f` works too and a pod whose protocol
