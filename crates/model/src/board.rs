@@ -46,13 +46,21 @@ pub struct ModelBoard<const RAM: usize> {
     /// BKPT/DSCLK and DSI driven (`Board::drive_link`): off at boot, and
     /// DSI dropped by GO's and CALL's last word and by a reset to run.
     driven: bool,
+    /// The target holds RESET low: a reset never ends.
+    reset_held: bool,
 }
 
 impl<const RAM: usize> ModelBoard<RAM> {
     /// A board around `target`, its BDM enabled or not.
     #[must_use]
     pub const fn new(target: Target<RAM>, bdm_enabled: bool) -> Self {
-        Self { target, edges: 0, bdm_enabled, dso_high: false, skew: 0, driven: false }
+        Self { target, edges: 0, bdm_enabled, dso_high: false, skew: 0, driven: false, reset_held: false }
+    }
+
+    /// Holds RESET low from the target's side, or lets it go: the pod's
+    /// resets then never end.
+    pub const fn hold_reset(&mut self, held: bool) {
+        self.reset_held = held;
     }
 
     /// The model, for what a test checks or sets.
@@ -128,7 +136,7 @@ impl<const RAM: usize> Board for ModelBoard<RAM> {
     }
 
     fn reset_high(&self) -> bool {
-        true
+        !self.reset_held
     }
 
     fn ds_high(&self) -> bool {
@@ -156,6 +164,9 @@ impl<const RAM: usize> Board for ModelBoard<RAM> {
     }
 
     async fn reset_halt(&mut self) -> bool {
+        if self.reset_held {
+            return false;
+        }
         if self.target.frozen() {
             self.edges = self.edges.wrapping_add(1);
         }
@@ -170,13 +181,16 @@ impl<const RAM: usize> Board for ModelBoard<RAM> {
         !self.target.frozen() || self.edges != edges
     }
 
-    async fn reset_run(&mut self) {
+    /// With RESET held the CPU stays in reset: it is not running, but
+    /// FREEZE is low and its next run starts with background mode off.
+    async fn reset_run(&mut self) -> bool {
         if self.target.frozen() {
             self.edges = self.edges.wrapping_add(1);
         }
         self.bdm_enabled = false;
         self.driven = false;
         self.target.reset_running();
+        !self.reset_held
     }
 
     fn version(&self) -> &'static str {

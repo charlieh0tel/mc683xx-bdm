@@ -209,7 +209,10 @@ bdm pins                         # ATEMP $00000000 (breakpoint), fresh
 
 After a power-on or reset without the pod holding BKPT, BDM is not
 enabled: `bdm halt` answers NoFreeze and the program takes vector 12
-(PLAN.md, Protocol summary).  Check both.
+(PLAN.md, Protocol summary).  Check both.  After the pod's own
+`bdm reset --run` it knows, and refuses before touching BKPT: `bdm
+halt` says "background mode is off since bdm reset --run; use bdm
+reset" and the program runs on undisturbed.
 
 ## 8. Commands
 

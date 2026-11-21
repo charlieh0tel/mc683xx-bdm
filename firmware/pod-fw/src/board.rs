@@ -184,7 +184,7 @@ impl Board for PicoBoard<'_> {
         with_timeout(FREEZE_TIMEOUT, FREEZE.wait_left(edges)).await.is_ok()
     }
 
-    async fn reset_run(&mut self) {
+    async fn reset_run(&mut self) -> bool {
         self.link.set_dsi_enabled(false);
         self.link.set_dsclk(Level::High);
         self.dsclk_enable.set_high();
@@ -193,7 +193,7 @@ impl Board for PicoBoard<'_> {
         self.reset_drive.set_low();
         // The target may hold RESET longer; the reply waits for it, within
         // the halt's bound.
-        let _ = with_timeout(FREEZE_TIMEOUT, self.reset.wait_for_high()).await;
+        with_timeout(FREEZE_TIMEOUT, self.reset.wait_for_high()).await.is_ok()
     }
 
     fn version(&self) -> &'static str {

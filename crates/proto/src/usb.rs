@@ -1,6 +1,8 @@
 //! Host-to-pod messages: one request per bulk OUT packet, one reply per
-//! bulk IN packet, little-endian.  A request starts with its code, a
-//! reply with its status; what follows depends on the request.
+//! bulk IN packet, little-endian.  A request is its tag, then its code
+//! and body; a reply is the tag echoed, FREEZE's edge count and the
+//! status, then a body that depends on the request.  Hello alone is
+//! untagged, the same in every protocol version.
 
 use mc683xx_target::address::Address;
 use mc683xx_target::register::Register;
@@ -39,17 +41,19 @@ pub fn serial_number<'a>(id: &[u8; UNIQUE_ID_BYTES], text: &'a mut [u8; SERIAL_N
 
 /// This protocol's version, in the Hello reply: raised on any change
 /// to a request or reply (docs/usb-protocol.md).
-pub const PROTOCOL_VERSION: u32 = 9;
+pub const PROTOCOL_VERSION: u32 = 10;
 
-/// Bytes a reply's status takes.
-const STATUS_BYTES: usize = 1;
+/// Bytes a request's or reply's tag takes.
+const TAG_BYTES: usize = 1;
+/// A reply's header: its tag, FREEZE's edge count and its status.
+const REPLY_HEADER_BYTES: usize = TAG_BYTES + 2;
 /// Bytes per 17-bit word in a Transfer reply.
 const REPLY_WORD_BYTES: usize = 4;
-/// Words in one Transfer: its reply, a status and 4 bytes a word,
-/// fills at most a packet.
-pub const MAX_TRANSFER_WORDS: usize = (PACKET - STATUS_BYTES) / REPLY_WORD_BYTES;
-/// Bytes in one memory read or write: a write's code, address, size and
-/// data fit a packet, and it is a whole number of longs.
+/// Words in one Transfer: its reply, a header and 4 bytes a word, fills
+/// at most a packet.
+pub const MAX_TRANSFER_WORDS: usize = (PACKET - REPLY_HEADER_BYTES) / REPLY_WORD_BYTES;
+/// Bytes in one memory read or write: a write's tag, code, address,
+/// size and data fit a packet, and it is a whole number of longs.
 pub const MAX_MEMORY_BYTES: usize = 56;
 
 /// Request codes.
@@ -66,6 +70,7 @@ const WRITE_SYSTEM_REGISTER: u8 = 0x0A;
 const READ_MEMORY: u8 = 0x0B;
 const WRITE_MEMORY: u8 = 0x0C;
 const CALL: u8 = 0x0D;
+/// Hello's code, which is its whole request (`HELLO_REQUEST`).
 const HELLO: u8 = 0x0E;
 const RESET_RUN: u8 = 0x0F;
 const RESYNC: u8 = 0x10;
@@ -82,6 +87,12 @@ const BERR: u8 = 1 << 3;
 /// Bytes in a 32-bit field.
 const LONG: usize = 4;
 
+/// Hello, the one untagged request: the same in every protocol version,
+/// so a host and pod of different versions still tell each other theirs.
+pub const HELLO_REQUEST: [u8; 1] = [HELLO];
+/// Bytes in Hello's reply: status Ok and the version, untagged.
+const HELLO_REPLY_BYTES: usize = 1 + LONG;
+
 /// The kind byte of an ATEMP field (`Pins`, `Halt`, `ResetHalt` replies).
 const ATEMP_NONE: u8 = 0;
 const ATEMP_FRESH: u8 = 1;
@@ -92,8 +103,9 @@ const ATEMP_BYTES: usize = 1 + LONG;
 /// A Pins reply's body: levels, VDD, ATEMP.
 const PINS_BYTES: usize = 3 + ATEMP_BYTES;
 
-/// What the host asks of the pod.  Everything from `ReadRegister` on
-/// needs the target in background mode, and so do Go and Call.
+/// What the host asks of the pod, Hello aside ([`HELLO_REQUEST`]).
+/// Everything from `ReadRegister` on needs the target in background
+/// mode, and so do Go and Call.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Request<'a> {
     /// Raw serial words, each answered with the 17 bits shifted in: for
@@ -154,9 +166,6 @@ pub enum Request<'a> {
     },
     /// CALL: stack RPC and run from an address.
     Call(Address),
-    /// The protocol version, [`PROTOCOL_VERSION`]; first, to check the
-    /// pod speaks this protocol.
-    Hello,
 }
 
 /// A Transfer's words, as they lie in the packet: two bytes each.
@@ -204,14 +213,21 @@ pub enum ParseError {
     Field(u8),
 }
 
+/// A tagged packet's tag and what follows it; `None` for an empty one.
+#[must_use]
+pub fn split_tag(packet: &[u8]) -> Option<(u8, &[u8])> {
+    packet.split_first().map(|(&tag, rest)| (tag, rest))
+}
+
 impl<'a> Request<'a> {
-    /// Reads a request from a bulk OUT packet.
+    /// Reads a request from what follows a bulk OUT packet's tag
+    /// ([`split_tag`]): its code and body.
     ///
     /// # Errors
-    /// The packet is not a request.
-    pub fn parse(packet: &'a [u8]) -> Result<Self, ParseError> {
-        let (&code, body) = packet.split_first().ok_or(ParseError::Empty)?;
-        let length = ParseError::Length { code, length: packet.len() };
+    /// The message is not a request.
+    pub fn parse(message: &'a [u8]) -> Result<Self, ParseError> {
+        let (&code, body) = message.split_first().ok_or(ParseError::Empty)?;
+        let length = ParseError::Length { code, length: message.len() };
         let field = ParseError::Field(code);
         let empty = |request| if body.is_empty() { Ok(request) } else { Err(length) };
         match code {
@@ -262,19 +278,20 @@ impl<'a> Request<'a> {
                 Ok(Self::WriteMemory { address: Address(long([a, b, c, d])), size, data })
             }
             CALL => Ok(Self::Call(Address(long(exact::<LONG>(body).ok_or(length)?)))),
-            HELLO => empty(Self::Hello),
             other => Err(ParseError::Unknown(other)),
         }
     }
 
-    /// Writes the request into `packet`, returning its length.
+    /// Writes the request, tagged `tag`, into `packet`, returning its
+    /// length.
     ///
     /// # Errors
     /// A Transfer of no words or more than [`MAX_TRANSFER_WORDS`], or a
     /// memory request whose length is not whole accesses or is more
     /// than [`MAX_MEMORY_BYTES`].
-    pub fn encode(&self, packet: &mut [u8; PACKET]) -> Result<usize, ParseError> {
+    pub fn encode(&self, tag: u8, packet: &mut [u8; PACKET]) -> Result<usize, ParseError> {
         let mut out = Writer { packet, length: 0 };
+        out.put(&[tag]);
         match *self {
             Self::Transfer(TransferWords(words)) => {
                 if words.is_empty() || words.len() / 2 > MAX_TRANSFER_WORDS {
@@ -341,9 +358,6 @@ impl<'a> Request<'a> {
             Self::Call(Address(address)) => {
                 out.put(&[CALL]).put(&address.to_le_bytes());
             }
-            Self::Hello => {
-                out.put(&[HELLO]);
-            }
         }
         Ok(out.length)
     }
@@ -397,20 +411,21 @@ fn memory_length_ok(size: Size, length: usize) -> bool {
     length > 0 && length <= MAX_MEMORY_BYTES && length.is_multiple_of(byte_count(size))
 }
 
-/// Writes a Transfer request for `words` into `packet`, returning its
-/// length.
+/// Writes a Transfer request for `words`, tagged `tag`, into `packet`,
+/// returning its length.
 ///
 /// # Errors
 /// No words, or more than one transfer takes.
-pub fn encode_transfer(words: &[u16], packet: &mut [u8; PACKET]) -> Result<usize, ParseError> {
+pub fn encode_transfer(tag: u8, words: &[u16], packet: &mut [u8; PACKET]) -> Result<usize, ParseError> {
     if words.is_empty() || words.len() > MAX_TRANSFER_WORDS {
         return Err(ParseError::Length { code: TRANSFER, length: 1 + 2 * words.len() });
     }
-    packet[0] = TRANSFER;
-    for (word, pair) in words.iter().zip(packet[1..].as_chunks_mut::<2>().0) {
-        *pair = word.to_le_bytes();
+    let mut out = Writer { packet, length: 0 };
+    out.put(&[tag, TRANSFER]);
+    for word in words {
+        out.put(&word.to_le_bytes());
     }
-    Ok(1 + 2 * words.len())
+    Ok(out.length)
 }
 
 /// How a request went: a reply's first byte.
@@ -442,10 +457,17 @@ pub enum Status {
     /// A response the command's sequence does not allow.
     #[error("unexpected response from target")]
     Unexpected = 7,
+    /// Halt or Hold refused: the pod's own last reset was `ResetRun`, so
+    /// BKPT would be a breakpoint exception in the running program.
+    #[error("background mode is off since the pod's reset to run")]
+    BdmDisabled = 8,
+    /// RESET stayed low after the pod's pulse: the target holds it.
+    #[error("the target holds RESET low")]
+    ResetHeld = 9,
 }
 
 impl Status {
-    const ALL: [Self; 8] = [
+    const ALL: [Self; 10] = [
         Self::Ok,
         Self::BadRequest,
         Self::NoTarget,
@@ -454,6 +476,8 @@ impl Status {
         Self::Illegal,
         Self::NotReady,
         Self::Unexpected,
+        Self::BdmDisabled,
+        Self::ResetHeld,
     ];
 
     fn from_byte(byte: u8) -> Option<Self> {
@@ -547,65 +571,111 @@ impl Atemp {
     }
 }
 
+/// What every reply but Hello's starts with.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ReplyHeader {
+    /// The request's tag, echoed: 0 for a request too short to carry
+    /// one, which a host never sends.
+    pub tag: u8,
+    /// FREEZE's edge count as the reply is written, its low 8 bits: a
+    /// count that moved between two replies means the CPU left
+    /// background mode in between, perhaps to enter it again.
+    pub freeze_edges: u8,
+}
+
+/// Writes a reply's header and `status`.
+fn reply(header: ReplyHeader, status: Status, packet: &mut [u8; PACKET]) -> Writer<'_> {
+    let mut out = Writer { packet, length: 0 };
+    out.put(&[header.tag, header.freeze_edges, status as u8]);
+    out
+}
+
 /// Writes a reply that is only a status, returning its length.
-pub fn encode_status(status: Status, packet: &mut [u8; PACKET]) -> usize {
-    packet[0] = status as u8;
-    STATUS_BYTES
+pub fn encode_status(header: ReplyHeader, status: Status, packet: &mut [u8; PACKET]) -> usize {
+    reply(header, status, packet).length
 }
 
 /// Writes a Transfer's reply, returning its length.  `responses` is at
 /// most [`MAX_TRANSFER_WORDS`] long.
-pub fn encode_transfer_reply(responses: &[u32], packet: &mut [u8; PACKET]) -> usize {
-    packet[0] = Status::Ok as u8;
-    for (response, out) in responses.iter().zip(packet[STATUS_BYTES..].as_chunks_mut::<REPLY_WORD_BYTES>().0)
-    {
-        *out = response.to_le_bytes();
+pub fn encode_transfer_reply(header: ReplyHeader, responses: &[u32], packet: &mut [u8; PACKET]) -> usize {
+    let mut out = reply(header, Status::Ok, packet);
+    for response in responses {
+        out.put(&response.to_le_bytes());
     }
-    STATUS_BYTES + REPLY_WORD_BYTES * responses.len()
+    out.length
 }
 
 /// Writes a Pins reply, returning its length.
-pub fn encode_pins(pins: &Pins, packet: &mut [u8; PACKET]) -> usize {
+pub fn encode_pins(header: ReplyHeader, pins: &Pins, packet: &mut [u8; PACKET]) -> usize {
     let levels = [(pins.freeze, FREEZE), (pins.reset, RESET), (pins.ds, DS), (pins.berr, BERR)]
         .into_iter()
         .filter(|(high, _)| *high)
         .fold(0, |bits, (_, bit)| bits | bit);
-    packet[0] = Status::Ok as u8;
-    packet[1] = levels;
-    packet[2..4].copy_from_slice(&pins.vdd_mv.to_le_bytes());
-    packet[4..STATUS_BYTES + PINS_BYTES].copy_from_slice(&pins.atemp.to_bytes());
-    STATUS_BYTES + PINS_BYTES
+    let mut out = reply(header, Status::Ok, packet);
+    out.put(&[levels]).put(&pins.vdd_mv.to_le_bytes()).put(&pins.atemp.to_bytes());
+    out.length
 }
 
-/// Writes a `Halt` or `ResetHalt` reply, returning its length.
-pub fn encode_atemp(atemp: Atemp, packet: &mut [u8; PACKET]) -> usize {
-    packet[0] = Status::Ok as u8;
-    packet[STATUS_BYTES..STATUS_BYTES + ATEMP_BYTES].copy_from_slice(&atemp.to_bytes());
-    STATUS_BYTES + ATEMP_BYTES
+/// Writes a `Halt`, `ResetHalt` or `Resync` reply, returning its length.
+pub fn encode_atemp(header: ReplyHeader, atemp: Atemp, packet: &mut [u8; PACKET]) -> usize {
+    let mut out = reply(header, Status::Ok, packet);
+    out.put(&atemp.to_bytes());
+    out.length
 }
 
-/// Writes a reply carrying one 32-bit value (a register, ATEMP, the
-/// DSCLK rate set), returning its length.
-pub fn encode_value(value: u32, packet: &mut [u8; PACKET]) -> usize {
-    packet[0] = Status::Ok as u8;
-    packet[1..=LONG].copy_from_slice(&value.to_le_bytes());
-    STATUS_BYTES + LONG
+/// Writes a reply carrying one 32-bit value (a register, the DSCLK rate
+/// set), returning its length.
+pub fn encode_value(header: ReplyHeader, value: u32, packet: &mut [u8; PACKET]) -> usize {
+    let mut out = reply(header, Status::Ok, packet);
+    out.put(&value.to_le_bytes());
+    out.length
 }
 
 /// Writes a memory read's reply, returning its length.  `data` is at
 /// most [`MAX_MEMORY_BYTES`] long.
-pub fn encode_data(data: &[u8], packet: &mut [u8; PACKET]) -> usize {
-    packet[0] = Status::Ok as u8;
-    packet[STATUS_BYTES..STATUS_BYTES + data.len()].copy_from_slice(data);
-    STATUS_BYTES + data.len()
+pub fn encode_data(header: ReplyHeader, data: &[u8], packet: &mut [u8; PACKET]) -> usize {
+    let mut out = reply(header, Status::Ok, packet);
+    out.put(data);
+    out.length
 }
 
-/// A reply's result, after its status.
+/// Writes Hello's reply, untagged: status Ok and [`PROTOCOL_VERSION`].
+pub fn encode_hello_reply(packet: &mut [u8; PACKET]) -> usize {
+    let mut out = Writer { packet, length: 0 };
+    out.put(&[Status::Ok as u8]).put(&PROTOCOL_VERSION.to_le_bytes());
+    out.length
+}
+
+/// The version in a Hello reply; `None` for any other packet, a
+/// tagged reply included (its first byte, the tag, is never 0 from a
+/// host's request).
+#[must_use]
+pub fn parse_hello_reply(packet: &[u8]) -> Option<u32> {
+    let [status, version @ ..] = exact::<HELLO_REPLY_BYTES>(packet)?;
+    (status == Status::Ok as u8).then(|| long(version))
+}
+
+/// A tagged reply's header, and what follows it, for [`parse_reply`].
+///
+/// # Errors
+/// Too short for a header.
+pub fn parse_reply_header(packet: &[u8]) -> Result<(ReplyHeader, &[u8]), ReplyError> {
+    match packet {
+        [tag, freeze_edges, rest @ ..] if !rest.is_empty() => {
+            Ok((ReplyHeader { tag: *tag, freeze_edges: *freeze_edges }, rest))
+        }
+        _ => Err(ReplyError::Malformed),
+    }
+}
+
+/// A reply's result, from what follows its header
+/// ([`parse_reply_header`]): its status, then the body.
 ///
 /// # Errors
 /// The pod reported a failure, or the reply is malformed.
-pub fn parse_reply(packet: &[u8]) -> Result<&[u8], ReplyError> {
-    let (&status, body) = packet.split_first().ok_or(ReplyError::Malformed)?;
+pub fn parse_reply(message: &[u8]) -> Result<&[u8], ReplyError> {
+    let (&status, body) = message.split_first().ok_or(ReplyError::Malformed)?;
+
     match Status::from_byte(status) {
         Some(Status::Ok) => Ok(body),
         Some(failed) => Err(ReplyError::Failed(failed)),
@@ -675,13 +745,16 @@ mod tests {
     use super::BERR;
     use super::DS;
     use super::FREEZE;
+    use super::HELLO_REQUEST;
     use super::MAX_MEMORY_BYTES;
     use super::MAX_TRANSFER_WORDS;
     use super::PACKET;
+    use super::PROTOCOL_VERSION;
     use super::ParseError;
     use super::Pins;
     use super::Register;
     use super::ReplyError;
+    use super::ReplyHeader;
     use super::Request;
     use super::SERIAL_NUMBER_CHARS;
     use super::Size;
@@ -691,22 +764,61 @@ mod tests {
     use super::byte_count;
     use super::encode_atemp;
     use super::encode_data;
+    use super::encode_hello_reply;
     use super::encode_pins;
     use super::encode_status;
     use super::encode_transfer;
     use super::encode_transfer_reply;
     use super::encode_value;
     use super::parse_atemp;
+    use super::parse_hello_reply;
     use super::parse_pins;
     use super::parse_reply;
+    use super::parse_reply_header;
     use super::parse_transfer_reply;
     use super::parse_value;
     use super::serial_number;
+    use super::split_tag;
+
+    /// A reply header with no meaning beyond the test's.
+    const HEADER: ReplyHeader = ReplyHeader { tag: 0x5A, freeze_edges: 3 };
 
     fn round_trip(request: Request<'_>) {
         let mut packet = [0; PACKET];
-        let length = request.encode(&mut packet).unwrap();
-        assert_eq!(Request::parse(&packet[..length]), Ok(request));
+        let length = request.encode(0xC3, &mut packet).unwrap();
+        let (tag, message) = split_tag(&packet[..length]).unwrap();
+        assert_eq!(tag, 0xC3);
+        assert_eq!(Request::parse(message), Ok(request));
+    }
+
+    /// A reply's result, its header checked against [`HEADER`].
+    fn result(packet: &[u8]) -> Result<&[u8], ReplyError> {
+        let (header, message) = parse_reply_header(packet).unwrap();
+        assert_eq!(header, HEADER);
+        parse_reply(message)
+    }
+
+    #[test]
+    fn hello_is_untagged_and_the_same_in_every_version() {
+        assert_eq!(HELLO_REQUEST, [0x0E]);
+        let mut packet = [0; PACKET];
+        let length = encode_hello_reply(&mut packet);
+        assert_eq!(packet[..length], [0, PROTOCOL_VERSION as u8, 0, 0, 0]);
+        assert_eq!(parse_hello_reply(&packet[..length]), Some(PROTOCOL_VERSION));
+        // A tagged reply is never taken for it: its tag is not 0.
+        let length = encode_value(ReplyHeader { tag: 1, freeze_edges: 0 }, 9, &mut packet);
+        assert_eq!(parse_hello_reply(&packet[..length]), None);
+        assert_eq!(parse_hello_reply(&[0, 9, 0, 0]), None);
+        assert_eq!(parse_hello_reply(&[1]), None);
+    }
+
+    #[test]
+    fn replies_carry_the_tag_and_freeze_edges() {
+        let mut packet = [0; PACKET];
+        let length = encode_status(HEADER, Status::NoFreeze, &mut packet);
+        assert_eq!(packet[..length], [0x5A, 3, Status::NoFreeze as u8]);
+        assert_eq!(parse_reply_header(&[0x5A, 3]), Err(ReplyError::Malformed));
+        assert_eq!(split_tag(&[]), None);
     }
 
     #[test]
@@ -732,7 +844,6 @@ mod tests {
             data: &[1, 2, 3, 4],
         });
         round_trip(Request::Call(Address(0x0004_0000)));
-        round_trip(Request::Hello);
     }
 
     #[test]
@@ -741,7 +852,8 @@ mod tests {
         round_trip(Request::WriteMemory { address: Address(u32::MAX), size: Size::Long, data: &data });
         round_trip(Request::ReadMemory { address: Address(0), size: Size::Byte, length: MAX_MEMORY_BYTES });
         assert!(MAX_MEMORY_BYTES.is_multiple_of(byte_count(Size::Long)));
-        const { assert!(1 + 4 + 1 + MAX_MEMORY_BYTES <= PACKET) };
+        const { assert!(2 + 4 + 1 + MAX_MEMORY_BYTES <= PACKET) };
+        const { assert!(3 + MAX_MEMORY_BYTES <= PACKET) };
     }
 
     #[test]
@@ -751,10 +863,10 @@ mod tests {
             [(Size::Word, 3), (Size::Long, 6), (Size::Byte, 0), (Size::Byte, MAX_MEMORY_BYTES + 1)]
         {
             let request = Request::ReadMemory { address: Address(0), size, length };
-            assert_eq!(request.encode(&mut packet), Err(ParseError::Field(0x0B)), "{size:?} {length}");
+            assert_eq!(request.encode(1, &mut packet), Err(ParseError::Field(0x0B)), "{size:?} {length}");
         }
         let request = Request::WriteMemory { address: Address(0), size: Size::Word, data: &[1, 2, 3] };
-        assert_eq!(request.encode(&mut packet), Err(ParseError::Field(0x0C)));
+        assert_eq!(request.encode(1, &mut packet), Err(ParseError::Field(0x0C)));
         // Parsed: odd word length, the reserved size, and sizes past the
         // field's two bits.
         assert_eq!(Request::parse(&[0x0B, 0, 0, 0, 0, 1, 3]), Err(ParseError::Field(0x0B)));
@@ -778,9 +890,9 @@ mod tests {
     fn transfer_round_trips() {
         let words = [0x2588, 0x0000, 0xFFFF];
         let mut packet = [0; PACKET];
-        let length = encode_transfer(&words, &mut packet).unwrap();
-        assert_eq!(&packet[..length], [0x01, 0x88, 0x25, 0, 0, 0xFF, 0xFF]);
-        let Ok(Request::Transfer(parsed)) = Request::parse(&packet[..length]) else {
+        let length = encode_transfer(7, &words, &mut packet).unwrap();
+        assert_eq!(&packet[..length], [7, 0x01, 0x88, 0x25, 0, 0, 0xFF, 0xFF]);
+        let Ok(Request::Transfer(parsed)) = Request::parse(&packet[1..length]) else {
             panic!("not a transfer");
         };
         assert_eq!(parsed.iter().collect::<Vec<_>>(), words);
@@ -792,12 +904,12 @@ mod tests {
     fn transfer_limits() {
         let mut packet = [0; PACKET];
         let most = [0; MAX_TRANSFER_WORDS];
-        assert!(encode_transfer(&most, &mut packet).is_ok());
+        assert!(encode_transfer(1, &most, &mut packet).is_ok());
         let too_many = [0; MAX_TRANSFER_WORDS + 1];
-        assert!(encode_transfer(&too_many, &mut packet).is_err());
-        assert!(encode_transfer(&[], &mut packet).is_err());
+        assert!(encode_transfer(1, &too_many, &mut packet).is_err());
+        assert!(encode_transfer(1, &[], &mut packet).is_err());
         // A reply to the most words still fits a packet.
-        const { assert!(4 * MAX_TRANSFER_WORDS < PACKET) };
+        const { assert!(3 + 4 * MAX_TRANSFER_WORDS <= PACKET) };
     }
 
     #[test]
@@ -810,13 +922,15 @@ mod tests {
         assert_eq!(Request::parse(&[0x06, 1, 2, 3]), Err(ParseError::Length { code: 6, length: 4 }));
         assert_eq!(Request::parse(&[0x0C, 0, 0, 0]), Err(ParseError::Length { code: 0x0C, length: 4 }));
         assert_eq!(Request::parse(&[0x0D, 0, 0]), Err(ParseError::Length { code: 0x0D, length: 3 }));
+        // Hello is no tagged request.
+        assert_eq!(Request::parse(&[0x0E]), Err(ParseError::Unknown(0x0E)));
     }
 
     #[test]
     fn transfer_reply() {
         let mut packet = [0; PACKET];
-        let length = encode_transfer_reply(&[0x1_0000, 0x0_1234], &mut packet);
-        let body = parse_reply(&packet[..length]).unwrap();
+        let length = encode_transfer_reply(HEADER, &[0x1_0000, 0x0_1234], &mut packet);
+        let body = result(&packet[..length]).unwrap();
         assert_eq!(parse_transfer_reply(body).unwrap().collect::<Vec<_>>(), [0x1_0000, 0x0_1234]);
         assert!(parse_transfer_reply(&[0, 0, 0]).is_err());
     }
@@ -826,15 +940,15 @@ mod tests {
         let mut packet = [0; PACKET];
         for (freeze, atemp) in [(true, Atemp::Fresh(1)), (true, Atemp::Stale(0)), (false, Atemp::None)] {
             let pins = Pins { freeze, reset: true, ds: false, berr: true, vdd_mv: 5012, atemp };
-            let length = encode_pins(&pins, &mut packet);
-            assert_eq!(parse_pins(parse_reply(&packet[..length]).unwrap()), Ok(pins));
+            let length = encode_pins(HEADER, &pins, &mut packet);
+            assert_eq!(parse_pins(result(&packet[..length]).unwrap()), Ok(pins));
         }
         // Each level in its own bit.
         for (berr, levels) in [(true, DS | BERR), (false, DS)] {
             let pins = Pins { freeze: false, reset: false, ds: true, berr, vdd_mv: 0, atemp: Atemp::None };
-            let length = encode_pins(&pins, &mut packet);
-            assert_eq!(packet[1], levels);
-            assert_eq!(parse_pins(parse_reply(&packet[..length]).unwrap()), Ok(pins));
+            let length = encode_pins(HEADER, &pins, &mut packet);
+            assert_eq!(packet[3], levels);
+            assert_eq!(parse_pins(result(&packet[..length]).unwrap()), Ok(pins));
         }
         assert_eq!(parse_pins(&[0, 0]), Err(ReplyError::Malformed));
         // ATEMP only in background mode, and always then.
@@ -846,11 +960,11 @@ mod tests {
     fn atemp_reply() {
         let mut packet = [0; PACKET];
         for atemp in [Atemp::Fresh(0x1234_FFFF), Atemp::Stale(0xA7E3_A7E3), Atemp::Unread] {
-            let length = encode_atemp(atemp, &mut packet);
-            assert_eq!(parse_atemp(parse_reply(&packet[..length]).unwrap()), Ok(atemp));
+            let length = encode_atemp(HEADER, atemp, &mut packet);
+            assert_eq!(parse_atemp(result(&packet[..length]).unwrap()), Ok(atemp));
         }
-        let length = encode_atemp(Atemp::None, &mut packet);
-        assert_eq!(parse_atemp(parse_reply(&packet[..length]).unwrap()), Err(ReplyError::Malformed));
+        let length = encode_atemp(HEADER, Atemp::None, &mut packet);
+        assert_eq!(parse_atemp(result(&packet[..length]).unwrap()), Err(ReplyError::Malformed));
         assert_eq!(parse_atemp(&[ATEMP_UNREAD, 1, 0, 0, 0]), Err(ReplyError::Malformed));
         assert_eq!(parse_atemp(&[4, 0, 0, 0, 0]), Err(ReplyError::Malformed));
         assert_eq!(parse_atemp(&[ATEMP_FRESH, 0, 0, 0]), Err(ReplyError::Malformed));
@@ -859,20 +973,22 @@ mod tests {
     #[test]
     fn value_and_data_replies() {
         let mut packet = [0; PACKET];
-        let length = encode_value(0x0000_0001, &mut packet);
-        assert_eq!(parse_value(parse_reply(&packet[..length]).unwrap()), Ok(1));
+        let length = encode_value(HEADER, 0x0000_0001, &mut packet);
+        assert_eq!(parse_value(result(&packet[..length]).unwrap()), Ok(1));
         assert_eq!(parse_value(&[0, 0]), Err(ReplyError::Malformed));
-        let length = encode_data(&[9, 8, 7], &mut packet);
-        assert_eq!(parse_reply(&packet[..length]), Ok(&[9, 8, 7][..]));
+        let length = encode_data(HEADER, &[9, 8, 7], &mut packet);
+        assert_eq!(result(&packet[..length]), Ok(&[9, 8, 7][..]));
     }
 
     #[test]
     fn failures() {
         let mut packet = [0; PACKET];
         for status in Status::ALL.into_iter().skip(1) {
-            let length = encode_status(status, &mut packet);
-            assert_eq!(parse_reply(&packet[..length]), Err(ReplyError::Failed(status)));
+            let length = encode_status(HEADER, status, &mut packet);
+            assert_eq!(result(&packet[..length]), Err(ReplyError::Failed(status)));
         }
+        assert_eq!(Status::ALL.map(|status| status as u8), [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
+
         assert_eq!(parse_reply(&[0xEE]), Err(ReplyError::Malformed));
         assert_eq!(parse_reply(&[]), Err(ReplyError::Malformed));
     }

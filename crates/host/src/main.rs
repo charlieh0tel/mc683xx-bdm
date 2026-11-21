@@ -33,7 +33,9 @@ use mc683xx_bdm::transport::list_pods;
 use mc683xx_bdm::transport::reboot_to_bootloader;
 use mc683xx_bdm_proto::usb::Atemp;
 use mc683xx_bdm_proto::usb::PROTOCOL_VERSION;
+use mc683xx_bdm_proto::usb::ReplyError;
 use mc683xx_bdm_proto::usb::SERIAL_NUMBER_CHARS;
+use mc683xx_bdm_proto::usb::Status;
 use mc683xx_target::Cpu32Target;
 use mc683xx_target::address::Address;
 use mc683xx_target::entry::Entry;
@@ -508,10 +510,24 @@ fn main() -> ExitCode {
         Err(error) if is_broken_pipe(&error) => ExitCode::SUCCESS,
         Err(error) if let Some(signaled) = error.downcast_ref::<Signaled>().copied() => signaled.status(),
         Err(error) => {
-            eprintln!("bdm: {error:#}");
+            eprintln!("bdm: {}", message(&error));
             ExitCode::FAILURE
         }
     }
+}
+
+/// What `bdm` says of a pod's `BdmDisabled`: in its own terms.
+const BDM_DISABLED: &str = "background mode is off since bdm reset --run; use bdm reset";
+
+/// `error` as `bdm` reports it.
+fn message(error: &anyhow::Error) -> String {
+    let disabled = error.chain().any(|cause| {
+        matches!(
+            cause.downcast_ref::<mc683xx_bdm::pod::Error>(),
+            Some(mc683xx_bdm::pod::Error::Reply(ReplyError::Failed(Status::BdmDisabled)))
+        )
+    });
+    if disabled { BDM_DISABLED.to_owned() } else { format!("{error:#}") }
 }
 
 #[cfg(test)]
@@ -521,6 +537,9 @@ mod tests {
     use std::process::ExitCode;
 
     use super::FunctionCode;
+    use super::ReplyError;
+    use super::Status;
+
     use super::SIGINT;
     use super::SIGTERM;
     use super::Signaled;
@@ -529,6 +548,7 @@ mod tests {
     use super::is_broken_pipe;
     use super::loopback_mismatch;
     use super::loopback_words;
+    use super::message;
     use super::number;
     use super::save_dump;
     use super::usb_serial;
@@ -626,6 +646,20 @@ mod tests {
         let full = std::io::Error::from(std::io::ErrorKind::StorageFull);
         assert!(!is_broken_pipe(&anyhow::Error::from(full)));
         assert!(!is_broken_pipe(&anyhow::anyhow!("illegal command")));
+    }
+
+    #[test]
+    fn bdm_disabled_says_what_to_do() {
+        let refused = mc683xx_bdm::pod::Error::Reply(ReplyError::Failed(Status::BdmDisabled));
+        assert_eq!(
+            message(&anyhow::Error::from(refused)),
+            "background mode is off since bdm reset --run; use bdm reset"
+        );
+        let other = mc683xx_bdm::pod::Error::Reply(ReplyError::Failed(Status::NoFreeze));
+        assert_eq!(
+            message(&anyhow::Error::from(other).context("halt")),
+            "halt: target not in background mode"
+        );
     }
 
     #[test]

@@ -7,14 +7,18 @@ use mc683xx_bdm_model::board::ModelBoard;
 use mc683xx_bdm_proto::bdm::Command;
 use mc683xx_bdm_proto::pod::Pod;
 use mc683xx_bdm_proto::usb::Atemp;
+use mc683xx_bdm_proto::usb::HELLO_REQUEST;
 use mc683xx_bdm_proto::usb::PACKET;
 use mc683xx_bdm_proto::usb::PROTOCOL_VERSION;
 use mc683xx_bdm_proto::usb::ReplyError;
+use mc683xx_bdm_proto::usb::ReplyHeader;
 use mc683xx_bdm_proto::usb::Request;
 use mc683xx_bdm_proto::usb::Status;
 use mc683xx_bdm_proto::usb::parse_atemp;
+use mc683xx_bdm_proto::usb::parse_hello_reply;
 use mc683xx_bdm_proto::usb::parse_pins;
 use mc683xx_bdm_proto::usb::parse_reply;
+use mc683xx_bdm_proto::usb::parse_reply_header;
 use mc683xx_bdm_proto::usb::parse_value;
 use mc683xx_target::address::Address;
 use mc683xx_target::entry::Entry;
@@ -29,6 +33,8 @@ type ModelPod = Pod<ModelBoard<RAM>>;
 
 /// The Transfer request's opcode (docs/usb-protocol.md).
 const TRANSFER: u8 = 0x01;
+/// The tag every request here carries.
+const TAG: u8 = 0x42;
 
 /// A pod on a running model, its BDM enabled or not.
 fn pod(bdm_enabled: bool) -> ModelPod {
@@ -42,10 +48,10 @@ fn pod_on_halted() -> ModelPod {
     Pod::new(ModelBoard::new(target, true))
 }
 
-/// Sends `request`; returns the reply's bytes.
+/// Sends `request`, tagged [`TAG`]; returns the reply's bytes.
 fn send(pod: &mut ModelPod, request: &Request<'_>) -> Vec<u8> {
     let mut packet = [0; PACKET];
-    let length = request.encode(&mut packet).unwrap();
+    let length = request.encode(TAG, &mut packet).unwrap();
     raw(pod, &packet[..length])
 }
 
@@ -55,8 +61,16 @@ fn raw(pod: &mut ModelPod, packet: &[u8]) -> Vec<u8> {
     reply[..length].to_vec()
 }
 
+/// A reply's header.
+fn header(reply: &[u8]) -> ReplyHeader {
+    parse_reply_header(reply).unwrap().0
+}
+
+/// A reply's result, its tag checked as [`TAG`].
 fn status(reply: &[u8]) -> Result<&[u8], ReplyError> {
-    parse_reply(reply)
+    let (header, message) = parse_reply_header(reply).unwrap();
+    assert_eq!(header.tag, TAG, "the tag echoed");
+    parse_reply(message)
 }
 
 fn failed(status: Status) -> Result<&'static [u8], ReplyError> {
@@ -66,15 +80,33 @@ fn failed(status: Status) -> Result<&'static [u8], ReplyError> {
 #[test]
 fn hello() {
     let mut pod = pod(true);
-    assert_eq!(parse_value(status(&send(&mut pod, &Request::Hello)).unwrap()), Ok(PROTOCOL_VERSION));
+    assert_eq!(parse_hello_reply(&raw(&mut pod, &HELLO_REQUEST)), Some(PROTOCOL_VERSION));
 }
 
 #[test]
-fn bad_requests_are_one_byte() {
+fn bad_requests_echo_the_tag() {
     let mut pod = pod(true);
-    for packet in [&[][..], &[0xFF], &[0x02, 0], &[0x0B, 0, 0, 0, 0, 3, 4]] {
-        assert_eq!(raw(&mut pod, packet), [Status::BadRequest as u8], "{packet:?}");
+    for packet in [&[TAG][..], &[TAG, 0xFF], &[TAG, 0x02, 0], &[TAG, 0x0B, 0, 0, 0, 0, 3, 4], &[TAG, 0x0E]] {
+        assert_eq!(status(&raw(&mut pod, packet)), failed(Status::BadRequest), "{packet:?}");
     }
+    // No tag to echo: tagged 0, which no host uses.
+    assert_eq!(raw(&mut pod, &[]), [0, 0, Status::BadRequest as u8]);
+    let mut reply = [0; PACKET];
+    let length = pod.oversized(&mut reply);
+    assert_eq!(reply[..length], [0, 0, Status::BadRequest as u8]);
+}
+
+#[test]
+fn replies_carry_freeze_edges() {
+    let mut pod = pod(true);
+    assert_eq!(header(&send(&mut pod, &Request::Pins)), ReplyHeader { tag: TAG, freeze_edges: 0 });
+    send(&mut pod, &Request::ResetHalt);
+    let entered = header(&send(&mut pod, &Request::Pins)).freeze_edges;
+    assert_eq!(entered, 1);
+    // A reset to run and the CPU's own entry: left, and back.
+    send(&mut pod, &Request::ResetRun);
+    pod.board_mut().enter_background(Entry::Background);
+    assert_eq!(header(&send(&mut pod, &Request::Pins)).freeze_edges, entered + 2);
 }
 
 #[test]
@@ -85,7 +117,7 @@ fn commands_need_freeze() {
         Request::ReadRegister(Register::D0),
         Request::ReadMemory { address: Address(RAM_BASE), size: Size::Byte, length: 1 },
     ] {
-        assert_eq!(send(&mut pod, &request), [Status::NoFreeze as u8], "{request:?}");
+        assert_eq!(status(&send(&mut pod, &request)), failed(Status::NoFreeze), "{request:?}");
     }
     let pins = parse_pins(status(&send(&mut pod, &Request::Pins)).unwrap()).unwrap();
     assert!(!pins.freeze);
@@ -174,7 +206,7 @@ fn a_failed_entry_read_fails_one_request() {
     assert_eq!((pins.freeze, pins.atemp), (true, Atemp::Unread));
     assert_eq!(status(&send(&mut pod, &Request::Halt)).map(parse_atemp), Ok(Ok(Atemp::Unread)));
     // A Transfer of one NOP: DSO high comes back as is.
-    assert_eq!(status(&raw(&mut pod, &[TRANSFER, 0, 0])), Ok(&[0xFF, 0xFF, 1, 0][..]));
+    assert_eq!(status(&raw(&mut pod, &[TAG, TRANSFER, 0, 0])), Ok(&[0xFF, 0xFF, 1, 0][..]));
     // A reset is a new entry, read again.
     pod.board_mut().hold_dso_high(false);
     assert_eq!(parse_atemp(status(&send(&mut pod, &Request::ResetHalt)).unwrap()), Ok(Atemp::Fresh(0)));
@@ -187,9 +219,35 @@ fn reset_run_leaves_the_target_running_without_bdm() {
     assert_eq!(status(&send(&mut pod, &Request::ResetRun)), Ok(&[][..]));
     let pins = parse_pins(status(&send(&mut pod, &Request::Pins)).unwrap()).unwrap();
     assert_eq!((pins.freeze, pins.atemp), (false, Atemp::None));
-    // Background mode is off until a ResetHalt.
-    assert_eq!(status(&send(&mut pod, &Request::Halt)), failed(Status::NoFreeze));
+    // Background mode is off until a ResetHalt: Halt and Hold are refused
+    // before BKPT moves, and the program runs on.
+    assert_eq!(status(&send(&mut pod, &Request::Halt)), failed(Status::BdmDisabled));
+    assert_eq!(status(&send(&mut pod, &Request::Hold)), failed(Status::BdmDisabled));
+    assert!(!pod.board_mut().target().frozen());
     assert_eq!(parse_atemp(status(&send(&mut pod, &Request::ResetHalt)).unwrap()), Ok(Atemp::Fresh(0)));
+    assert_eq!(parse_atemp(status(&send(&mut pod, &Request::Halt)).unwrap()), Ok(Atemp::Fresh(0)));
+}
+
+#[test]
+fn an_entry_after_a_reset_to_run_lifts_the_halt_guard() {
+    let mut pod = pod(true);
+    send(&mut pod, &Request::ResetRun);
+    // A reset the pod did not make, with BKPT low: background mode on.
+    pod.board_mut().enter_background(Entry::Breakpoint);
+    send(&mut pod, &Request::Go);
+    // The pod tries: the model, whose own BDM flag only its resets set,
+    // then answers NoFreeze.
+    assert_eq!(status(&send(&mut pod, &Request::Halt)), failed(Status::NoFreeze));
+}
+
+#[test]
+fn a_reset_the_target_holds_is_reset_held() {
+    let mut pod = pod(true);
+    pod.board_mut().hold_reset(true);
+    assert_eq!(status(&send(&mut pod, &Request::ResetRun)), failed(Status::ResetHeld));
+    assert_eq!(status(&send(&mut pod, &Request::ResetHalt)), failed(Status::ResetHeld));
+    pod.board_mut().hold_reset(false);
+    assert!(status(&send(&mut pod, &Request::ResetRun)).is_ok());
 }
 
 #[test]
@@ -238,7 +296,7 @@ fn requests_that_need_no_target_skip_the_entry_read() {
     // run works, and nothing is clocked before the Resync.
     let mut pod = pod_on_halted();
     pod.board_mut().put_out_of_frame(9);
-    assert_eq!(parse_value(status(&send(&mut pod, &Request::Hello)).unwrap()), Ok(PROTOCOL_VERSION));
+    assert_eq!(parse_hello_reply(&raw(&mut pod, &HELLO_REQUEST)), Some(PROTOCOL_VERSION));
     assert!(status(&send(&mut pod, &Request::Version)).is_ok());
     assert!(status(&send(&mut pod, &Request::SetClock { dsclk_hz: 1_000_000 })).is_ok());
     let atemp = parse_atemp(status(&send(&mut pod, &Request::Resync)).unwrap());
@@ -329,7 +387,7 @@ fn memory_round_trips() {
     let read = Request::ReadMemory { address: Address(RAM_BASE), size: Size::Long, length: 8 };
     assert_eq!(status(&send(&mut pod, &read)), Ok(&data[..]));
     let outside = Request::ReadMemory { address: Address(0), size: Size::Byte, length: 1 };
-    assert_eq!(send(&mut pod, &outside), [Status::BusError as u8]);
+    assert_eq!(status(&send(&mut pod, &outside)), failed(Status::BusError));
 }
 
 #[test]

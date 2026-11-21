@@ -277,7 +277,13 @@ machine; `embassy-usb` vendor class; matches the async rules in
 
 USB: vendor class, one bulk OUT and one bulk IN endpoint, 64-byte
 packets, one request per packet and one reply per request
-(`mc683xx-bdm-proto`'s `usb`).  The answer to each request is
+(`mc683xx-bdm-proto`'s `usb`).  Each request but Hello carries a tag
+byte the reply echoes, so a host that gave up on a reply (a timeout,
+Ctrl-C) discards it when it comes later instead of taking it for the
+next request's; Hello is untagged and fixed across versions, so a
+version mismatch is still reported as one.  Each reply also carries
+FREEZE's edge count (low 8 bits), so a host sees a leave and re-entry
+that FREEZE's level hides.  The answer to each request is
 `mc683xx-bdm-proto`'s `pod`, over a `Board` trait: the firmware's board (`board.rs`) is the
 Pico's pins, ADC, PIO link and timeouts, so the request rules run in
 host tests too.  VID:PID 1209:0001, pid.codes' test pair, until
@@ -299,10 +305,17 @@ pods apart (`bdm --pod usb:SERIAL`).  Requests:
   VDD, and NoFreeze if FREEZE does not assert in 100 ms.  Each returns
   ATEMP.  Halt on a CPU already in background mode only returns it.
 - ResetRun: RESET pulsed with BKPT high, so the CPU runs with
-  background mode off; refused without VDD.  It and ResetHalt skip the
-  ATEMP read, so a link out of frame cannot stop them; so do Hello,
+  background mode off; refused without VDD, and ResetHeld if RESET is
+  still low 100 ms later (the target holds it).  It and ResetHalt skip
+  the ATEMP read, so a link out of frame cannot stop them; so do Hello,
   Version and SetClock, which touch no target, so the Hello a host
   sends first cannot stop them either.
+- Halt guard: after its own ResetRun the pod knows background mode is
+  off, so until a ResetHalt or a FREEZE edge (an entry shows it on) it
+  refuses Halt and Hold with BdmDisabled instead of pulling BKPT low,
+  which the running program would take as a breakpoint exception.
+  After the pod's start or a reset it did not make it cannot know, and
+  goes ahead.
 - Hold: BKPT low with no ATEMP read, so nothing releases it until the
   next request: the CPU halts and stays in, or comes back to,
   background mode through a reset the pod did not make (a watchdog's).
@@ -439,6 +452,11 @@ code and no `unsafe`; no USB request, so the protocol is unchanged.
   own timeout; `UsbTransport` over `nusb`, blocking, the device with the pod's VID:PID and the serial number
   asked for (case ignored), or with none asked for the only one: more
   than one is an error listing their serial numbers, never a guess.
+  On USB a request goes out without waiting for the pod to take it
+  and a read always waits for the next reply: a pod still writing a
+  reply the host gave up on takes nothing until that reply is read.
+  `Pod` tags each request (1-255, round again) and discards replies
+  with another tag, Hello's too, which takes only Hello's own form.
   `PodAddress` is `--pod`'s text (`usb`, `usb:SERIAL`, `unix:PATH`,
   `tcp:HOST:PORT`) and connects, for `bdm` and other callers alike;
   `list_pods` reads each pod's serial number and bus-ports from the

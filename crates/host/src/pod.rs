@@ -3,10 +3,12 @@
 //! longer than a packet go as several requests.
 
 use std::time::Duration;
+use std::time::Instant;
 
 use mc683xx_bdm_proto::bdm::byte_count;
 
 use mc683xx_bdm_proto::usb::Atemp;
+use mc683xx_bdm_proto::usb::HELLO_REQUEST;
 use mc683xx_bdm_proto::usb::MAX_MEMORY_BYTES;
 use mc683xx_bdm_proto::usb::MAX_TRANSFER_WORDS;
 use mc683xx_bdm_proto::usb::PACKET;
@@ -17,8 +19,11 @@ use mc683xx_bdm_proto::usb::ReplyError;
 use mc683xx_bdm_proto::usb::Request;
 use mc683xx_bdm_proto::usb::encode_transfer;
 use mc683xx_bdm_proto::usb::parse_atemp;
+use mc683xx_bdm_proto::usb::parse_hello_reply;
 use mc683xx_bdm_proto::usb::parse_pins;
 use mc683xx_bdm_proto::usb::parse_reply;
+use mc683xx_bdm_proto::usb::parse_reply_header;
+
 use mc683xx_bdm_proto::usb::parse_transfer_reply;
 use mc683xx_bdm_proto::usb::parse_value;
 use mc683xx_target::address::Address;
@@ -74,12 +79,18 @@ pub fn function_code(bits: u32) -> Option<FunctionCode> {
 #[derive(Debug)]
 pub struct Pod<T> {
     transport: T,
+    /// The last request's tag, 1-255 once one is sent: 0 tags only the
+    /// pod's replies to packets it could not read a tag from.
+    tag: u8,
+    /// FREEZE's edge count, low 8 bits, from the last reply that carried
+    /// one.
+    freeze_edges: Option<u8>,
 }
 
 impl<T: Transport> Pod<T> {
     /// The pod at the end of `transport`.
     pub const fn new(transport: T) -> Self {
-        Self { transport }
+        Self { transport, tag: 0, freeze_edges: None }
     }
 
     /// The transport, to give it back.
@@ -87,12 +98,30 @@ impl<T: Transport> Pod<T> {
         self.transport
     }
 
-    /// The pod's protocol version.
+    /// FREEZE's edge count, its low 8 bits, as the last reply gave it
+    /// (docs/usb-protocol.md, Replies): one that moved between two
+    /// replies means the target left background mode in between, perhaps
+    /// to enter it again.  `None` before the first reply.
+    #[must_use]
+    pub const fn freeze_edges(&self) -> Option<u8> {
+        self.freeze_edges
+    }
+
+    /// The pod's protocol version, from its untagged Hello, whatever its
+    /// version: any other reply waiting (a stale one) is discarded.
     ///
     /// # Errors
     /// As [`Error`].
     pub fn hello(&mut self) -> Result<u32, Error> {
-        self.value(&Request::Hello)
+        self.transport.send(&HELLO_REQUEST)?;
+        let deadline = Instant::now() + TIMEOUT;
+        let mut reply = [0; PACKET];
+        loop {
+            let length = self.receive(&mut reply, deadline)?;
+            if let Some(version) = parse_hello_reply(&reply[..length]) {
+                return Ok(version);
+            }
+        }
     }
 
     /// Says Hello, and checks the pod speaks this host's protocol.
@@ -280,10 +309,8 @@ impl<T: Transport> Pod<T> {
     pub fn transfer(&mut self, words: &[u16]) -> Result<Vec<u32>, Error> {
         let mut responses = Vec::with_capacity(words.len());
         for chunk in words.chunks(MAX_TRANSFER_WORDS) {
-            let mut packet = [0; PACKET];
-            let length = encode_transfer(chunk, &mut packet)?;
             let mut reply = [0; PACKET];
-            let body = self.exchange(&packet[..length], &mut reply)?;
+            let body = self.exchange(|tag, packet| encode_transfer(tag, chunk, packet), &mut reply)?;
             let before = responses.len();
             responses.extend(parse_transfer_reply(body)?);
             if responses.len() - before != chunk.len() {
@@ -313,15 +340,42 @@ impl<T: Transport> Pod<T> {
 
     /// Encodes and exchanges `request`; returns the reply's result.
     fn request<'r>(&mut self, request: &Request<'_>, reply: &'r mut [u8; PACKET]) -> Result<&'r [u8], Error> {
-        let mut packet = [0; PACKET];
-        let length = request.encode(&mut packet)?;
-        self.exchange(&packet[..length], reply)
+        self.exchange(|tag, packet| request.encode(tag, packet), reply)
     }
 
-    fn exchange<'r>(&mut self, packet: &[u8], reply: &'r mut [u8; PACKET]) -> Result<&'r [u8], Error> {
-        self.transport.send(packet)?;
-        let length = self.transport.receive(reply, TIMEOUT)?;
-        Ok(parse_reply(&reply[..length])?)
+    /// Sends the request `encode` writes, with the next tag, and returns
+    /// its reply's result.  Replies with another tag are stale (left by
+    /// a request this host gave up on) and discarded.
+    fn exchange<'r>(
+        &mut self,
+        encode: impl FnOnce(u8, &mut [u8; PACKET]) -> Result<usize, ParseError>,
+        reply: &'r mut [u8; PACKET],
+    ) -> Result<&'r [u8], Error> {
+        self.tag = self.tag % u8::MAX + 1;
+        let mut packet = [0; PACKET];
+        let length = encode(self.tag, &mut packet)?;
+        self.transport.send(&packet[..length])?;
+        let deadline = Instant::now() + TIMEOUT;
+        let length = loop {
+            let length = self.receive(reply, deadline)?;
+            if let Ok((header, _)) = parse_reply_header(&reply[..length])
+                && header.tag == self.tag
+            {
+                self.freeze_edges = Some(header.freeze_edges);
+                break length;
+            }
+        };
+        let (_, message) = parse_reply_header(&reply[..length])?;
+        Ok(parse_reply(message)?)
+    }
+
+    /// The next reply packet, by `deadline`.
+    fn receive(&mut self, reply: &mut [u8; PACKET], deadline: Instant) -> Result<usize, Error> {
+        let remaining = deadline.saturating_duration_since(Instant::now());
+        match self.transport.receive(reply, remaining) {
+            Err(TransportError::NoReply(_)) => Err(TransportError::NoReply(TIMEOUT).into()),
+            received => Ok(received?),
+        }
     }
 }
 
@@ -341,6 +395,10 @@ fn check_length(size: Size, length: usize) -> Result<(), Error> {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::VecDeque;
+    use std::time::Duration;
+
+    use mc683xx_bdm_proto::usb::PACKET;
     use mc683xx_bdm_proto::usb::PROTOCOL_VERSION;
     use mc683xx_bdm_proto::usb::ReplyError;
     use mc683xx_bdm_proto::usb::Request;
@@ -350,11 +408,82 @@ mod tests {
     use super::Address;
     use super::Atemp;
     use super::Error;
+    use super::Pod;
     use super::Register;
     use super::Size;
     use super::function_code;
     use crate::script::parsed;
     use crate::script::pod;
+    use crate::script::pod_with_edges;
+    use crate::transport::Transport;
+
+    use crate::transport::TransportError;
+
+    /// A pod whose replies come late: those to requests a host gave up
+    /// on wait ahead of the next.  Each request is answered with its tag
+    /// as a register's value, after `late` requests' worth of delay.
+    struct Late {
+        /// Replies not yet received.
+        waiting: VecDeque<Vec<u8>>,
+        /// Requests whose reply has not come yet.
+        late: usize,
+        /// Replies held back by `late`.
+        held: VecDeque<Vec<u8>>,
+    }
+
+    impl Transport for Late {
+        fn send(&mut self, request: &[u8]) -> Result<(), TransportError> {
+            let tag = request[0];
+            self.held.push_back(vec![tag, 0, Status::Ok as u8, tag, 0, 0, 0]);
+            if self.late > 0 {
+                self.late -= 1;
+            } else {
+                self.waiting.extend(self.held.drain(..));
+            }
+            Ok(())
+        }
+
+        fn receive(&mut self, reply: &mut [u8; PACKET], timeout: Duration) -> Result<usize, TransportError> {
+            let next = self.waiting.pop_front().ok_or(TransportError::NoReply(timeout))?;
+            reply[..next.len()].copy_from_slice(&next);
+            Ok(next.len())
+        }
+    }
+
+    #[test]
+    fn a_reply_left_by_a_request_given_up_on_is_discarded() {
+        let mut pod = Pod::new(Late { waiting: VecDeque::new(), late: 1, held: VecDeque::new() });
+        assert!(matches!(pod.read_register(Register::D0), Err(Error::Transport(TransportError::NoReply(_)))));
+        // The first request's reply comes ahead of the second's, tagged 1.
+        assert_eq!(pod.read_register(Register::D1).unwrap(), 2, "the second request's own");
+        assert_eq!(pod.read_register(Register::D2).unwrap(), 3);
+    }
+
+    #[test]
+    fn stale_replies_waiting_before_hello_are_discarded() {
+        let stale = vec![vec![7, 0, Status::Ok as u8, 1, 0, 0, 0], vec![0, 0, Status::BadRequest as u8]];
+        let mut pod = Pod::new(Late { waiting: stale.into(), late: 0, held: VecDeque::new() });
+        // Hello's reply is its own form; the script below has none, so
+        // the stale ones are read and discarded until it gives up.
+        assert!(matches!(pod.hello(), Err(Error::Transport(TransportError::NoReply(_)))));
+        assert_eq!(pod.into_transport().waiting.len(), 0);
+    }
+
+    #[test]
+    fn tags_run_from_1_to_255_and_round_again() {
+        let mut pod = Pod::new(Late { waiting: VecDeque::new(), late: 0, held: VecDeque::new() });
+        for expected in (1..=255).chain(1..=2) {
+            assert_eq!(pod.read_register(Register::D0).unwrap(), expected);
+        }
+    }
+
+    #[test]
+    fn replies_give_freeze_edges() {
+        let mut pod = pod_with_edges(&[(9, &[0])]);
+        assert_eq!(pod.freeze_edges(), None);
+        pod.go().unwrap();
+        assert_eq!(pod.freeze_edges(), Some(9));
+    }
 
     #[test]
     fn halt_returns_atemp() {
