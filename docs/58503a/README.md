@@ -141,6 +141,16 @@ vector: ATEMP $0000, RSR $20 (the watchdog alone), SIMCR $60CF, SYPCR
 $80, RPC $550, VBR 0.  After GO the firmware read warm_start 1
 (2026-11-21).
 
+S1 at reset (2026-11-21, step R12 of smartclock's checklist): with all
+eight positions OFF as RESET rose, and again at a power-up into
+background mode (`bdm hold` held BKPT low through the power cycle),
+the reset-state SIM registers (SIMCR $60CF, SYPCR $80, CSPAR $3FFF and
+$03FF, CSBARBT $0007, CSORBT $7B70), RPC $550, the vectors and the
+512 KB flash contents read the same as with all ON.  S1 shows only at
+$302000, which needs CS5 (CSPAR0 $2BFF, CSBAR5 $3003, CSOR5 $7B30):
+$FF all OFF, $00 all ON.  The power-up entry read RSR $40, power-up
+alone.
+
 ## Pod restarts
 
 A pod restarted while the CPU is halted can glitch BKPT
