@@ -304,19 +304,17 @@ impl<T: Transport> PodTarget<T> {
         self.write_system_register(SystemRegister::Sr, (program_sr & !SR_TRACE) | SR_T1)?;
         self.leave()?;
         self.pod.go()?;
-        let Some(entry) = self.stop_stepping()? else {
-            self.untrace(program_sr, program_vbr)?;
-            let pc = self.read_system_register(SystemRegister::Rpc)?;
-            return Err(StepError::NotStopped(Address(pc)).into());
-        };
-        let at_stub = entry == Entry::Background
-            && self.read_system_register(SystemRegister::Rpc)? == after_stub(scratch).0;
+        let entry = self.stop_stepping()?;
+        let pc = self.read_system_register(SystemRegister::Rpc)?;
+        // RPC past the stub is the stub's BGND, even when the wait ran
+        // out and the halt found the target already there.
+        let at_stub = pc == after_stub(scratch).0 && entry.is_none_or(|entry| entry == Entry::Background);
         if at_stub {
             self.unwind(stub(scratch), program_sr as u16, program_vbr)?;
             return Ok(Entry::Breakpoint);
         }
         self.untrace(program_sr, program_vbr)?;
-        Ok(entry)
+        entry.ok_or_else(|| StepError::NotStopped(Address(pc)).into())
     }
 
     /// Sets SFC or DFC to `function_code` for a memory call, reading the
@@ -626,6 +624,34 @@ mod tests {
                 Request::WriteSystemRegister(SystemRegister::Sr, PROGRAM_SR),
             ]
         );
+    }
+
+    #[test]
+    fn a_step_at_the_stub_as_the_wait_ends_is_unwound() {
+        let mut target = halted_for_a_step(answering(|request| match request {
+            Request::Pins => pins(Atemp::None),
+            request => stepping(request),
+        }));
+        assert_eq!(target.step().unwrap(), Entry::Breakpoint);
+        let sent = answered(target);
+        let sent: Vec<_> = sent.iter().map(|r| parsed(r)).collect();
+        assert!(sent.contains(&Request::Halt));
+        assert_eq!(sent.last(), Some(&Request::WriteSystemRegister(SystemRegister::Sr, PROGRAM_SR)));
+        assert!(sent.contains(&Request::WriteSystemRegister(SystemRegister::Rpc, TRACED_PC)));
+    }
+
+    #[test]
+    fn a_step_that_does_not_stop_is_halted_and_untraced() {
+        let elsewhere = 0x2000;
+        let mut target = halted_for_a_step(answering(|request| match request {
+            Request::Pins => pins(Atemp::None),
+            Request::ReadSystemRegister(SystemRegister::Rpc) => value(elsewhere),
+            request => stepping(request),
+        }));
+        assert!(matches!(target.step(), Err(Error::Step(StepError::NotStopped(Address(0x2000))))));
+        let sent = answered(target);
+        let sent: Vec<_> = sent.iter().map(|r| parsed(r)).collect();
+        assert_eq!(sent[sent.len() - 3..], untraced());
     }
 
     #[test]
