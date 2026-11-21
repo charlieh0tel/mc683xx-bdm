@@ -16,10 +16,13 @@
   thumbv6m-none-eabi, then picotool), which it does not build.
   The step: a pre-build input added to `rust-build-deb` in
   deb-workflows (owner's choice, 2026-11-21).
-- Publish from CI: `pod-proto` and `pod-host` to crates.io, and the
-  Python module (`host/pod-py`, wheels per platform) to PyPI.  Needs
-  each crate's metadata (description, repository, license) and the
-  publishing tokens as repository secrets.
+- Publish from CI, beside mc683xx's crates and PyPI package (owner,
+  2026-11-21): crates.io `mc683xx-bdm` (today's pod-host: the library
+  and `bdm`) and `mc683xx-bdm-proto` (pod-proto); PyPI `mc683xx-bdm`
+  (import `mc683xx_bdm`, wheels per platform).  bdm-model and pod-py's
+  crate stay unpublished, renamed `mc683xx-bdm-model` and
+  `mc683xx-bdm-py`.  First the renames, then each crate's metadata and
+  the publishing tokens as repository secrets.
 - DSCLK above 4 MHz, once the throughput test measures the margin.
 - Report a watchdog reset to the host (WATCHDOG's REASON at start,
   say in Pins or Version, and in `bdm pins`): a protocol change, so
