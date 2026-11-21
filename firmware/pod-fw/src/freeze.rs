@@ -1,6 +1,6 @@
 //! FREEZE, watched in a task of its own: its level and a count of its
 //! edges, so the pod can tell a new entry into background mode from the
-//! one it already read ATEMP for (`pod_proto::entry`).
+//! one it already read ATEMP for (`mc683xx_bdm_proto::entry`).
 
 use embassy_futures::select::select;
 use embassy_rp::Peri;
@@ -12,8 +12,8 @@ use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
 use embassy_sync::signal::Signal;
 use embassy_time::Duration;
 use embassy_time::Timer;
-use pod_proto::entry::FreezeLatches;
-use pod_proto::entry::freeze_edges;
+use mc683xx_bdm_proto::entry::FreezeLatches;
+use mc683xx_bdm_proto::entry::freeze_edges;
 use portable_atomic::AtomicBool;
 use portable_atomic::AtomicU32;
 use portable_atomic::Ordering;
@@ -89,7 +89,7 @@ impl Freeze {
 /// so after each wakeup the latches hold the edges since the arm, read
 /// before the next arm clears them; an edge outside them (while
 /// arming, or between reading them and the level) shows in the level
-/// (`pod_proto::entry::freeze_edges`).
+/// (`mc683xx_bdm_proto::entry::freeze_edges`).
 pub(crate) async fn watch(pin: Peri<'static, impl Pin>) -> ! {
     let gpio = usize::from(pin.pin());
     let mut pin = Input::new(pin, Pull::Down);

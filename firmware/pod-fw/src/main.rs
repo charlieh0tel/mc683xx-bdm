@@ -1,6 +1,6 @@
 //! The pod: a Pico or Pico 2 between USB and a CPU32's BDM connector
 //! (PLAN.md).  Requests come in on a vendor-class bulk endpoint and are
-//! answered on another (`pod_proto::usb`).
+//! answered on another (`mc683xx_bdm_proto::usb`).
 
 #![no_std]
 #![no_main]
@@ -36,16 +36,16 @@ use embassy_usb::Builder;
 use embassy_usb::driver::EndpointError;
 use embassy_usb::driver::EndpointIn;
 use embassy_usb::driver::EndpointOut;
+use mc683xx_bdm_proto::dsclk::DEFAULT_HZ;
+use mc683xx_bdm_proto::dsclk::divider;
+use mc683xx_bdm_proto::pod::Pod;
+use mc683xx_bdm_proto::usb::PACKET;
+use mc683xx_bdm_proto::usb::PID;
+use mc683xx_bdm_proto::usb::Status;
+use mc683xx_bdm_proto::usb::VID;
+use mc683xx_bdm_proto::usb::encode_status;
 #[cfg(feature = "rtt")]
 use panic_probe as _;
-use pod_proto::dsclk::DEFAULT_HZ;
-use pod_proto::dsclk::divider;
-use pod_proto::pod::Pod;
-use pod_proto::usb::PACKET;
-use pod_proto::usb::PID;
-use pod_proto::usb::Status;
-use pod_proto::usb::VID;
-use pod_proto::usb::encode_status;
 use static_cell::ConstStaticCell;
 
 use crate::board::Lines;

@@ -6,17 +6,17 @@ list; this is how to do each item.  Write what each step found into
 `PLAN.md` (a figure, a confirmed or refuted assumption) in the commit
 that records it.
 
-`bdm` below is `cargo run -p pod-host --bin bdm --` from the
+`bdm` below is `cargo run -p mc683xx-bdm --bin bdm --` from the
 repository's root.
 
 ## Before the hardware
 
 The host side runs now against a stand-in pod on a model CPU32, which
 answers as the pod does and runs only NOP, MOVEQ, BRA.S, TRAP, ILLEGAL
-and BGND from its RAM (`bdm-model`'s `program`):
+and BGND from its RAM (`mc683xx-bdm-model`'s `program`):
 
 ```
-cargo run -p pod-host --bin bdm-stand-in -- unix:/tmp/pod.sock &
+cargo run -p mc683xx-bdm --bin bdm-stand-in -- unix:/tmp/pod.sock &
 bdm --pod unix:/tmp/pod.sock reset      # halted: breakpoint
 bdm --pod unix:/tmp/pod.sock regs
 ```

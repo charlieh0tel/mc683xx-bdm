@@ -1,0 +1,15 @@
+[package]
+name = "mc683xx-bdm-model"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+mc683xx-bdm-proto = { version = "0.1.0", path = "../proto" }
+mc683xx-target = "0.6.0"
+
+[lints]
+workspace = true
+
+[dev-dependencies]
+embassy-futures = "0.1.2"

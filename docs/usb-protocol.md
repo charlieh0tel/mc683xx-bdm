@@ -4,7 +4,7 @@ How a host talks to the pod: over USB, or over a stream socket to
 anything that answers as the pod does (m683xx-emu's virtual BDM
 cable).  It is the complete specification: a stand-in written from
 it alone answers as the pod does.  The pod's implementation is
-`crates/pod-proto/src/usb.rs`; where the two disagree, that is a bug
+`crates/proto/src/usb.rs`; where the two disagree, that is a bug
 in one of them.
 
 Protocol version: **9** (`PROTOCOL_VERSION`), raised on any change to a
@@ -217,6 +217,6 @@ the request table gives it; every other status is a one-byte reply.
 
 ## Checking
 
-`cargo test -p pod-proto` round-trips every request and reply; a
+`cargo test -p mc683xx-bdm-proto` round-trips every request and reply; a
 change here goes with a change to `usb.rs` and its tests, and a raised
 `PROTOCOL_VERSION` if the wire changes.

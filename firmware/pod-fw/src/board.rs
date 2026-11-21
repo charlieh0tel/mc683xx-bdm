@@ -1,6 +1,6 @@
 //! The pod's board: the Pico's pins, ADC and PIO link around the target
-//! connector, as `pod_proto::pod::Board`.  The request rules are
-//! `pod_proto::pod`'s.
+//! connector, as `mc683xx_bdm_proto::pod::Board`.  The request rules are
+//! `mc683xx_bdm_proto::pod`'s.
 
 use core::convert::Infallible;
 
@@ -14,10 +14,10 @@ use embassy_rp::gpio::Output;
 use embassy_time::Duration;
 use embassy_time::Timer;
 use embassy_time::with_timeout;
-use pod_proto::dsclk::divider;
-use pod_proto::pod::Board;
-use pod_proto::pod::VddError;
-use pod_proto::session::Link;
+use mc683xx_bdm_proto::dsclk::divider;
+use mc683xx_bdm_proto::pod::Board;
+use mc683xx_bdm_proto::pod::VddError;
+use mc683xx_bdm_proto::session::Link;
 
 use crate::freeze::FREEZE;
 use crate::link::PioLink;

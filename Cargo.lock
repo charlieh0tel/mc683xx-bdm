@@ -65,15 +65,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f2032f911046de80f0a198e0901378627c33f59ea0ac00e363d481118bd70a53"
 
 [[package]]
-name = "bdm-model"
-version = "0.1.0"
-dependencies = [
- "embassy-futures",
- "mc683xx-target",
- "pod-proto",
-]
-
-[[package]]
 name = "bitflags"
 version = "2.13.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -295,6 +286,51 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0ca88d725a0a943b096803bd34e73a4437208b6077654cc4ecb2947a5f91618d"
 
 [[package]]
+name = "mc683xx-bdm"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "embassy-futures",
+ "mc683xx-bdm-model",
+ "mc683xx-bdm-proto",
+ "mc683xx-gdb",
+ "mc683xx-target",
+ "nusb",
+ "signal-hook",
+ "thiserror",
+]
+
+[[package]]
+name = "mc683xx-bdm-model"
+version = "0.1.0"
+dependencies = [
+ "embassy-futures",
+ "mc683xx-bdm-proto",
+ "mc683xx-target",
+]
+
+[[package]]
+name = "mc683xx-bdm-proto"
+version = "0.1.0"
+dependencies = [
+ "embassy-futures",
+ "mc683xx-target",
+ "thiserror",
+]
+
+[[package]]
+name = "mc683xx-bdm-py"
+version = "0.1.0"
+dependencies = [
+ "mc683xx-bdm",
+ "mc683xx-bdm-proto",
+ "mc683xx-target",
+ "pyo3",
+ "thiserror",
+]
+
+[[package]]
 name = "mc683xx-cpu32"
 version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -382,42 +418,6 @@ name = "pin-project-lite"
 version = "0.2.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a89322df9ebe1c1578d689c92318e070967d1042b512afbe49518723f4e6d5cd"
-
-[[package]]
-name = "pod-host"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "bdm-model",
- "clap",
- "embassy-futures",
- "mc683xx-gdb",
- "mc683xx-target",
- "nusb",
- "pod-proto",
- "signal-hook",
- "thiserror",
-]
-
-[[package]]
-name = "pod-proto"
-version = "0.1.0"
-dependencies = [
- "embassy-futures",
- "mc683xx-target",
- "thiserror",
-]
-
-[[package]]
-name = "pod-py"
-version = "0.1.0"
-dependencies = [
- "mc683xx-target",
- "pod-host",
- "pod-proto",
- "pyo3",
- "thiserror",
-]
 
 [[package]]
 name = "portable-atomic"

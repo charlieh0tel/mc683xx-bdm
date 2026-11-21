@@ -22,9 +22,8 @@ registers and SIM registers, and reads 512 KB of flash correctly.
 | `RELEASING.md` | cutting a firmware, `bdm` or board release |
 | `docs/` | the host-pod protocol (`usb-protocol.md`), bring-up steps (`bring-up.md`); `oncore-vp/`, notes on the Motorola Oncore VP's BDM test points; `58503a/`, the HP 58503A's BDM header and reading its flash |
 | `hardware/` | the KiCad carrier board; `ee_tooling/`, the shared tooling (a submodule on ee_tooling's `release/0.2` branch), whose `jlcpcb-release` builds a JLCPCB order into `production/`, each release as ordered; `fastcheck.py`, a report on the BDM link's fast nets (`uv run python fastcheck.py mc683xx-pod/mc683xx-pod.kicad_pcb`) |
-| `Cargo.toml` | the host Rust workspace: `host/` and `crates/` |
-| `host/` | the host crates: `pod-host` (library and `bdm` CLI), `pod-py` (Python bindings), `bdm-model` (a model CPU32, for tests) |
-| `crates/` | `pod-proto`, shared by the firmware and the host |
+| `Cargo.toml` | the host Rust workspace: `crates/` |
+| `crates/` | `proto/`, `mc683xx-bdm-proto`, shared by the firmware and the host; the host crates: `host/`, `mc683xx-bdm` (library and `bdm` CLI), `py/`, `mc683xx-bdm-py` (Python bindings), `model/`, `mc683xx-bdm-model` (a model CPU32, for tests) |
 | `firmware/` | `pod-fw`, the pod's firmware, its own workspace (Pico targets) |
 | `packaging/` | the Debian changelog and the pod's udev rule |
 | `third_party/` | vendor documents and their provenance (`NOTICE`) |
@@ -32,7 +31,7 @@ registers and SIM registers, and reads 512 KB of flash correctly.
 ## Firmware
 
 ```
-cargo test                     # pod-proto, bdm-model, pod-host and pod-py, on the host
+cargo test                     # mc683xx-bdm-proto, mc683xx-bdm-model, mc683xx-bdm and mc683xx-bdm-py, on the host
 
 cd firmware/pod-fw
 cargo run --release            # Pico, defmt over RTT, through an SWD probe
@@ -48,13 +47,13 @@ make size                      # every firmware build linked; flash and RAM
 ## Host
 
 ```
-cargo run -p pod-host --bin bdm -- pins     # or halt, regs, dump 0xfffa00 64, ...
-cargo run -p pod-host --bin bdm -- --pod unix:/path/to/socket regs   # a stand-in pod
-cargo run -p pod-host --bin bdm -- list     # each pod on USB: serial number, bus-ports
-cargo run -p pod-host --bin bdm -- --pod usb:E6613852833B2A2F regs    # one pod of several
+cargo run -p mc683xx-bdm --bin bdm -- pins     # or halt, regs, dump 0xfffa00 64, ...
+cargo run -p mc683xx-bdm --bin bdm -- --pod unix:/path/to/socket regs   # a stand-in pod
+cargo run -p mc683xx-bdm --bin bdm -- list     # each pod on USB: serial number, bus-ports
+cargo run -p mc683xx-bdm --bin bdm -- --pod usb:E6613852833B2A2F regs    # one pod of several
 
-cargo run -p pod-host --bin bdm-stand-in -- unix:/tmp/pod.sock &      # a pod on a model CPU32
-cargo run -p pod-host --bin bdm -- --pod unix:/tmp/pod.sock reset
+cargo run -p mc683xx-bdm --bin bdm-stand-in -- unix:/tmp/pod.sock &      # a pod on a model CPU32
+cargo run -p mc683xx-bdm --bin bdm -- --pod unix:/tmp/pod.sock reset
 ```
 
 `--pod usb`, the default, is the only pod connected; with more than
@@ -94,12 +93,12 @@ shared test pair, so the rule also matches anything else using it.
 
 ### Python
 
-`host/pod-py` is the Python module `mc683xx_bdm`, PyO3 bindings
-over `pod-host`: one open pod across calls, for scripts with loops and
+`crates/py` is the Python module `mc683xx_bdm`, PyO3 bindings
+over `mc683xx-bdm`: one open pod across calls, for scripts with loops and
 polling.  uv builds it with maturin into the crate's `.venv`:
 
 ```
-cd host/pod-py
+cd crates/py
 uv sync                        # builds and installs the module
 uv run pytest                  # against bdm-stand-in, no hardware
 uv build --wheel               # a wheel, to pip install elsewhere
@@ -163,7 +162,7 @@ firmware (`/usr/share/mc683xx-bdm/pod-fw-rp2040.uf2`, needs picotool
 to build), with
 cargo-deb 3.8.0 (deb-workflows' `rust-build-deb` pin):
 `target/debian/mc683xx-bdm_VERSION-1_ARCH.deb`.  Metadata:
-`[package.metadata.deb]` in `host/pod-host/Cargo.toml`; changelog:
+`[package.metadata.deb]` in `crates/host/Cargo.toml`; changelog:
 `packaging/debian/changelog`.  No release workflow yet (TODO.md):
 `rust-build-deb` has no step before `cargo deb` to build the UF2 the
 package ships.

@@ -231,10 +231,12 @@ count 1).
 ## Repo layout
 
 The host Rust workspace is the repository's root (`Cargo.toml`,
-`Cargo.lock`): the host crates in `host/` and the shared `pod-proto` in
-`crates/`, so cargo, cargo-deb and maturin all run at the root.
+`Cargo.lock`): the host crates and the shared `mc683xx-bdm-proto`, all
+in `crates/`, so cargo, cargo-deb and maturin all run at the root.
+Each crate's directory is its short name (`crates/proto` is
+`mc683xx-bdm-proto`), as in mc683xx.
 `firmware/pod-fw` builds only for the Pico targets, so it is its own
-workspace with its own `Cargo.lock`, and takes `pod-proto` by path.
+workspace with its own `Cargo.lock`, and takes `mc683xx-bdm-proto` by path.
 One pinned toolchain (`rust-toolchain.toml`) and one `clippy.toml` and
 `rustfmt.toml`, at the root, which cargo, clippy and rustfmt find from
 either workspace by searching upward.
@@ -246,12 +248,11 @@ mc683xx-bdm/
 │   ├── production/       # each release as ordered
 │   └── ee_tooling/      # shared KiCad tooling and house style (submodule, release/0.2)
 ├── crates/
-│   ├── pod-proto/       # BDM words and command sequences; USB commands; no_std
-│   └── git-version.rs   # the git commit in pod-fw's and pod-host's versions
-├── host/
-│   ├── bdm-model/       # a CPU32 in background mode at the serial word, and a board around it; no_std; test target
-│   ├── pod-host/        # Rust library + `bdm` CLI (nusb)
-│   └── pod-py/          # Python bindings, `mc683xx_bdm` (PyO3, maturin, uv)
+│   ├── proto/           # mc683xx-bdm-proto: BDM words and command sequences; USB commands; no_std
+│   ├── host/            # mc683xx-bdm: Rust library + `bdm` CLI (nusb)
+│   ├── py/              # mc683xx-bdm-py: Python bindings, `mc683xx_bdm` (PyO3, maturin, uv)
+│   ├── model/           # mc683xx-bdm-model: a CPU32 in background mode at the serial word, and a board around it; no_std; test target
+│   └── git-version.rs   # the git commit in pod-fw's and mc683xx-bdm's versions
 ├── firmware/
 │   └── pod-fw/          # Pico / Pico 2 firmware, embassy-rp, PIO; its own workspace
 ├── packaging/           # Debian changelog, udev rule
@@ -276,8 +277,8 @@ machine; `embassy-usb` vendor class; matches the async rules in
 
 USB: vendor class, one bulk OUT and one bulk IN endpoint, 64-byte
 packets, one request per packet and one reply per request
-(`pod-proto`'s `usb`).  The answer to each request is `pod-proto`'s
-`pod`, over a `Board` trait: the firmware's board (`board.rs`) is the
+(`mc683xx-bdm-proto`'s `usb`).  The answer to each request is
+`mc683xx-bdm-proto`'s `pod`, over a `Board` trait: the firmware's board (`board.rs`) is the
 Pico's pins, ADC, PIO link and timeouts, so the request rules run in
 host tests too.  VID:PID 1209:0001, pid.codes' test pair, until
 the pod has its own.  Serial number string: the chip's unique ID in
@@ -330,7 +331,7 @@ pods apart (`bdm --pod usb:SERIAL`).  Requests:
   re-entry (GO onto a BGND) is two latched edges, not lost.  Two missed
   edges together still are.  Before each request, if FREEZE is high and the count moved since the
   last read, the pod drives DSCLK and DSI and reads ATEMP first
-  (`pod-proto`'s `entry`).  It reports it as fresh, or as stale when
+  (`mc683xx-bdm-proto`'s `entry`).  It reports it as fresh, or as stale when
   the CPU was halted when the pod started and so may have been
   commanded before.  This also turns DSI on after a self-entry: GO
   turned it off.  Every sequenced command, memory block, BerrPulse and
@@ -339,7 +340,7 @@ pods apart (`bdm --pod usb:SERIAL`).  Requests:
   or a GO the CPU did not take, with no entry read since.
 - SetClock: DSCLK's rate; the reply gives the rate set, never faster
   than asked and at most 4 MHz until the throughput test measures the
-  margin (`pod-proto`'s `dsclk::MAX_HZ` has the arithmetic).
+  margin (`mc683xx-bdm-proto`'s `dsclk::MAX_HZ` has the arithmetic).
 - Every BDM command, refused with NoFreeze unless FREEZE is asserted,
   since its clocks would otherwise be BKPT pulses:
   - ReadRegister, WriteRegister: D0-D7, A0-A7.
@@ -359,7 +360,7 @@ pods apart (`bdm --pod usb:SERIAL`).  Requests:
     FREEZE's 10 ms refresh (`freeze.rs`); a stacking cycle that
     outlasts it with no bus monitor reads as not ready.
 
-Watchdog (`watchdog.rs`, `pod-proto`'s `watchdog`): the chip's
+Watchdog (`watchdog.rs`, `mc683xx-bdm-proto`'s `watchdog`): the chip's
 hardware watchdog, 8 s on either chip, the RP2040's longest (2^24
 ticks of 1 us, counted twice: RP2040-E1).  A task checks once a second
 and feeds it while the serve loop waits for a request, however long
@@ -407,11 +408,11 @@ summary): 31536 bytes of text on the RP2040 and 29784 on the RP2350,
 2832 bytes of statics on either.
 
 Handle not-ready retries in firmware; report BERR and illegal-command
-errors to the host.  `pod-proto`'s `session` does both, over a `Link`
+errors to the host.  `mc683xx-bdm-proto`'s `session` does both, over a `Link`
 trait that the PIO state machine implements.  Two sets of host tests
-run it: scripted word sequences from CPU32RM's figures (`pod-proto`),
-and `bdm-model`, a CPU32 in background mode that answers each word as
-CPU32RM 7.2.8 says, decodes opcodes independently of `pod-proto`, and
+run it: scripted word sequences from CPU32RM's figures (`mc683xx-bdm-proto`),
+and `mc683xx-bdm-model`, a CPU32 in background mode that answers each word as
+CPU32RM 7.2.8 says, decodes opcodes independently of `mc683xx-bdm-proto`, and
 records what a real CPU would not take: clocks while running, words
 lost while busy, DUMP or FILL without READ or WRITE, GO or CALL
 without the DSI release.  It is `no_std` so a second Pico can run it
@@ -433,7 +434,7 @@ code and no `unsafe`; no USB request, so the protocol is unchanged.
 
 ## Host (Rust)
 
-- `pod-host`'s `transport`: a `Transport` trait, one request packet
+- `mc683xx-bdm`'s `transport`: a `Transport` trait, one request packet
   out and one reply back; `UsbTransport` over `nusb`, blocking, 1 s
   timeout, the device with the pod's VID:PID and the serial number
   asked for (case ignored), or with none asked for the only one: more
@@ -447,14 +448,14 @@ code and no `unsafe`; no USB request, so the protocol is unchanged.
   protocol is `docs/usb-protocol.md`; this repo owns it.  `bdm`
   sends Hello first and stops on another protocol version
   (`Pod::check_protocol`).
-- `pod-host`'s `register`: registers by name, `d0`-`a7`, `sp`, `pc`
+- `mc683xx-bdm`'s `register`: registers by name, `d0`-`a7`, `sp`, `pc`
   (RPC, the emulator's name) and the system registers, read and
   written through any `Cpu32Target`, and the system registers in
   listing order.
-- `pod-host`'s `pod`: each USB request as a call.  Memory goes as
+- `mc683xx-bdm`'s `pod`: each USB request as a call.  Memory goes as
   56-byte requests and raw transfers as 15-word ones; a chunk never
   splits an access.  Tested against scripted replies.
-- `pod-host`'s `target`: `PodTarget`, `Cpu32Target` over a `Pod`.  The
+- `mc683xx-bdm`'s `target`: `PodTarget`, `Cpu32Target` over a `Pod`.  The
   entry source is the pod's ATEMP (Pins, Halt, ResetHalt): fresh
   decodes per Table 7-2, stale is `Entry::Unknown`.  It is kept until
   the target resumes, a request is refused with NoFreeze (the target
@@ -464,15 +465,16 @@ code and no `unsafe`; no USB request, so the protocol is unchanged.
   reach the program's value; go, call and `restore_function_codes` put
   it back.  Resync keeps it, and takes the CPU's as unknown, as after
   a write whose reply did not come: the next restore writes it.
-- `pod-host`'s `stand_in` and `bdm-stand-in`: `pod-proto`'s `pod` over
-  `bdm-model`'s `ModelBoard` on a stream socket, one client at a time.
+- `mc683xx-bdm`'s `stand_in` and `bdm-stand-in`: `mc683xx-bdm-proto`'s
+  `pod` over `mc683xx-bdm-model`'s `ModelBoard` on a stream socket, one
+  client at a time.
   `bdm` and `PodTarget` run end to end against it with no hardware
-  (`pod-host/tests/stand_in.rs`).  The model's FREEZE is its state, VDD
+  (`crates/host/tests/stand_in.rs`).  The model's FREEZE is its state, VDD
   5 V; a halt or reset enters with a breakpoint, and a reset keeps
   registers and memory.  Not the emulator: once resumed the model runs
   only NOP, MOVEQ, BRA.S, TRAP #n, ILLEGAL and BGND from its RAM, with
   T1/T0 trace, exception frames $0 and $2 through VBR, a requested
-  interrupt, and A7 as SSP or USP by SR's S (`bdm-model`'s `program`);
+  interrupt, and A7 as SSP or USP by SR's S (`mc683xx-bdm-model`'s `program`);
   any other instruction, an access outside RAM or 1000 instructions
   and it runs on unwatched.  Enough for `PodTarget::step`; anything
   else enters background mode by the test's hand.
@@ -486,7 +488,7 @@ code and no `unsafe`; no USB request, so the protocol is unchanged.
   knows nothing of it.  So does a Python `Pod`, on close, leaving its
   `with` block or, best effort, when collected unclosed (with a
   `ResourceWarning`, as Python's files).
-- Scripting: Python bindings, `pod-py` (Python module `mc683xx_bdm`),
+- Scripting: Python bindings, `mc683xx-bdm-py` (Python module `mc683xx_bdm`),
   PyO3 over `PodTarget`, so a script keeps one pod open across calls
   and uses Python's loops and polling.  No script mode in `bdm`, which
   would be a language of its own, and no sharing of a pod between
@@ -494,7 +496,7 @@ code and no `unsafe`; no USB request, so the protocol is unchanged.
   each method is one `PodTarget` or `Pod` call, with the GIL released
   while it waits on the pod; register names, the protocol check and
   the pod's address (`PodAddress`, `usb:SERIAL` included) are
-  `pod-host`'s, shared with `bdm`.  The API follows the emulator's
+  `mc683xx-bdm`'s, shared with `bdm`.  The API follows the emulator's
   bindings (m683xx-emu's `cpu32-py`, module `mc683xx`)
   where the concepts match, so a script can drive either: `halt`,
   `go`, `reset_with_breakpoint`, `background`, `read_register(name)`,
@@ -561,7 +563,7 @@ code and no `unsafe`; no USB request, so the protocol is unchanged.
     `reset_halted`.  Init and load are not monitor commands yet.
   - `bdm gdb [--listen HOST:PORT] --scratch ADDRESS`: mc683xx-gdb
     (crates.io, default features off, so no chip or board crates)
-    serving its `bdm::Bdm` over `PodTarget`, one session (`pod-host`'s
+    serving its `bdm::Bdm` over `PodTarget`, one session (`mc683xx-bdm`'s
     `gdb`, the session for `bdm` and `Pod.serve_gdb` alike).  Listens on
     127.0.0.1:1234 by default (mc683xx's `serve_gdb` default; localhost,
     since the session controls the target; port 0 picks one, named on
@@ -575,12 +577,12 @@ code and no `unsafe`; no USB request, so the protocol is unchanged.
     signal, so no BGND is left in the program.  A second signal
     meanwhile exits at once.  gdb's own Ctrl-C is a byte on its
     connection, a halt for gdb, not this.  Tested end to end
-    (`pod-host/tests/gdb.rs`): the `bdm`
+    (`crates/host/tests/gdb.rs`): the `bdm`
     binary on the model, raw packets on TCP: `?`, `m`, `g`, `s`,
     `Z0`/`z0` and `c` to the breakpoint, Ctrl-C, `D` and `k`, SIGINT
     while running (the breakpoint's word, SFC and DFC back) and SIGTERM
     waiting for gdb; the same
-    from Python (`pod-py/tests/test_gdb.py`), with a signal handler's
+    from Python (`crates/py/tests/test_gdb.py`), with a signal handler's
     exception waiting for gdb and while running, and raised still when
     cleaning up after it fails (the failure its `__cause__`).
   - `step()` is in `Cpu32Target` (mc683xx-target 0.6): from RPC to
@@ -614,7 +616,7 @@ code and no `unsafe`; no USB request, so the protocol is unchanged.
     table (copied to RAM when in ROM): the contract stops before every
     handler, which only a table of the pod's own sees (decided
     2026-11-20, from mc683xx PLAN.md's `Cpu32Target` row).
-  - Tested against `bdm-stand-in`'s model (`pod-host/tests/stand_in.rs`):
+  - Tested against `bdm-stand-in`'s model (`crates/host/tests/stand_in.rs`):
     one instruction, user mode, TRAP, an interrupt pending, BGND, no
     stop, no scratch; the unwinding itself on frames
     (`step.rs`'s tests), an interrupt above the trace among them.
