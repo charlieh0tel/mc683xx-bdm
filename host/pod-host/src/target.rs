@@ -137,14 +137,13 @@ impl<T: Transport> PodTarget<T> {
     /// # Errors
     /// As [`Error`].
     pub fn restore_function_codes(&mut self) -> Result<(), Error> {
-        let Some(halted) = self.halted.as_mut() else { return Ok(()) };
         for register in [SystemRegister::Sfc, SystemRegister::Dfc] {
-            let state = halted.register(register).expect("SFC and DFC are kept");
+            let Some(&mut state) = function_code_register(&mut self.halted, register) else { return Ok(()) };
             if let Some(program) = state.program
                 && state.current != Some(program)
             {
-                self.pod.write_system_register(register, program)?;
-                state.current = Some(program);
+                self.request(|pod| pod.write_system_register(register, program))?;
+                self.function_code_state(register).current = Some(program);
             }
         }
         Ok(())
@@ -180,6 +179,22 @@ impl<T: Transport> PodTarget<T> {
         self.halted = None;
         self.scratch_written = false;
         self.pod.resync()
+    }
+
+    /// `call` on the pod, the halted state forgotten if the pod found
+    /// the target running: it left background mode (a reset, say) since
+    /// it was last seen halted.
+    fn request<R>(&mut self, call: impl FnOnce(&mut Pod<T>) -> Result<R, Error>) -> Result<R, Error> {
+        let result = call(&mut self.pod);
+        if matches!(result, Err(Error::Reply(ReplyError::Failed(Status::NoFreeze)))) {
+            self.halted = None;
+        }
+        result
+    }
+
+    /// SFC's or DFC's state, while the target is halted.
+    fn function_code_state(&mut self, register: SystemRegister) -> &mut FunctionCodeRegister {
+        function_code_register(&mut self.halted, register).expect("halted, on SFC or DFC")
     }
 
     /// Puts back the program's SFC and DFC and forgets the halted
@@ -285,22 +300,21 @@ impl<T: Transport> PodTarget<T> {
     /// program's value first so it can be restored.
     fn select(&mut self, register: SystemRegister, function_code: FunctionCode) -> Result<(), Error> {
         let wanted = u32::from(function_code.bits());
-        let pod = &mut self.pod;
-        let state = function_code_register(&mut self.halted, register)
-            .expect("a memory call runs halted, on SFC or DFC");
+        let state = *self.function_code_state(register);
         if state.current == Some(wanted) {
             return Ok(());
         }
         if state.program.is_none() {
-            let value = pod.read_system_register(register)?;
+            let value = self.request(|pod| pod.read_system_register(register))?;
+            let state = self.function_code_state(register);
             state.program = Some(value);
             state.current = Some(value);
             if FunctionCode::new(value) == function_code {
                 return Ok(());
             }
         }
-        pod.write_system_register(register, wanted)?;
-        state.current = Some(wanted);
+        self.request(|pod| pod.write_system_register(register, wanted))?;
+        self.function_code_state(register).current = Some(wanted);
         Ok(())
     }
 }
@@ -315,9 +329,14 @@ impl<T: Transport> Cpu32Target for PodTarget<T> {
         self.halted_at(atemp)
     }
 
+    /// A halt already seen is confirmed by FREEZE, so a target that
+    /// left background mode since (a reset) is halted again.
     fn halt(&mut self) -> Result<Entry, Error> {
         if let Some(halted) = self.halted {
-            return Ok(halted.entry);
+            if self.pod.pins()?.freeze {
+                return Ok(halted.entry);
+            }
+            self.halted = None;
         }
         let atemp = self.pod.halt()?;
         self.halted_at(atemp)
@@ -378,12 +397,12 @@ impl<T: Transport> Cpu32Target for PodTarget<T> {
 
     fn read_register(&mut self, register: Register) -> Result<u32, Error> {
         self.halted_state()?;
-        self.pod.read_register(register)
+        self.request(|pod| pod.read_register(register))
     }
 
     fn write_register(&mut self, register: Register, value: u32) -> Result<(), Error> {
         self.halted_state()?;
-        self.pod.write_register(register, value)
+        self.request(|pod| pod.write_register(register, value))
     }
 
     fn read_system_register(&mut self, register: SystemRegister) -> Result<u32, Error> {
@@ -391,7 +410,7 @@ impl<T: Transport> Cpu32Target for PodTarget<T> {
         if let Some(program) = halted.register(register).and_then(|state| state.program) {
             return Ok(program);
         }
-        let value = self.pod.read_system_register(register)?;
+        let value = self.request(|pod| pod.read_system_register(register))?;
         if let Some(state) = function_code_register(&mut self.halted, register) {
             state.program = Some(value);
             state.current = Some(value);
@@ -401,7 +420,7 @@ impl<T: Transport> Cpu32Target for PodTarget<T> {
 
     fn write_system_register(&mut self, register: SystemRegister, value: u32) -> Result<(), Error> {
         self.halted_state()?;
-        self.pod.write_system_register(register, value)?;
+        self.request(|pod| pod.write_system_register(register, value))?;
         if let Some(state) = function_code_register(&mut self.halted, register) {
             state.program = Some(value);
             state.current = Some(value);
@@ -418,7 +437,7 @@ impl<T: Transport> Cpu32Target for PodTarget<T> {
     ) -> Result<(), Error> {
         self.halted_state()?;
         self.select(SystemRegister::Sfc, function_code)?;
-        self.pod.read_memory(address, size, data)
+        self.request(|pod| pod.read_memory(address, size, data))
     }
 
     fn write_memory(
@@ -430,7 +449,7 @@ impl<T: Transport> Cpu32Target for PodTarget<T> {
     ) -> Result<(), Error> {
         self.halted_state()?;
         self.select(SystemRegister::Dfc, function_code)?;
-        self.pod.write_memory(address, size, data)
+        self.request(|pod| pod.write_memory(address, size, data))
     }
 }
 
@@ -516,7 +535,8 @@ mod tests {
 
     #[test]
     fn a_halt_is_kept_until_resumed() {
-        let mut target = target(&[&halted(Atemp::Fresh(1)), DONE, &pins(Atemp::None)]);
+        let mut target =
+            target(&[&halted(Atemp::Fresh(1)), &pins(Atemp::Fresh(1)), DONE, &pins(Atemp::None)]);
         assert_eq!(target.halt().unwrap(), Entry::Background);
         assert_eq!(target.halt().unwrap(), Entry::Background);
         assert_eq!(target.halted().unwrap(), Some(Entry::Background));
@@ -524,7 +544,44 @@ mod tests {
         assert_eq!(target.halted().unwrap(), None);
         let sent = requests(target);
         let sent: Vec<_> = sent.iter().map(|r| parsed(r)).collect();
-        assert_eq!(sent, [Request::Halt, Request::Go, Request::Pins]);
+        assert_eq!(sent, [Request::Halt, Request::Pins, Request::Go, Request::Pins]);
+    }
+
+    #[test]
+    fn a_kept_halt_without_freeze_halts_again() {
+        let mut target = target(&[&halted(Atemp::Fresh(1)), &pins(Atemp::None), &halted(Atemp::Fresh(0))]);
+        assert_eq!(target.halt().unwrap(), Entry::Background);
+        assert_eq!(target.halt().unwrap(), Entry::Breakpoint);
+        let sent = requests(target);
+        let sent: Vec<_> = sent.iter().map(|r| parsed(r)).collect();
+        assert_eq!(sent, [Request::Halt, Request::Pins, Request::Halt]);
+    }
+
+    #[test]
+    fn no_freeze_forgets_the_halt() {
+        let no_freeze = [Status::NoFreeze as u8];
+        let mut target = target(&[&halted(Atemp::Fresh(1)), &no_freeze, &pins(Atemp::None)]);
+        target.halt().unwrap();
+        assert!(matches!(
+            target.read_register(Register::D0),
+            Err(Error::Reply(ReplyError::Failed(Status::NoFreeze)))
+        ));
+        assert_eq!(target.halted().unwrap(), None, "asks the pod again");
+        let sent = requests(target);
+        let sent: Vec<_> = sent.iter().map(|r| parsed(r)).collect();
+        assert_eq!(sent, [Request::Halt, Request::ReadRegister(Register::D0), Request::Pins]);
+    }
+
+    #[test]
+    fn no_freeze_on_a_memory_call_forgets_the_halt() {
+        let no_freeze = [Status::NoFreeze as u8];
+        let mut target = target(&[&halted(Atemp::Fresh(0)), &value(5), &no_freeze, &pins(Atemp::None)]);
+        target.reset_halted().unwrap();
+        let mut data = [0; 1];
+        assert!(
+            target.read_memory(Address(0), FunctionCode::SUPERVISOR_DATA, Size::Byte, &mut data).is_err()
+        );
+        assert_eq!(target.halted().unwrap(), None);
     }
 
     #[test]

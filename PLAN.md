@@ -436,7 +436,9 @@ code and no `unsafe`; no USB request, so the protocol is unchanged.
 - `pod-host`'s `target`: `PodTarget`, `Cpu32Target` over a `Pod`.  The
   entry source is the pod's ATEMP (Pins, Halt, ResetHalt): fresh
   decodes per Table 7-2, stale is `Entry::Unknown`.  It is kept until
-  the target resumes.  A memory call sets SFC or DFC to its function
+  the target resumes, a request is refused with NoFreeze (the target
+  left background mode, a reset say), or a halt finds FREEZE low: a
+  halt with the entry kept confirms it with Pins.  A memory call sets SFC or DFC to its function
   code, reading the program's value first; SFC/DFC reads and writes
   reach the program's value; go, call and `restore_function_codes` put
   it back.
