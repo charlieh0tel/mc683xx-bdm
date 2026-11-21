@@ -35,11 +35,6 @@
   waits for the watchdog; on the next carrier, U1's enable falling
   before its input (a stronger or faster OE path than GP9's), so a
   power loss or replug cannot glitch BKPT either.
-- CALL whose stacking takes a bus error (SP unmapped) reports success:
-  `pod-proto`'s CALL expects no reply (`Reply::Exit`), so the bus
-  error the CPU answers with (CPU32RM 7.2.8.13) goes unread and the
-  CPU stays halted.  Seen through the Python bindings on
-  `bdm-stand-in`; read the response or check FREEZE after CALL.
 - Python bindings (`pod-py`): `step` (and the scratch area) now that
   `PodTarget::step` is in; `__init__.pyi` checked against the module
   with mypy's stubtest, as cpu32-py's is, once mypy is agreed as a

@@ -151,6 +151,10 @@ impl<const RAM: usize> Board for ModelBoard<RAM> {
         true
     }
 
+    async fn left_background(&mut self, edges: u32) -> bool {
+        !self.target.frozen() || self.edges != edges
+    }
+
     async fn reset_run(&mut self) {
         if self.target.frozen() {
             self.edges = self.edges.wrapping_add(1);

@@ -164,9 +164,14 @@ Semantics:
   it BKPT is a breakpoint exception, vector $0C (MC68331UM 5.10.2.2.1,
   Table 5-3): the program takes it, and Halt answers NoFreeze.
 - Go and Call release DSI after their last word (PLAN.md, PIO
-  program); nothing is clocked after them.  After their Ok the target
-  runs: Go at RPC, Call at the address with the return address stacked
-  (CPU32RM 7.2.8.12, 7.2.8.13).
+  program); nothing is clocked after them while the target runs.
+  After their Ok the target runs: Go at RPC, Call at the address with
+  the return address stacked (CPU32RM 7.2.8.12, 7.2.8.13).
+- Call waits up to 100 ms for FREEZE to fall.  If it stays high,
+  stacking took a bus or address error and the CPU stayed in
+  background mode (CPU32RM 7.2.8.13): the pod drives DSI again, reads
+  the error with a NOP and answers BusError, the target halted, its
+  registers and the kept ATEMP as before.
 - SetClock sets DSCLK's rate and replies with the rate in effect: at
   most 4 MHz, and never faster than asked unless asked for less than
   the slowest rate the pod's divider gives (about 120 Hz), which it

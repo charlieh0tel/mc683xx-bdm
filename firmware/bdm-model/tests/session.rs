@@ -201,10 +201,15 @@ fn call_stacks_rpc_and_runs() {
 fn call_that_cannot_stack_stays_in_background_mode() {
     let mut session = halted();
     session.link_mut().set_register(Register::A7, 0x00FF_0000);
-    // The session clocks nothing after CALL, so it cannot see the bus
-    // error; FREEZE stays asserted, and the release was not a violation.
+    session.link_mut().set_system_register(SystemRegister::Rpc, 0x0004_1234);
+    // The session clocks nothing after CALL; FREEZE stays asserted, and
+    // the release was not a violation.
     assert_eq!(block_on(session.execute(&Command::Call(Address(0x0004_8000)))), Ok(0));
     assert!(session.link_mut().frozen());
+    // The next word collects the bus error, and the CPU takes commands.
+    assert_eq!(block_on(session.exit_refused()), Error::BusError);
+    assert_eq!(block_on(session.read_register(Register::A7)), Ok(0x00FF_0000));
+    assert_eq!(block_on(session.read_system_register(SystemRegister::Rpc)), Ok(0x0004_1234));
     clean(&mut session);
 }
 

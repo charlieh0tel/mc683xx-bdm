@@ -73,7 +73,8 @@ Figure A-14); the series resistor limits any overlap's current.
 The Pico's DSI_EN is a PIO pin as well: the program drops it 3 PIO
 cycles after the last rising edge of GO's opcode or CALL's last word,
 about 190 ns at 1 MHz DSCLK (PIO program), which may beat FREEZE
-negating.  The firmware raises it once FREEZE asserts.
+negating.  The firmware raises it once FREEZE asserts, or once a CALL
+has left FREEZE high (Firmware).
 
 Pico pins (GPn):
 
@@ -315,7 +316,17 @@ pods apart (`bdm --pod usb:SERIAL`).  Requests:
   - ReadMemory, WriteMemory: up to 56 bytes in byte, word or long
     accesses, READ then DUMP or WRITE then FILL, on-chip.  Through SFC
     and DFC, which the host sets.
-  - Go, Call: the last word through `Link::transfer_exit`.
+  - Go, Call: the last word through `Link::transfer_exit`.  Then
+    Call waits for FREEZE to fall or its edge count to move, within
+    100 ms (`Board::left_background`): a CALL whose stacking takes a
+    bus or address error leaves the CPU in background mode, and its
+    next word answers the error (CPU32RM 7.2.8.13).  Clocking that
+    word blind is a BKPT pulse to a CPU that did leave, so FREEZE
+    decides first; if it stays high the pod drives DSI again, reads
+    the error with a NOP and answers BusError.  The timeout is long
+    against stacking's two bus cycles, a bus monitor's timeout and
+    FREEZE's 10 ms refresh (`freeze.rs`); a stacking cycle that
+    outlasts it with no bus monitor reads as not ready.
 
 Watchdog (`watchdog.rs`, `pod-proto`'s `watchdog`): the chip's
 hardware watchdog, 8 s on either chip, the RP2040's longest (2^24
@@ -353,8 +364,8 @@ a link word.
   (WATCHDOG's REASON).  Not reported over USB: that is a protocol
   change (TODO.md).
 
-The firmware's own sizes, release builds: 28788 bytes of text on the
-RP2040 and 27180 on the RP2350, 2812 bytes of statics on either.
+The firmware's own sizes, release builds: 30508 bytes of text on the
+RP2040 and 28772 on the RP2350, 2832 bytes of statics on either.
 
 Handle not-ready retries in firmware; report BERR and illegal-command
 errors to the host.  `pod-proto`'s `session` does both, over a `Link`

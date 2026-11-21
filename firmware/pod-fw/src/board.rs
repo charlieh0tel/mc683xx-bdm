@@ -22,7 +22,9 @@ use pod_proto::session::Link;
 use crate::freeze::FREEZE;
 use crate::link::PioLink;
 
-/// How long FREEZE may take after BKPT, or after RESET releases.
+/// How long FREEZE may take after BKPT, or after RESET releases, and
+/// to fall after CALL: long against stacking's bus cycles, a bus
+/// monitor's timeout included, and against FREEZE's refresh.
 const FREEZE_TIMEOUT: Duration = Duration::from_millis(100);
 /// RESET held low by the pod: long against the SIM's reset timing
 /// (SIMRM), short against a person.
@@ -168,6 +170,10 @@ impl Board for PicoBoard<'_> {
         Timer::after(RESET_PULSE).await;
         self.reset_drive.set_low();
         self.wait_freeze(async |board| board.reset.wait_for_high().await).await
+    }
+
+    async fn left_background(&mut self, edges: u32) -> bool {
+        with_timeout(FREEZE_TIMEOUT, FREEZE.wait_left(edges)).await.is_ok()
     }
 
     async fn reset_run(&mut self) {

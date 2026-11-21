@@ -4,6 +4,7 @@
 //! supplies the hardware.  The firmware's board is the Pico's pins and
 //! PIO; a model board stands in for tests.
 
+use mc683xx_target::address::Address;
 use mc683xx_target::register::SystemRegister;
 
 use crate::bdm::COMPLETE;
@@ -79,6 +80,12 @@ pub trait Board: Link {
     /// reset in background mode (MC68331UM 5.10.2.1), and waits for
     /// FREEZE as [`Board::halt`] does.
     async fn reset_halt(&mut self) -> bool;
+
+    /// After CALL's last word: waits for the CPU to leave background
+    /// mode, FREEZE low or its edge count moved from `edges`, within a
+    /// timeout long against stacking's bus cycles and FREEZE's own
+    /// refresh.  Returns whether it left.
+    async fn left_background(&mut self, edges: u32) -> bool;
 
     /// Pulses RESET with BKPT high, so the CPU comes out of reset
     /// running, background mode off, and waits for RESET to rise.
@@ -188,7 +195,7 @@ impl<B: Board> Pod<B> {
             Request::Halt => self.halt().await.map(Answer::Atemp),
             Request::SetClock { dsclk_hz } => Ok(Answer::Value(self.session.link_mut().set_clock(dsclk_hz))),
             Request::Go => self.command(&Command::Go).await.map(|_| Answer::Done),
-            Request::Call(address) => self.command(&Command::Call(address)).await.map(|_| Answer::Done),
+            Request::Call(address) => self.call(address).await.map(|()| Answer::Done),
             Request::Hello => Ok(Answer::Value(PROTOCOL_VERSION)),
             Request::Version => Ok(Answer::Text(self.session.link_mut().version())),
             Request::ReadRegister(register) => {
@@ -222,6 +229,23 @@ impl<B: Board> Pod<B> {
     async fn command(&mut self, command: &Command) -> Result<u32, Status> {
         self.require_frozen()?;
         Ok(self.session.execute(command).await?)
+    }
+
+    /// CALL: the CPU leaves background mode once the return address is
+    /// stacked, or stays and answers the next word with a bus error if
+    /// stacking took one (CPU32RM 7.2.8.13).  FREEZE tells which before
+    /// anything more is clocked: to a running CPU a clock is a BKPT
+    /// pulse.
+    async fn call(&mut self, address: Address) -> Result<(), Status> {
+        self.require_frozen()?;
+        let edges = self.session.link_mut().freeze_edges();
+        self.session.execute(&Command::Call(address)).await?;
+        let board = self.session.link_mut();
+        if board.left_background(edges).await {
+            return Ok(());
+        }
+        board.drive_link();
+        Err(self.session.exit_refused().await.into())
     }
 
     fn require_frozen(&mut self) -> Result<(), Status> {

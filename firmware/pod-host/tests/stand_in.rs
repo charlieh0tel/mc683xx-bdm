@@ -22,6 +22,8 @@ use pod_host::step::StepError;
 use pod_host::target::PodTarget;
 use pod_host::transport::StreamTransport;
 use pod_proto::usb::PROTOCOL_VERSION;
+use pod_proto::usb::ReplyError;
+use pod_proto::usb::Status;
 
 const RAM_BASE: u32 = 0x0010_0000;
 const RAM: usize = 4096;
@@ -75,6 +77,18 @@ fn halt_without_bdm_enabled_fails() {
     let (mut target, _pod) = stand_in(false);
     assert!(target.halt().is_err());
     assert_eq!(target.reset_halted().unwrap(), Entry::Breakpoint);
+}
+
+#[test]
+fn a_call_that_cannot_stack_fails_and_stays_halted() {
+    let (mut target, pod) = stand_in(true);
+    target.reset_halted().unwrap();
+    target.write_register(Register::A7, 0x00FF_0000).unwrap();
+    let error = target.call(Address(RAM_BASE)).unwrap_err();
+    assert!(matches!(error, Error::Reply(ReplyError::Failed(Status::BusError))), "{error}");
+    assert_eq!(target.halted().unwrap(), Some(Entry::Breakpoint));
+    assert_eq!(target.read_register(Register::A7).unwrap(), 0x00FF_0000);
+    clean(&pod);
 }
 
 /// Where a stepped program runs, its exception table, the step's

@@ -51,6 +51,18 @@ impl Freeze {
         }
     }
 
+    /// Waits for FREEZE low, or for its edge count to move from
+    /// `edges`: the CPU left background mode, perhaps entering again.
+    pub(crate) async fn wait_left(&self, edges: u32) {
+        loop {
+            self.changed.reset();
+            if !self.is_high() || self.edges() != edges {
+                return;
+            }
+            self.changed.wait().await;
+        }
+    }
+
     /// Takes in a level read from the pin: one edge, or two coalesced,
     /// if it moved; any edge counts.
     fn update(&self, high: bool, edge: bool) {

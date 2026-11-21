@@ -122,6 +122,36 @@ fn a_self_entry_after_go_is_read_first_and_fresh() {
 }
 
 #[test]
+fn call_stacks_and_runs() {
+    let mut pod = pod(true);
+    send(&mut pod, &Request::ResetHalt);
+    let stack = RAM_BASE + 0x80;
+    send(&mut pod, &Request::WriteRegister(Register::A7, stack));
+    assert_eq!(status(&send(&mut pod, &Request::Call(Address(0x0004_8000)))), Ok(&[][..]));
+    let target = pod.board_mut().target();
+    assert!(!target.frozen());
+    assert_eq!(target.register(Register::A7), stack - 4);
+    assert_eq!(target.violations(), (None, 0));
+}
+
+#[test]
+fn a_call_that_cannot_stack_is_a_bus_error_and_stays_halted() {
+    let mut pod = pod(true);
+    send(&mut pod, &Request::ResetHalt);
+    let unmapped = 0x00FF_0000;
+    send(&mut pod, &Request::WriteRegister(Register::A7, unmapped));
+    assert_eq!(status(&send(&mut pod, &Request::Call(Address(0x0004_8000)))), failed(Status::BusError));
+    assert!(pod.board_mut().target().frozen());
+    // The same stay in background mode: ATEMP as read at entry, and the
+    // CPU takes the next command.
+    let pins = parse_pins(status(&send(&mut pod, &Request::Pins)).unwrap()).unwrap();
+    assert_eq!((pins.freeze, pins.atemp), (true, Atemp::Fresh(0)));
+    let a7 = status(&send(&mut pod, &Request::ReadRegister(Register::A7))).map(parse_value);
+    assert_eq!(a7, Ok(Ok(unmapped)));
+    assert_eq!(pod.board_mut().target().violations(), (None, 0));
+}
+
+#[test]
 fn a_cpu_halted_before_the_pod_started_is_stale() {
     let mut pod = pod_on_halted();
     assert_eq!(parse_atemp(status(&send(&mut pod, &Request::Halt)).unwrap()), Ok(Atemp::Stale(1)));

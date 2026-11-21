@@ -176,6 +176,16 @@ impl<L: Link> Session<L> {
         Ok(())
     }
 
+    /// After a CALL the CPU did not leave background mode for: the
+    /// status it answers the next word with, a bus error if stacking
+    /// the return address took one (CPU32RM 7.2.8.13).
+    pub async fn exit_refused(&mut self) -> Error<L::Error> {
+        match self.first_word().await {
+            Ok(data) => Error::Unexpected(Response::Data(data)),
+            Err(error) => error,
+        }
+    }
+
     /// Sends a command's words, the last through
     /// [`Link::transfer_exit`] if the command leaves background mode.
     /// The answer to the opcode belongs to the word before and is
@@ -400,6 +410,18 @@ mod tests {
                 s.execute(&Command::Call(Address(0x0004_1000))).await
             });
         assert_eq!(result, Ok(0));
+    }
+
+    #[test]
+    fn a_call_that_stayed_reads_its_bus_error() {
+        let result = run(&[(0x0000, NOT_READY), (0x0000, BUS_ERROR)], async |s| s.exit_refused().await);
+        assert_eq!(result, Error::BusError);
+    }
+
+    #[test]
+    fn a_call_that_stayed_with_data_is_unexpected() {
+        let result = run(&[(0x0000, COMPLETE)], async |s| s.exit_refused().await);
+        assert_eq!(result, Error::Unexpected(Response::Data(0xFFFF)));
     }
 
     #[test]
