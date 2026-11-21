@@ -184,6 +184,15 @@ error instead: with SIMCR $614A, a read of $110000 (unmapped) replied
 
 DUMP at 1 MHz DSCLK: 512 KB of longs in 18.9 s, about 28 KB/s.
 
+## The six main-board LEDs
+
+The DUART's OP2-OP7 drive the six LEDs: a pin taken high (ROPBC,
+$20001F) lights its LED, low (SOPBC, $20001D) turns it off.  Counted
+from the right: OP2 the rightmost, green; OP3, OP4, OP5, OP6 and OP7
+(the leftmost) red (2026-11-21, step W1 of smartclock's checklist).
+Reads of $20001D and $20001F start and stop the DUART's counter: write
+them only.
+
 ## Programming the flash over BDM
 
 From one reset entry (firmware never run), with the chip selects set
