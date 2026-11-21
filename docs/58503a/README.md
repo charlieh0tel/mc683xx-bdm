@@ -111,6 +111,15 @@ dated 2026-11-20.  $2030 is a format $2 frame at vector offset $030,
 vector 12, the hardware breakpoint: BKPT taken as an exception, as a
 halt with background mode off is (Back to running, above).
 
+## Long halts
+
+Writing SIMCR $614A (FRZSW and FRZBM) in a halt of the running firmware
+stops its watchdog and PIT while the CPU is halted: a 15 s halt ended
+without a reset (RSR still $80, the firmware's countdown unchanged),
+and the firmware ran on after SIMCR $014A and GO (2026-11-21, step W0
+of smartclock's checklist).  With FRZBM set an access nothing answers
+hangs instead of taking a bus error: no unmapped addresses then.
+
 ## Pod restarts
 
 A pod restarted while the CPU is halted can glitch BKPT
