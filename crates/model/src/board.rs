@@ -7,7 +7,10 @@
 //! a breakpoint entry.  Words clocked with the link not driven (as at
 //! the pod's boot, or after GO dropped DSI) do not reach the model: DSO
 //! reads high, "illegal".  A reset keeps registers and memory: the model
-//! has no reset vectors to fetch.
+//! has no reset vectors to fetch.  BKPT/DSCLK's driver (U1) and DSCLK's
+//! level between words are modeled as the firmware's: BKPT at the
+//! target is high (its pull-up) with the driver off, else DSCLK; a
+//! rising edge outside a word is a bit to a halted CPU.
 
 use core::convert::Infallible;
 
@@ -48,6 +51,13 @@ pub struct ModelBoard<const RAM: usize> {
     /// BKPT/DSCLK and DSI driven (`Board::drive_link`): off at boot, and
     /// DSI dropped by GO's and CALL's last word and by a reset to run.
     driven: bool,
+    /// BKPT/DSCLK's driver on.
+    u1_on: bool,
+    /// DSCLK high between words.
+    dsclk_high: bool,
+    /// The driver turned off by `Board::rest` with the link driven: the
+    /// next word turns it back on.
+    resting: bool,
     /// The target holds RESET low: a reset never ends.
     reset_held: bool,
     /// DSCLK's rate, as `Board::set_clock` set it.
@@ -79,6 +89,9 @@ impl<const RAM: usize> ModelBoard<RAM> {
             dso_high: false,
             skew: 0,
             driven: false,
+            u1_on: false,
+            dsclk_high: true,
+            resting: false,
             reset_held: false,
             dsclk_hz: DEFAULT_HZ,
             clock_us: 0,
@@ -131,13 +144,67 @@ impl<const RAM: usize> ModelBoard<RAM> {
         self.target.enter_background(entry);
     }
 
+    /// BKPT/DSCLK's driver on.
+    #[must_use]
+    pub const fn u1_on(&self) -> bool {
+        self.u1_on
+    }
+
+    /// BKPT at the target: its pull-up with the driver off, else DSCLK.
+    #[must_use]
+    pub const fn bkpt_high(&self) -> bool {
+        !self.u1_on || self.dsclk_high
+    }
+
+    /// The pod's chip resets (a replug, a watchdog): GP9, the driver's
+    /// input, falls before GP10 turns the driver off, so with the driver
+    /// on BKPT falls, then its pull-up raises it, a bit to a halted CPU.
+    /// Then the pod's side is as at its boot.
+    pub const fn restart_pod(&mut self) {
+        self.set_bkpt_pins(self.u1_on, false);
+        self.set_bkpt_pins(false, false);
+        self.dsclk_high = true;
+        self.driven = false;
+        self.resting = false;
+    }
+
+    /// Sets the driver and DSCLK between words; BKPT rising at the target
+    /// is a bit to a halted CPU, moving its frame on.
+    const fn set_bkpt_pins(&mut self, u1_on: bool, dsclk_high: bool) {
+        let was_high = self.bkpt_high();
+        self.u1_on = u1_on;
+        self.dsclk_high = dsclk_high;
+        if !was_high && self.bkpt_high() && self.target.frozen() {
+            self.skew = (self.skew + 1) % WORD_BITS;
+        }
+    }
+
+    /// BKPT low: the driver on, DSCLK low.
+    const fn bkpt_low(&mut self) {
+        self.resting = false;
+        self.set_bkpt_pins(true, false);
+    }
+
+    /// Before a word or a lone edge: the driver back on if `Board::rest`
+    /// turned it off.
+    const fn wake(&mut self) {
+        if self.resting {
+            self.resting = false;
+            self.set_bkpt_pins(true, self.dsclk_high);
+        }
+    }
+
     /// Exchanges a word, counting FREEZE's fall if it ends background
     /// mode.
     fn exchange(&mut self, word: u16, exit: bool) -> u32 {
         self.clock_us = self.clock_us.wrapping_add(WORD_BITS * MICROS_PER_SECOND / self.dsclk_hz);
-        if !self.driven {
+        self.wake();
+        if !self.driven || !self.u1_on {
             return DSO_HIGH;
         }
+        // The word's first rise releases BKPT held low; its last leaves
+        // DSCLK high.
+        self.dsclk_high = true;
         // The link drops DSI as an exit word ends, whether or not the CPU
         // leaves.
         self.driven = !exit;
@@ -219,25 +286,49 @@ impl<const RAM: usize> Board for ModelBoard<RAM> {
         Ok(VDD_MV)
     }
 
+    /// DSCLK raised only with the driver off, as the firmware's.
     fn drive_link(&mut self) {
+        if !self.u1_on {
+            self.set_bkpt_pins(false, true);
+        }
+        self.resting = false;
+        self.set_bkpt_pins(true, self.dsclk_high);
         self.driven = true;
     }
 
+    /// R3 holds BKPT high with the driver off; DSCLK low keeps it on.
+    fn rest(&mut self) {
+        if self.u1_on && self.dsclk_high {
+            self.set_bkpt_pins(false, true);
+            self.resting = true;
+        }
+    }
+
+    /// On a timeout BKPT is released, DSCLK high.
     async fn halt(&mut self) -> bool {
+        self.bkpt_low();
         if self.bdm_enabled {
             self.enter_background(Entry::Breakpoint);
             self.driven = true;
+        } else {
+            self.set_bkpt_pins(true, true);
         }
         self.bdm_enabled
     }
 
     async fn reset_halt(&mut self) -> bool {
+        self.resting = false;
         if self.reset_held {
+            // BKPT released after the wait for FREEZE.
+            self.u1_on = true;
+            self.dsclk_high = true;
             return false;
         }
         if self.target.frozen() {
             self.edges = self.edges.wrapping_add(1);
         }
+        self.u1_on = true;
+        self.dsclk_high = false;
         self.bdm_enabled = true;
         self.edges = self.edges.wrapping_add(1);
         self.target.enter_background(Entry::Breakpoint);
@@ -257,6 +348,9 @@ impl<const RAM: usize> Board for ModelBoard<RAM> {
         }
         self.bdm_enabled = false;
         self.driven = false;
+        self.resting = false;
+        self.u1_on = true;
+        self.dsclk_high = true;
         self.target.reset_running();
         !self.reset_held
     }
@@ -270,12 +364,14 @@ impl<const RAM: usize> Board for ModelBoard<RAM> {
     }
 
     fn hold(&mut self) {
+        self.bkpt_low();
         if self.bdm_enabled {
             self.enter_background(Entry::Breakpoint);
         }
     }
 
     async fn clock_bit(&mut self) {
+        self.wake();
         self.clock_us = self.clock_us.wrapping_add(EDGE_US);
         self.skew = (self.skew + 1) % WORD_BITS;
     }

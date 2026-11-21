@@ -329,6 +329,85 @@ fn hold_halts_and_leaves_the_entry_unread() {
     assert_eq!(violation, None);
 }
 
+/// The value D0 reads, the target halted.
+fn read_d0(pod: &mut ModelPod) -> Result<u32, ReplyError> {
+    status(&send(pod, &Request::ReadRegister(Register::D0))).map(|value| parse_value(value).unwrap())
+}
+
+#[test]
+fn the_bkpt_driver_is_off_after_each_request_with_dsclk_high() {
+    let mut pod = pod(true);
+    for request in [
+        Request::ResetHalt,
+        Request::WriteRegister(Register::D0, 0x1234_5678),
+        Request::ReadMemory { address: Address(RAM_BASE), size: Size::Word, length: 2 },
+        Request::Pins,
+        Request::Go,
+        Request::Halt,
+        Request::ResetRun,
+    ] {
+        assert!(status(&send(&mut pod, &request)).is_ok(), "{request:?}");
+        let board = pod.board_mut();
+        assert!(!board.u1_on() && board.bkpt_high(), "{request:?}");
+    }
+    // A halt that times out releases BKPT, and the driver goes off.
+    let mut pod = self::pod(false);
+    assert_eq!(status(&send(&mut pod, &Request::Halt)), failed(Status::NoFreeze));
+    assert!(!pod.board_mut().u1_on());
+}
+
+#[test]
+fn words_after_a_request_turn_the_bkpt_driver_on_without_an_edge() {
+    let mut pod = pod(true);
+    send(&mut pod, &Request::ResetHalt);
+    send(&mut pod, &Request::WriteRegister(Register::D0, 0x1234_5678));
+    // A lone rising edge would put the link out of frame: these would
+    // read "illegal".
+    for _ in 0..3 {
+        assert_eq!(read_d0(&mut pod), Ok(0x1234_5678));
+    }
+    // A raw Transfer too: an idle CPU answers a NOP "command complete".
+    assert_eq!(status(&raw(&mut pod, &[TAG, TRANSFER, 0, 0])), Ok(&[0xFF, 0xFF, 0, 0][..]));
+    assert!(!pod.board_mut().u1_on());
+    assert_eq!(read_d0(&mut pod), Ok(0x1234_5678));
+}
+
+#[test]
+fn a_pod_restart_between_requests_leaves_the_link_in_frame() {
+    let mut pod = pod(true);
+    send(&mut pod, &Request::ResetHalt);
+    send(&mut pod, &Request::WriteRegister(Register::D0, 0x1234_5678));
+    pod.board_mut().restart_pod();
+    assert_eq!(read_d0(&mut pod), Ok(0x1234_5678));
+    // After a halt from running: the entry read's first word released
+    // BKPT.
+    send(&mut pod, &Request::Go);
+    assert_eq!(parse_atemp(status(&send(&mut pod, &Request::Halt)).unwrap()), Ok(Atemp::Fresh(0)));
+    pod.board_mut().restart_pod();
+    assert_eq!(read_d0(&mut pod), Ok(0x1234_5678));
+}
+
+#[test]
+fn hold_keeps_the_bkpt_driver_on_and_a_restart_then_glitches() {
+    let mut pod = pod(true);
+    send(&mut pod, &Request::ResetHalt);
+    send(&mut pod, &Request::WriteRegister(Register::D0, 0x1234_5678));
+    send(&mut pod, &Request::Go);
+    send(&mut pod, &Request::Hold);
+    let board = pod.board_mut();
+    assert!(board.u1_on() && !board.bkpt_high());
+    // The next request's first word releases BKPT; the driver goes off.
+    assert_eq!(read_d0(&mut pod), Ok(0x1234_5678));
+    assert!(!pod.board_mut().u1_on());
+    // A restart during the hold: BKPT rises, a bit out of frame.
+    send(&mut pod, &Request::Hold);
+    pod.board_mut().restart_pod();
+    assert!(read_d0(&mut pod).is_err());
+    let atemp = parse_atemp(status(&send(&mut pod, &Request::Resync)).unwrap());
+    assert!(matches!(atemp, Ok(Atemp::Stale(_))), "{atemp:?}");
+    assert_eq!(read_d0(&mut pod), Ok(0x1234_5678));
+}
+
 #[test]
 fn a_hung_access_is_ended_by_berr() {
     let mut pod = pod(true);

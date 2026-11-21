@@ -140,6 +140,16 @@ pub trait Board: Link {
     /// low, for the first word's first rising edge to release.
     fn drive_link(&mut self);
 
+    /// At the end of every request: turns BKPT/DSCLK's driver off if
+    /// DSCLK is high, BKPT's pull-up at the target holding it there, so
+    /// a restart of the pod between requests cannot glitch BKPT.  Left
+    /// on while DSCLK is low: BKPT held low by [`Board::hold`], or by a
+    /// halt with no word since.  Makes no edge.  As far as requests can
+    /// tell the link stays as it was: [`Board::drive_link`], each word
+    /// and [`Board::clock_bit`] turn the driver back on, DSCLK high
+    /// first, if this turned it off.
+    fn rest(&mut self);
+
     /// Holds BKPT low until FREEZE asserts, within the halt timeout;
     /// then drives DSI.  Returns whether FREEZE asserted; if not, BKPT
     /// is released.
@@ -259,8 +269,9 @@ impl<B: Board> Pod<B> {
         self.session.link_mut()
     }
 
-    /// Carries out the request in `packet` and writes the reply into
-    /// `reply`, returning its length.
+    /// Carries out the request in `packet`, rests the board
+    /// ([`Board::rest`]) and writes the reply into `reply`, returning its
+    /// length.
     pub async fn handle(&mut self, packet: &[u8], reply: &mut [u8; PACKET]) -> usize {
         if packet == HELLO_REQUEST {
             return encode_hello_reply(reply);
@@ -274,6 +285,7 @@ impl<B: Board> Pod<B> {
             Ok(request) => self.answer(request, &mut responses, &mut data).await,
             Err(_) => Err(Status::BadRequest),
         };
+        self.session.link_mut().rest();
         let header = self.header(tag);
         match answer {
             Ok(Answer::Done) => encode_status(header, Status::Ok, reply),

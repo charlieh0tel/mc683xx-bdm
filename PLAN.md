@@ -45,7 +45,7 @@ firmware and documentation are GPL-3.0-only (`LICENSE`).
 | MCU | Pico (RP2040) or Pico 2 (RP2350), soldered flat by its castellated edge | USB to host; same footprint and pinout; JLCPCB places a Pico (SC0915, C9900019762); a Pico 2 is fitted by hand |
 | 3.3 V → 5 V outputs | 74AHCT1G125 ×2 (U1 BKPT/DSCLK, U2 DSI), VCC = target VDD | 220 Ω series (R1, R2): about 20 mA if DSI and IFETCH overlap (MC68331UM Table A-1: 25 mA per pin), or into an unpowered 74AHCT1G125's output clamp if the cable's signals meet before its VDD (SCLS378P 5.1: ±20 mA); each its own OE |
 | 74AHCT1G125 input pull-downs | 100 kΩ to GND on GP9 and GP3 (R15, R16) | The inputs must not float (SCLS378P 5.3, note 1); the Pico's own pull-downs need it powered |
-| U1 OE pull-up, BKPT/DSCLK | 1 kΩ to target VDD (R4), pulled low by Q3 (BSS138BK, gate on GP10, 100 kΩ gate pull-down) | The OE edge within the 74AHCT1G125's 20 ns/V (SCLS378P 5.3): about 8 ns/V into its 10 pF (5.5) and Q3's 7 pF; 5 mA from VDD while Q3 is on.  Output tristated while the pod is unpowered or booting.  Q3 keeps the target's 5 V off every Pico pin: a GPIO on this pull-up would see 5 V, over the RP2040's and RP2350's 3.63 V limit unpowered (RP2040 datasheet 5.5.2.1, RP2350 14.9.1) |
+| U1 OE pull-up, BKPT/DSCLK | 1 kΩ to target VDD (R4), pulled low by Q3 (BSS138BK, gate on GP10, 100 kΩ gate pull-down) | The OE edge within the 74AHCT1G125's 20 ns/V (SCLS378P 5.3): about 8 ns/V into its 10 pF (5.5) and Q3's 7 pF; 5 mA from VDD while Q3 is on.  Output tristated while the pod is unpowered or booting, and between requests unless BKPT is held low (Firmware).  Q3 keeps the target's 5 V off every Pico pin: a GPIO on this pull-up would see 5 V, over the RP2040's and RP2350's 3.63 V limit unpowered (RP2040 datasheet 5.5.2.1, RP2350 14.9.1) |
 | DSI enable gate | 74AHCT1G00 (U3), VCC = target VDD | Drives U2's OE: NAND(FREEZE, DSI_EN), so DSI is driven only while FREEZE is high and the Pico enables it |
 | DSI_EN pull-down | 100 kΩ to GND | DSI off while the pod is unpowered or booting |
 | 5 V → 3.3 V inputs | 74LVC1G17 ×5, Schmitt trigger, VCC = 3.3 V: U4 RESET, U5 IPIPE/DSO, U6 FREEZE, U7 DS, U8 BERR | One SOT-23-5 per input, each placed at its J1 pin.  RESET and BERR are open drain on the target and rise as its pull-ups let them; a Schmitt input sets no transition-rate limit.  5.5 V inputs at any VCC and Ioff (SCES351Y 5.3, 5.5).  IPIPE is pin 10 outside BDM, so U5 reads both.  4.6 ns max A to Y at 3.3 V (SCES351Y 5.6) |
@@ -342,11 +342,25 @@ pods apart (`bdm --pod usb:SERIAL`).  Requests:
   On request only: on a target a pod restart left the link in frame
   but the CPU refusing commands, which only a reset cleared, so an
   automatic resync bought nothing (docs/bring-up.md, step 5).
+- U1 off between requests (`Board::rest`, called by `pod::handle` at
+  each request's end): a resetting Pico drops GP9 before GP10, and an
+  enabled U1 would pass that to BKPT, a DSCLK clock to a halted CPU
+  (docs/bring-up.md, step 5).  If DSCLK is high the board turns U1 off
+  and R3 holds BKPT high: no edge.  U1 stays on while DSCLK is low:
+  after Hold, and after a halt until a word's first rise releases BKPT
+  (every request that halts reads ATEMP, so only Hold leaves it low
+  past the request's end).  The link stays driven as requests see it:
+  the next word, lone edge or `drive_link` turns U1 back on, DSCLK
+  already high, and waits 1 us for Q3 and U1 before clocking.  A long
+  DUMP or FILL is a request per USB packet, so U1 is off between
+  packets too.  The model board models U1 and DSCLK's level, a lone
+  BKPT rise to a halted CPU as a bit, and a pod restart
+  (`ModelBoard::restart_pod`).
 - Bootsel turns U1 off (GP10 low, then 10 us) before the boot ROM's
-  reboot, so a resetting Pico cannot glitch BKPT low; this needs
-  embassy-rp's `unstable-pac` for the one register write.  The
-  production build's panic handler does the same before it waits for
-  the watchdog (Watchdog, below).
+  reboot, so a Pico reset in a request or a hold cannot glitch BKPT
+  low either; this needs embassy-rp's `unstable-pac` for the one
+  register write.  The production build's panic handler does the same
+  before it waits for the watchdog (Watchdog, below).
 - ATEMP holds the entry source only until the first command after
   entry, and the CPU can enter on its own (BGND, a breakpoint, a double
   bus fault).  A task watches FREEZE and counts its edges (`freeze.rs`):
@@ -428,8 +442,9 @@ a link word.
 - A reply the host does not collect waits in the USB write, which
   counts as idle.  Not caught: a USB stack that stops answering while
   the serve loop waits for a request.
-- A watchdog reset is a pod restart: under a halted CPU it takes the
-  serial link out of frame and loses the kept ATEMP (`docs/bring-up.md`,
+- A watchdog reset is a pod restart: under a halted CPU it loses the
+  kept ATEMP, and in a request or a hold takes the serial link out of
+  frame (`docs/bring-up.md`,
   step 5).  So the timeout is generous and the reset rare: recovery from
   a firmware fault in place of a replug, not part of normal running.
 - Panics: the production build's handler (`panic.rs`) disables
@@ -439,11 +454,11 @@ a link word.
   pauses while a debugger halts the core (CTRL's PAUSE_DBG0/1 and
   PAUSE_JTAG), so under probe-rs the panic stays for inspection; with
   no probe attached it resets as the production build does, but can
-  glitch BKPT.
+  glitch BKPT if the panic comes in a request or a hold.
 - A watchdog reset with no panic (a loop without an await, a hard
   fault, a request stuck without a link word) is not covered: no
-  software runs before it, so it can still glitch BKPT
-  (`docs/bring-up.md`, step 5).
+  software runs before it, so in a request or a hold, U1 on, it can
+  still glitch BKPT (`docs/bring-up.md`, step 5).
 - `bdm bootsel`: the boot ROM's `reset_to_usb_boot` reprograms the
   watchdog for its own reboot into BOOTSEL (RP2040 datasheet 2.8.3.1.5,
   Table 168).  The boot ROM's device staying up past the timeout is a
