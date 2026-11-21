@@ -172,6 +172,10 @@ enum Command {
     List,
     /// bdm's version and the pod firmware's, and their protocol.
     Version,
+    /// Hold BKPT low and return, clocking nothing: the target halts, and
+    /// comes out of any reset meanwhile (a watchdog's, say) in
+    /// background mode.  The next command releases it.
+    Hold,
     /// Bring a halted target's serial link back into frame, after a pod
     /// restart, without resetting it.
     Resync,
@@ -380,6 +384,10 @@ fn execute<T: Transport>(target: &mut PodTarget<T>, command: Command, out: &mut 
             }
             let total = words.len() * usize::try_from(rounds)?;
             writeln!(out, "loopback: {total} words ok in {:.3} s", started.elapsed().as_secs_f64())?;
+        }
+        Command::Hold => {
+            target.hold()?;
+            writeln!(out, "holding BKPT low until the next command")?;
         }
         Command::Version => {
             writeln!(out, "bdm {VERSION}")?;

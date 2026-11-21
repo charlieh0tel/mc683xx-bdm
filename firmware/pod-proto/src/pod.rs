@@ -91,6 +91,12 @@ pub trait Board: Link {
     /// running, background mode off, and waits for RESET to rise.
     async fn reset_run(&mut self);
 
+    /// Drives BKPT low and leaves it, clocking nothing: a running CPU
+    /// with background mode enabled halts, and a CPU reset meanwhile
+    /// comes out of reset in background mode (BKPT low as RESET rises).
+    /// The next word's first rising edge releases it.
+    fn hold(&mut self);
+
     /// The firmware's version: crate version and git commit, ASCII,
     /// shorter than a packet.
     fn version(&self) -> &'static str;
@@ -155,8 +161,10 @@ impl<B: Board> Pod<B> {
         };
         // A reset makes the entry moot, and a link out of frame must not
         // stop the reset that frames it again.
-        if !matches!(request, Request::ResetHalt | Request::ResetRun | Request::Resync | Request::Version)
-            && let Err(status) = self.read_entry().await
+        if !matches!(
+            request,
+            Request::ResetHalt | Request::ResetRun | Request::Resync | Request::Version | Request::Hold
+        ) && let Err(status) = self.read_entry().await
         {
             return encode_status(status, reply);
         }
@@ -191,6 +199,7 @@ impl<B: Board> Pod<B> {
             Request::Pins => self.pins().await.map(Answer::Pins),
             Request::ResetHalt => self.reset_halt().await.map(Answer::Atemp),
             Request::ResetRun => self.reset_run().await.map(|()| Answer::Done),
+            Request::Hold => self.hold().await.map(|()| Answer::Done),
             Request::Resync => self.resync_request().await.map(Answer::Atemp),
             Request::Halt => self.halt().await.map(Answer::Atemp),
             Request::SetClock { dsclk_hz } => Ok(Answer::Value(self.session.link_mut().set_clock(dsclk_hz))),
@@ -283,6 +292,13 @@ impl<B: Board> Pod<B> {
             }
         }
         self.entry_atemp().await
+    }
+
+    /// Holds BKPT low; no ATEMP read, which would release it.
+    async fn hold(&mut self) -> Result<(), Status> {
+        self.require_target().await?;
+        self.session.link_mut().hold();
+        Ok(())
     }
 
     /// Resets the CPU to run.

@@ -30,6 +30,10 @@
   code in ROM (PLAN.md, Host, gdb).
 - `monitor init` and `monitor load` in `bdm gdb`, once `mc683xx-debug`
   is in (PLAN.md, Host, Loading and init).
+- Abort a hung bus cycle with the carrier's BERR driver (Q2, GP7):
+  with SIMCR's FRZBM set, a BDM access nothing answers never ends, and
+  every later command reads not ready until a reset.  A request, and
+  perhaps the pod doing it itself after the not-ready retries.
 - BKPT glitch on the reboots bootsel does not cover (docs/bring-up.md,
   step 5): a panic handler that turns U1 off (GP10 low) before it
   waits for the watchdog; on the next carrier, U1's enable falling

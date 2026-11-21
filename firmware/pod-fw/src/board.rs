@@ -192,6 +192,10 @@ impl Board for PicoBoard<'_> {
         concat!(env!("CARGO_PKG_VERSION"), " ", env!("GIT_VERSION"))
     }
 
+    fn hold(&mut self) {
+        self.bkpt_low();
+    }
+
     async fn clock_bit(&mut self) {
         self.link.set_dsclk(Level::Low);
         Timer::after(EDGE_PHASE).await;

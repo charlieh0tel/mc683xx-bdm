@@ -149,7 +149,18 @@ turns U1 off first, left it answering (2026-11-20).
 m68k:cpu32` and `set endian big`: registers, memory and disassembly of
 the boot code at $550 work; `detach` lets the firmware boot.  Steps and
 RAM breakpoints need the RAM chip selects (CS0, CS2, CS3) and a scratch
-block the firmware does not use: not yet chosen.
+block the firmware does not use.  smartclock's RAM map: $106000 while
+the primary runs (VBR $10000); all of RAM with the firmware stopped;
+not $106000 under the installer.
+
+Single-step on the running primary, halted at $133EE, scratch $106000,
+SIMCR $414A for the session (2026-11-21): the first `stepi` took a
+pending level-6 interrupt and stopped at its handler's entry ($12FB2,
+SR $2600, SP $10FCF8); the next two stepped inside it; VBR was back at
+$10000 and `detach` let the firmware run on.  With SIMCR $614A the
+second step hung: FRZBM stops the bus monitor, so a stray access
+(likely past the top of RAM, $10FFFF) never ends.  Use $414A (FRZSW
+only) for gdb.
 
 ## Throughput
 

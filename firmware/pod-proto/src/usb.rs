@@ -39,7 +39,7 @@ pub fn serial_number<'a>(id: &[u8; UNIQUE_ID_BYTES], text: &'a mut [u8; SERIAL_N
 
 /// This protocol's version, in the Hello reply: raised on any change
 /// to a request or reply (docs/usb-protocol.md).
-pub const PROTOCOL_VERSION: u32 = 7;
+pub const PROTOCOL_VERSION: u32 = 8;
 
 /// Bytes a reply's status takes.
 const STATUS_BYTES: usize = 1;
@@ -70,6 +70,7 @@ const HELLO: u8 = 0x0E;
 const RESET_RUN: u8 = 0x0F;
 const RESYNC: u8 = 0x10;
 const VERSION: u8 = 0x11;
+const HOLD: u8 = 0x12;
 
 /// Pin level bits in a Pins reply: set for high.
 const FREEZE: u8 = 1 << 0;
@@ -108,6 +109,9 @@ pub enum Request<'a> {
     Resync,
     /// The firmware's version, ASCII: crate version and git commit.
     Version,
+    /// Drive BKPT low and leave it, clocking nothing: the CPU halts and
+    /// comes out of any reset meanwhile in background mode.
+    Hold,
     /// Stop the running target in background mode; the reply is ATEMP.
     Halt,
     /// GO: resume at RPC.
@@ -218,6 +222,7 @@ impl<'a> Request<'a> {
             RESET_RUN => empty(Self::ResetRun),
             RESYNC => empty(Self::Resync),
             VERSION => empty(Self::Version),
+            HOLD => empty(Self::Hold),
             HALT => empty(Self::Halt),
             GO => empty(Self::Go),
             SET_CLOCK => Ok(Self::SetClock { dsclk_hz: long(exact::<LONG>(body).ok_or(length)?) }),
@@ -286,6 +291,9 @@ impl<'a> Request<'a> {
             }
             Self::Version => {
                 out.put(&[VERSION]);
+            }
+            Self::Hold => {
+                out.put(&[HOLD]);
             }
             Self::Halt => {
                 out.put(&[HALT]);
@@ -700,6 +708,7 @@ mod tests {
         round_trip(Request::ResetRun);
         round_trip(Request::Resync);
         round_trip(Request::Version);
+        round_trip(Request::Hold);
         round_trip(Request::Halt);
         round_trip(Request::Go);
         round_trip(Request::SetClock { dsclk_hz: 1_000_000 });

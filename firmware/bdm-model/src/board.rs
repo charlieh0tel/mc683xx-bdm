@@ -167,6 +167,12 @@ impl<const RAM: usize> Board for ModelBoard<RAM> {
         concat!("bdm-model ", env!("CARGO_PKG_VERSION"))
     }
 
+    fn hold(&mut self) {
+        if self.bdm_enabled {
+            self.enter_background(Entry::Breakpoint);
+        }
+    }
+
     async fn clock_bit(&mut self) {
         self.skew = (self.skew + 1) % WORD_BITS;
     }

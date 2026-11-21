@@ -150,6 +150,16 @@ impl<T: Transport> PodTarget<T> {
         Ok(())
     }
 
+    /// Holds BKPT low until the next request (`Pod::hold`); forgets
+    /// the halted state.
+    ///
+    /// # Errors
+    /// As [`Error`].
+    pub fn hold(&mut self) -> Result<(), Error> {
+        self.halted = None;
+        self.pod.hold()
+    }
+
     /// Resets the target to run, background mode off; forgets the
     /// halted state.
     ///

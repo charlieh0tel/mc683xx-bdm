@@ -289,6 +289,9 @@ pods apart (`bdm --pod usb:SERIAL`).  Requests:
 - ResetRun: RESET pulsed with BKPT high, so the CPU runs with
   background mode off; refused without VDD.  It and ResetHalt skip the
   ATEMP read, so a link out of frame cannot stop them.
+- Hold: BKPT low with no ATEMP read, so nothing releases it until the
+  next request: the CPU halts and stays in, or comes back to,
+  background mode through a reset the pod did not make (a watchdog's).
 - Resync: NOP pairs, and a lone DSCLK edge after each pair whose second
   NOP does not read "command complete", until one does (at most 17).
   On request only: on a target a pod restart left the link in frame
@@ -434,7 +437,7 @@ code and no `unsafe`; no USB request, so the protocol is unchanged.
   any other instruction, an access outside RAM or 1000 instructions
   and it runs on unwatched.  Enough for `PodTarget::step`; anything
   else enters background mode by the test's hand.
-- `bdm`: pins, halt, reset (`--run`: ResetRun), resync, bootsel, list, version, go, call, clock, regs, get, set, dump,
+- `bdm`: pins, halt, hold, reset (`--run`: ResetRun), resync, bootsel, list, version, go, call, clock, regs, get, set, dump,
   write, xfer, loopback, gdb (Host, gdb), through `PodTarget` (bootsel
   and list excepted).  Halt and reset print the entry
   source.  Dump and write take `--fc`, default 5 (supervisor data).

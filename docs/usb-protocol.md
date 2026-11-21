@@ -7,7 +7,7 @@ it alone answers as the pod does.  The pod's implementation is
 `firmware/pod-proto/src/usb.rs`; where the two disagree, that is a bug
 in one of them.
 
-Protocol version: **7** (`PROTOCOL_VERSION`), raised on any change to a
+Protocol version: **8** (`PROTOCOL_VERSION`), raised on any change to a
 request or reply.
 
 ## Transport
@@ -86,6 +86,7 @@ would otherwise be BKPT pulses that halt it.
 | 0x0F | ResetRun | none | none | no |
 | 0x10 | Resync | none | ATEMP field, kind 2 | yes |
 | 0x11 | Version | none | the firmware's version, ASCII: crate version and git commit (`0.1.0 1a2b3c4`, `-dirty` if built with uncommitted changes) | no |
+| 0x12 | Hold | none | none | no |
 
 Fields:
 
@@ -121,7 +122,7 @@ Fields:
 Semantics:
 
 - Order of checks: the request is parsed (BadRequest); then, except
-  for ResetHalt, ResetRun, Resync and Version, the ATEMP read below, whose failure is the reply's status (once: the
+  for ResetHalt, ResetRun, Resync, Version and Hold, the ATEMP read below, whose failure is the reply's status (once: the
   pod keeps kind 3 and does not read again until FREEZE moves, so
   Pins, Transfer and ResetHalt still work); then the
   request's own checks (NoTarget, then NoFreeze); then the command.
@@ -159,6 +160,12 @@ Semantics:
   reports it stale.  On request only.  A command the CPU
   took out of frame may take the NOPs as operands.  NoTarget below
   4.5 V; NoFreeze if FREEZE is low.
+- Hold drives BKPT low and replies, clocking nothing and reading no
+  ATEMP: a running CPU with background mode enabled halts, and a CPU
+  that resets meanwhile (its watchdog, say) comes out of reset in
+  background mode, BKPT being low as RESET rises.  The next request's
+  first word releases BKPT, after its ATEMP read.  NoTarget below
+  4.5 V.
 - Halt works only if BDM was enabled at the target's last reset (BKPT
   low as RESET rises, MC68331UM 5.10.2.1), as ResetHalt does.  Without
   it BKPT is a breakpoint exception, vector $0C (MC68331UM 5.10.2.2.1,

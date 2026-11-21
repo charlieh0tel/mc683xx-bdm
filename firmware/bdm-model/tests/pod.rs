@@ -239,6 +239,19 @@ fn version_is_the_boards_and_needs_no_target() {
 }
 
 #[test]
+fn hold_halts_and_leaves_the_entry_unread() {
+    let mut pod = pod(true);
+    send(&mut pod, &Request::ResetHalt);
+    send(&mut pod, &Request::Go);
+    assert_eq!(status(&send(&mut pod, &Request::Hold)), Ok(&[][..]));
+    // Nothing was clocked: the entry is read by the next request.
+    let pins = parse_pins(status(&send(&mut pod, &Request::Pins)).unwrap()).unwrap();
+    assert_eq!((pins.freeze, pins.atemp), (true, Atemp::Fresh(0)));
+    let (violation, _) = pod.board_mut().target().violations();
+    assert_eq!(violation, None);
+}
+
+#[test]
 fn memory_round_trips() {
     let mut pod = pod(true);
     send(&mut pod, &Request::ResetHalt);

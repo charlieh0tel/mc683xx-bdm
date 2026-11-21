@@ -146,6 +146,16 @@ impl<T: Transport> Pod<T> {
         self.atemp(&Request::Resync)
     }
 
+    /// Holds BKPT low, clocking nothing: the target halts, and comes out
+    /// of any reset meanwhile in background mode.  The next request
+    /// releases it.
+    ///
+    /// # Errors
+    /// As [`Error`].
+    pub fn hold(&mut self) -> Result<(), Error> {
+        self.done(&Request::Hold)
+    }
+
     /// Resets the target to run, background mode off.
     ///
     /// # Errors

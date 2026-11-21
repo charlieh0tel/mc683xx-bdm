@@ -170,6 +170,12 @@ impl PodView {
         Ok(self.with(py, |target| Ok(target.reset_halted()?))?.into())
     }
 
+    /// BKPT held low, nothing clocked: the CPU halts, and comes out of
+    /// any reset meanwhile in background mode; the next call releases it.
+    fn hold(&mut self, py: Python<'_>) -> Result<(), Error> {
+        self.with(py, |target| Ok(target.hold()?))
+    }
+
     /// RESET alone: the CPU runs, background mode off.
     fn reset(&mut self, py: Python<'_>) -> Result<(), Error> {
         self.with(py, |target| Ok(target.reset_running()?))
