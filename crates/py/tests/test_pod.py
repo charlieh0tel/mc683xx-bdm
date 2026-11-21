@@ -201,9 +201,9 @@ def test_bad_names_are_value_errors(stand_in):
             pod.read_register("D8")
 
 
-def test_no_pod_is_a_transport_error(tmp_path):
+def test_no_pod_is_a_transport_error(socket_dir):
     with pytest.raises(mc683xx_bdm.TransportError) as raised:
-        Pod(f"unix:{tmp_path / 'none.sock'}")
+        Pod(f"unix:{socket_dir / 'none.sock'}")
     assert isinstance(raised.value, OSError)
     assert "socket failed" in str(raised.value)
 
@@ -215,10 +215,10 @@ def hello_reply() -> bytes:
     return bytes([len(reply)]) + reply
 
 
-def test_the_gil_is_released_while_waiting_on_the_pod(tmp_path):
+def test_the_gil_is_released_while_waiting_on_the_pod(socket_dir):
     """A pod answered by a Python thread: it can answer only if the
     calls release the GIL while they wait, or they time out."""
-    path = str(tmp_path / "python.sock")
+    path = str(socket_dir / "python.sock")
     listener = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
     listener.bind(path)
     listener.listen(1)
