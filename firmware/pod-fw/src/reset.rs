@@ -33,11 +33,17 @@ const MICROS_PER_SECOND: u64 = 1_000_000;
 /// Turns U1 off before a chip reset, so R3 holds BKPT high through it: as
 /// the chip resets, GP9 (U1's input) may fall before GP10 turns U1 off, a
 /// BKPT low pulse to a running CPU or a lone DSCLK edge to a halted one.
-/// The board owns GP10; this is its last use.  A busy wait on the
-/// processor's cycles, which runs with interrupts off, as in a panic.
+/// The board owns GP10; this is its last use.  A busy wait ([`spin`]),
+/// as in a panic.
 pub(crate) fn release_dsclk() {
     SIO.gpio_out(0).value_clr().write_value(1 << DSCLK_ENABLE_GPIO);
-    let cycles = u64::from(clk_sys_freq()) * DSCLK_RELEASE.as_micros() / MICROS_PER_SECOND;
+    spin(DSCLK_RELEASE);
+}
+
+/// Waits `duration` on the processor's cycles: runs with interrupts
+/// off, and needs no executor.
+pub(crate) fn spin(duration: Duration) {
+    let cycles = u64::from(clk_sys_freq()) * duration.as_micros() / MICROS_PER_SECOND;
     delay(u32::try_from(cycles).unwrap_or(u32::MAX));
 }
 
