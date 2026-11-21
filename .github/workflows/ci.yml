@@ -1,6 +1,8 @@
 # The Rust tests and `make lint`, as AGENTS.md has them run before each
-# commit.  The commit-message and identity checks are ee-tooling.yml's.  The toolchain and its targets come
-# from rust-toolchain.toml, at the root, for the host workspace and
+# commit, against the committed Cargo.lock and uv.lock files (--locked,
+# and the Makefile's UV_LOCKED).  The commit-message and identity checks
+# are ee-tooling.yml's.  The toolchain and its targets come from
+# rust-toolchain.toml, at the root, for the host workspace and
 # firmware/pod-fw alike.
 name: CI
 
@@ -19,6 +21,6 @@ jobs:
       - name: Toolchain
         run: rustup toolchain install
       - name: Tests
-        run: cargo test
+        run: cargo test --locked
       - name: Lint
         run: make lint

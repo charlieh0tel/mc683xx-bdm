@@ -9,7 +9,7 @@ Released together: the pod and `bdm` refuse each other unless their
    `firmware/pod-fw/Cargo.toml`; add a
    `packaging/debian/changelog` entry.  Raise `PROTOCOL_VERSION` and
    `docs/usb-protocol.md` if the wire changed.
-2. `make lint`, `cargo test`.
+2. `make lint`, `cargo test --locked`.
 3. `make deb`: the UF2 (`firmware/pod-fw/target/pod-fw-rp2040.uf2`)
    and the package, which ships it.
 4. Report flash, RAM and stack peak (AGENTS.md, Stack and RAM).  `bdm
