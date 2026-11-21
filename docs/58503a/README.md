@@ -201,6 +201,14 @@ PF5 high (no alarm), 0.6 mV with it low, measured at the jack (U33 pin
 firmware writes PF5 only when its alarm state changes, so a test that
 flips it puts it back.
 
+## /IRQ2
+
+Made a discrete input for a moment in a halt (DDRF $F3, then PFPAR $00;
+back with PFPAR $04, then DDRF $F7, so the pin is never driven), PF2,
+the /IRQ2 pin, reads 1 while the DUART's ISR AND IMR is $00 and 0
+while it is $02: /IRQ2 follows the DUART's enabled interrupts
+(2026-11-21, step W7 of smartclock's checklist).
+
 ## Programming the flash over BDM
 
 From one reset entry (firmware never run), with the chip selects set
