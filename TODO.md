@@ -26,10 +26,8 @@
   code in ROM (PLAN.md, Host, gdb).
 - `monitor init` and `monitor load` in `bdm gdb`, once `mc683xx-debug`
   is in (PLAN.md, Host, Loading and init).
-- BKPT glitch on the reboots bootsel and the panic handler do not
-  cover (docs/bring-up.md, step 5): on the next carrier, U1's enable
-  falling before its input (a stronger or faster OE path than GP9's),
-  so a power loss, replug or bare watchdog reset cannot glitch BKPT.
+- The next carrier revision's changes: `hardware/README.md`, Next
+  revision.
 - Python bindings (`mc683xx-bdm-py`): `step` (and the scratch area) now that
   `PodTarget::step` is in.
 - A second Pico as a stand-in CPU32: a target-side PIO program around
