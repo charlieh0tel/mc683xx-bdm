@@ -1,7 +1,8 @@
 # The Rust tests and `make lint`, as AGENTS.md has them run before each
-# commit, against the committed Cargo.lock and uv.lock files (--locked,
-# and the Makefile's UV_LOCKED).  The commit-message and identity checks
-# are ee-tooling.yml's.  The toolchain and its targets come from
+# commit, and every firmware build linked (`make size`), against the
+# committed Cargo.lock and uv.lock files (--locked, and the Makefile's
+# UV_LOCKED).  The commit-message and identity checks are
+# ee-tooling.yml's.  The toolchain and its targets come from
 # rust-toolchain.toml, at the root, for the host workspace and
 # firmware/pod-fw alike.
 name: CI
@@ -24,3 +25,13 @@ jobs:
         run: cargo test --locked
       - name: Lint
         run: make lint
+      # Links what clippy only checks: a FLASH or RAM overflow or a
+      # linker-script break fails here.  The sizes go to the run's
+      # summary.  Not `make deb`: its UF2 needs picotool 2's `uf2
+      # convert`, and ubuntu-latest's picotool package is older.
+      - name: Firmware
+        shell: bash
+        run: |
+          make size > "$RUNNER_TEMP/size.txt"
+          cat "$RUNNER_TEMP/size.txt"
+          { echo '### Firmware sizes (bytes)'; echo '```'; cat "$RUNNER_TEMP/size.txt"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"

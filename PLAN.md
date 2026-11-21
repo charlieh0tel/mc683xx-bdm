@@ -382,8 +382,9 @@ a link word.
   (WATCHDOG's REASON).  Not reported over USB: that is a protocol
   change (TODO.md).
 
-The firmware's own sizes, release builds: 30508 bytes of text on the
-RP2040 and 28772 on the RP2350, 2832 bytes of statics on either.
+The firmware's own sizes, release builds (`make size`, also in CI's
+summary): 31300 bytes of text on the RP2040 and 29572 on the RP2350,
+2832 bytes of statics on either.
 
 Handle not-ready retries in firmware; report BERR and illegal-command
 errors to the host.  `pod-proto`'s `session` does both, over a `Link`

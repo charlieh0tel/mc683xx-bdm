@@ -2,7 +2,7 @@
 # firmware in firmware/pod-fw; the hardware release is ee_tooling's
 # jlcpcb-release.
 
-.PHONY: deb hooks lint uf2
+.PHONY: deb hooks lint size uf2
 
 # cargo runs here with --locked and uv with UV_LOCKED: a Cargo.lock or
 # uv.lock that does not match its manifests is an error, not quietly
@@ -28,6 +28,24 @@ hooks:
 # Firmware builds, chip:target, each with and without rtt (PLAN.md,
 # Firmware).
 BUILDS = rp2040:thumbv6m-none-eabi rp235xa:thumbv8m.main-none-eabihf
+
+# The rustup toolchain's llvm-size (its llvm-tools component).
+LLVM_SIZE = $(shell rustc --print sysroot)/lib/rustlib/$(shell rustc -vV | sed -n 's/^host: //p')/bin/llvm-size
+
+# Every firmware build linked, release, and its flash and RAM (AGENTS.md,
+# Stack and RAM): llvm-size's text is flash, data flash and RAM, bss
+# RAM, against the memory map's FLASH and RAM (memory-*.x), which the
+# link refuses to overflow.
+size:
+	@for build in $(BUILDS); do \
+		chip=$${build%%:*}; target=$${build#*:}; \
+		for extra in "" ,rtt; do \
+			(cd firmware/pod-fw && cargo build --locked --release --no-default-features \
+				-F $$chip$$extra --target $$target) || exit 1; \
+			echo "$$chip$$extra:"; \
+			$(LLVM_SIZE) firmware/pod-fw/target/$$target/release/pod-fw || exit 1; \
+		done; \
+	done
 
 # Before each commit (AGENTS.md): rustfmt, clippy on the workspace (the
 # Python bindings with their `python` feature too) and on every firmware

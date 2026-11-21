@@ -42,6 +42,7 @@ cargo build --release --no-default-features -F rp235xa \
 
 cd ../..
 make lint                      # clippy on every build, before each commit
+make size                      # every firmware build linked; flash and RAM
 ```
 
 ## Host
