@@ -24,7 +24,8 @@
   at reset (SIMCR $60CF), but a program may clear it (the 58503A's
   does), and then the watchdog runs while the CPU is halted: an init
   script sets it again.
-- `bdm gdb` on silicon with a real m68k gdb: breakpoints, continue,
+- `bdm gdb` on silicon with a real m68k gdb: registers, memory and
+  disassembly work (58503A, 2026-11-20); still to try: breakpoints, continue,
   Ctrl-C, and `PodTarget::step` on a TRAP, an interrupt, user mode,
   code in ROM (PLAN.md, Host, gdb).
 - `monitor init` and `monitor load` in `bdm gdb`, once `mc683xx-debug`

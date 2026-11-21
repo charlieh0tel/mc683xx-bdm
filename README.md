@@ -62,7 +62,16 @@ does not open the pods, so it needs no udev rule, and takes no `--pod`.
 
 gdb on the target: `bdm gdb --scratch ADDRESS` listens on
 127.0.0.1:1234 (`--listen HOST:PORT` for another) for one session;
-then `target remote localhost:1234` in an m68k gdb.  `--scratch` names 1026 bytes of RAM, even, that the
+then, in an m68k gdb (`gdb-multiarch`):
+
+```
+set architecture m68k:cpu32
+set endian big
+target remote localhost:1234
+```
+
+Without an executable, gdb does not know the CPU32 is big-endian and
+shows every register and word byte-reversed.  `--scratch` names 1026 bytes of RAM, even, that the
 program does not use: a step's exception table and BGND stub.
 Breakpoints are BGND written into memory, so RAM only.  Detach leaves
 the target running, kill leaves it halted.
