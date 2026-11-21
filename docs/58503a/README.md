@@ -83,6 +83,12 @@ halted (smartclock's reading of the 3704 image).  At a reset entry
 SIMCR is still $60CF.  So: halt from a reset entry, or keep a halt
 after the firmware has run under about 5 s, or set FRZSW first.
 
+Read over BDM from a halt of the running firmware (2026-11-21, step R0
+of smartclock's checklist; halt under 1 s, then GO): ATEMP $0000
+(breakpoint), SIMCR $014A, SYPCR $CC, PICR $0542, PITR $0008, SYNCR
+$CF88, RPC $000120FC, PCC $000120F8, RSR $80 (the last reset was the
+pod's), the firmware's watchdog countdown at $100B90 7.
+
 ## Pod restarts
 
 A pod restarted while the CPU is halted can glitch BKPT
