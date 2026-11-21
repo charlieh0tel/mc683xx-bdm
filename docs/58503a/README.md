@@ -99,6 +99,18 @@ checklist).  No position changed the flash longs at $3FFFC ($5E4A146A),
 $7FFFC ($BCAE0C74) or $10000 ($0010FFFE): S1 does not gate flash
 reads.
 
+## The firmware's reset log
+
+Read from a halt after the pod's reset (2026-11-21, step R2 of
+smartclock's checklist): RSR $80, warm_start ($1039AF) 0, the preserved
+region's checksum and restore ($100000) $DE21 and 1,
+nv_settings_defaulted ($102276) 0, crash_message ($100B2E) empty.  The
+EEPROM's reset records at $400200 (32 of $5C bytes) hold "Log cleared"
+(2007) and four "Exception: ROOT|scpi, vector 2030, PC = ..." records
+dated 2026-11-20.  $2030 is a format $2 frame at vector offset $030,
+vector 12, the hardware breakpoint: BKPT taken as an exception, as a
+halt with background mode off is (Back to running, above).
+
 ## Pod restarts
 
 A pod restarted while the CPU is halted can glitch BKPT
