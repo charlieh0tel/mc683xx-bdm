@@ -503,8 +503,12 @@ code and no `unsafe`; no USB request, so the protocol is unchanged.
 - Bootloader knock: picotool's reset interface (interface 1), not a
   pod request, so `picotool -f` works too and a pod whose protocol
   differs from `bdm`'s can still be reflashed.  `bdm bootsel` sends it
-  and waits for the boot ROM's device; copying the UF2 is left to the
-  user (or picotool).
+  and waits for a boot ROM device (2E8A:0003 or 000F) at a bus address
+  that had none before the request, so a board already in BOOTSEL is
+  not taken for the pod.  Not by serial number: the RP2350 boot ROM's
+  is its OTP chip ID in hex (RP2350 datasheet 5.7.2), as the pod's, but
+  the RP2040 datasheet does not say what its boot ROM's is.  Copying
+  the UF2 is left to the user (or picotool).
 - `mc683xx-target` (m683xx-emu, no_std, MIT OR Apache-2.0) holds
   `Cpu32Target` and the types every crate here uses: Address, Size,
   Register, SystemRegister, FunctionCode, Entry.  Memory calls name
