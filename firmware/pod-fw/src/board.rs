@@ -124,6 +124,10 @@ impl Link for PicoBoard<'_> {
     async fn transfer_exit(&mut self, word: u16) -> Result<u32, Infallible> {
         self.link.transfer_exit(word).await
     }
+
+    fn clock_us(&self) -> u32 {
+        self.link.clock_us()
+    }
 }
 
 impl Board for PicoBoard<'_> {

@@ -353,7 +353,12 @@ pods apart (`bdm --pod usb:SERIAL`).  Requests:
   or a GO the CPU did not take, with no entry read since.
 - SetClock: DSCLK's rate; the reply gives the rate set, never faster
   than asked and at most 4 MHz until the throughput test measures the
-  margin (`mc683xx-bdm-proto`'s `dsclk::MAX_HZ` has the arithmetic).
+  margin (`mc683xx-bdm-proto`'s `dsclk::MAX_HZ` has the arithmetic),
+  and at least 10 kHz (`dsclk::MIN_HZ`): with not-ready waits bounded
+  by time as well as NOPs (1000 NOPs or 20 ms, `pod::NOT_READY_*`),
+  that bounds every request's time, which the host's timeout covers
+  at the rate in use (`pod::Workload`; docs/usb-protocol.md).  A host
+  that has not set the rate assumes the floor.
 - Every BDM command, refused with NoFreeze unless FREEZE is asserted,
   since its clocks would otherwise be BKPT pulses:
   - ReadRegister, WriteRegister: D0-D7, A0-A7.
@@ -387,8 +392,8 @@ a link word.
   in its read for as long as the host is idle.
 - The longest legitimate gaps between words: ResetHalt's 10 ms RESET
   pulse and up to 100 ms for FREEZE, and one word at the slowest DSCLK
-  (about 120 Hz: 143 ms).  Not-ready retries (up to 1000 NOPs), a long
-  DUMP or FILL and Resync are word after word.
+  (10 kHz: 1.7 ms).  Not-ready retries (up to 1000 NOPs or 20 ms), a
+  long DUMP or FILL and Resync are word after word.
 - A reply the host does not collect waits in the USB write, which
   counts as idle.  Not caught: a USB stack that stops answering while
   the serve loop waits for a request.
@@ -449,7 +454,8 @@ code and no `unsafe`; no USB request, so the protocol is unchanged.
 
 - `mc683xx-bdm`'s `transport`: a `Transport` trait, request packets
   sent and reply packets received, each in order, a receive with its
-  own timeout; `UsbTransport` over `nusb`, blocking, the device with the pod's VID:PID and the serial number
+  own timeout (`Pod` works it out for each request from DSCLK's rate,
+  docs/usb-protocol.md); `UsbTransport` over `nusb`, blocking, the device with the pod's VID:PID and the serial number
   asked for (case ignored), or with none asked for the only one: more
   than one is an error listing their serial numbers, never a guess.
   On USB a request goes out without waiting for the pod to take it

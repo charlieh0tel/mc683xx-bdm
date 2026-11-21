@@ -12,7 +12,9 @@
 use core::convert::Infallible;
 
 use mc683xx_bdm_proto::bdm::NOP;
+use mc683xx_bdm_proto::dsclk::DEFAULT_HZ;
 use mc683xx_bdm_proto::dsclk::MAX_HZ;
+use mc683xx_bdm_proto::dsclk::MIN_HZ;
 use mc683xx_bdm_proto::pod::Board;
 use mc683xx_bdm_proto::pod::VddError;
 use mc683xx_bdm_proto::session::Link;
@@ -48,13 +50,33 @@ pub struct ModelBoard<const RAM: usize> {
     driven: bool,
     /// The target holds RESET low: a reset never ends.
     reset_held: bool,
+    /// DSCLK's rate, as `Board::set_clock` set it.
+    dsclk_hz: u32,
+    /// The link's clock: each word takes its time at `dsclk_hz`, a lone
+    /// edge [`EDGE_US`].
+    clock_us: u32,
 }
+
+/// Microseconds in a second.
+const MICROS_PER_SECOND: u32 = 1_000_000;
+/// A lone DSCLK edge's two phases, as the pod's.
+const EDGE_US: u32 = 20;
 
 impl<const RAM: usize> ModelBoard<RAM> {
     /// A board around `target`, its BDM enabled or not.
     #[must_use]
     pub const fn new(target: Target<RAM>, bdm_enabled: bool) -> Self {
-        Self { target, edges: 0, bdm_enabled, dso_high: false, skew: 0, driven: false, reset_held: false }
+        Self {
+            target,
+            edges: 0,
+            bdm_enabled,
+            dso_high: false,
+            skew: 0,
+            driven: false,
+            reset_held: false,
+            dsclk_hz: DEFAULT_HZ,
+            clock_us: 0,
+        }
     }
 
     /// Holds RESET low from the target's side, or lets it go: the pod's
@@ -92,6 +114,7 @@ impl<const RAM: usize> ModelBoard<RAM> {
     /// Exchanges a word, counting FREEZE's fall if it ends background
     /// mode.
     fn exchange(&mut self, word: u16, exit: bool) -> u32 {
+        self.clock_us = self.clock_us.wrapping_add(WORD_BITS * MICROS_PER_SECOND / self.dsclk_hz);
         if !self.driven {
             return DSO_HIGH;
         }
@@ -123,6 +146,10 @@ impl<const RAM: usize> Link for ModelBoard<RAM> {
 
     async fn transfer_exit(&mut self, word: u16) -> Result<u32, Infallible> {
         Ok(self.exchange(word, true))
+    }
+
+    fn clock_us(&self) -> u32 {
+        self.clock_us
     }
 }
 
@@ -208,10 +235,12 @@ impl<const RAM: usize> Board for ModelBoard<RAM> {
     }
 
     async fn clock_bit(&mut self) {
+        self.clock_us = self.clock_us.wrapping_add(EDGE_US);
         self.skew = (self.skew + 1) % WORD_BITS;
     }
 
     fn set_clock(&mut self, dsclk_hz: u32) -> u32 {
-        dsclk_hz.clamp(1, MAX_HZ)
+        self.dsclk_hz = dsclk_hz.clamp(MIN_HZ, MAX_HZ);
+        self.dsclk_hz
     }
 }

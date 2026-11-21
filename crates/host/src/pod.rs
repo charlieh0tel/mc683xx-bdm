@@ -6,6 +6,10 @@ use std::time::Duration;
 use std::time::Instant;
 
 use mc683xx_bdm_proto::bdm::byte_count;
+use mc683xx_bdm_proto::dsclk::MIN_HZ;
+use mc683xx_bdm_proto::pod::NOT_READY_RETRIES;
+use mc683xx_bdm_proto::pod::NOT_READY_TIMEOUT_US;
+use mc683xx_bdm_proto::pod::Workload;
 
 use mc683xx_bdm_proto::usb::Atemp;
 use mc683xx_bdm_proto::usb::HELLO_REQUEST;
@@ -70,9 +74,26 @@ pub enum Error {
     Reentered,
 }
 
-/// How long a reply may take: a reset into background mode is the
-/// longest, about 110 ms (`pod-fw`'s RESET pulse and FREEZE timeout).
+/// How long a reply may take beyond its words and not-ready waits
+/// (`Workload`): a reset into background mode, about 110 ms (`pod-fw`'s
+/// RESET pulse and FREEZE timeout), CALL's 100 ms wait for FREEZE, and
+/// USB's own.  All of Hello's time.
 const TIMEOUT: Duration = Duration::from_secs(1);
+/// Bits in a serial word.
+const WORD_BITS: u64 = 17;
+/// The pod's own time per word, beyond its bits: generous against the
+/// firmware's handling between PIO words.
+const WORD_OVERHEAD_US: u64 = 20;
+const MICROS_PER_SECOND: u64 = 1_000_000;
+
+/// How long the pod may take over a request of `workload` at DSCLK
+/// `dsclk_hz`: [`TIMEOUT`], its words, and each wait at the first of
+/// its limits, time or NOPs, a word over for the check.
+fn timeout(workload: Workload, dsclk_hz: u32) -> Duration {
+    let word_us = WORD_BITS * MICROS_PER_SECOND / u64::from(dsclk_hz.max(1)) + WORD_OVERHEAD_US;
+    let wait_us = u64::from(NOT_READY_TIMEOUT_US).min((u64::from(NOT_READY_RETRIES) + 1) * word_us) + word_us;
+    TIMEOUT + Duration::from_micros(u64::from(workload.words) * word_us + u64::from(workload.waits) * wait_us)
+}
 
 /// The function code `bits` gives, if it fits FC\[2:0\].
 #[must_use]
@@ -91,12 +112,16 @@ pub struct Pod<T> {
     /// FREEZE's edge count, low 8 bits, from the last reply that carried
     /// one.
     freeze_edges: Option<u8>,
+    /// DSCLK's rate as the last `SetClock` gave it; until one, the
+    /// slowest the pod sets, since the pod keeps a rate from one host to
+    /// the next.  Each reply's timeout is worked out from it.
+    dsclk_hz: u32,
 }
 
 impl<T: Transport> Pod<T> {
     /// The pod at the end of `transport`.
     pub const fn new(transport: T) -> Self {
-        Self { transport, tag: 0, freeze_edges: None }
+        Self { transport, tag: 0, freeze_edges: None, dsclk_hz: MIN_HZ }
     }
 
     /// The transport, to give it back.
@@ -123,7 +148,7 @@ impl<T: Transport> Pod<T> {
         let deadline = Instant::now() + TIMEOUT;
         let mut reply = [0; PACKET];
         loop {
-            let length = self.receive(&mut reply, deadline)?;
+            let length = self.receive(&mut reply, deadline, TIMEOUT)?;
             if let Some(version) = parse_hello_reply(&reply[..length]) {
                 return Ok(version);
             }
@@ -239,7 +264,9 @@ impl<T: Transport> Pod<T> {
     /// # Errors
     /// As [`Error`].
     pub fn set_clock(&mut self, dsclk_hz: u32) -> Result<u32, Error> {
-        self.value(&Request::SetClock { dsclk_hz })
+        let set = self.value(&Request::SetClock { dsclk_hz })?;
+        self.dsclk_hz = set;
+        Ok(set)
     }
 
     /// A data or address register.
@@ -360,10 +387,12 @@ impl<T: Transport> Pod<T> {
         self.tag = self.tag % u8::MAX + 1;
         let mut packet = [0; PACKET];
         let length = encode(self.tag, &mut packet)?;
+        let request = Request::parse(&packet[1..length])?;
+        let timeout = timeout(Workload::of(&request), self.dsclk_hz);
         self.transport.send(&packet[..length])?;
-        let deadline = Instant::now() + TIMEOUT;
+        let deadline = Instant::now() + timeout;
         let length = loop {
-            let length = self.receive(reply, deadline)?;
+            let length = self.receive(reply, deadline, timeout)?;
             if let Ok((header, _)) = parse_reply_header(&reply[..length])
                 && header.tag == self.tag
             {
@@ -375,11 +404,17 @@ impl<T: Transport> Pod<T> {
         Ok(parse_reply(message)?)
     }
 
-    /// The next reply packet, by `deadline`.
-    fn receive(&mut self, reply: &mut [u8; PACKET], deadline: Instant) -> Result<usize, Error> {
+    /// The next reply packet, by `deadline`; `timeout` is what it is
+    /// reported as.
+    fn receive(
+        &mut self,
+        reply: &mut [u8; PACKET],
+        deadline: Instant,
+        timeout: Duration,
+    ) -> Result<usize, Error> {
         let remaining = deadline.saturating_duration_since(Instant::now());
         match self.transport.receive(reply, remaining) {
-            Err(TransportError::NoReply(_)) => Err(TransportError::NoReply(TIMEOUT).into()),
+            Err(TransportError::NoReply(_)) => Err(TransportError::NoReply(timeout).into()),
             received => Ok(received?),
         }
     }
@@ -404,11 +439,22 @@ mod tests {
     use std::collections::VecDeque;
     use std::time::Duration;
 
+    use embassy_futures::block_on;
+    use mc683xx_bdm_model::Target;
+    use mc683xx_bdm_model::board::ModelBoard;
+    use mc683xx_bdm_proto::dsclk::MAX_HZ;
+    use mc683xx_bdm_proto::dsclk::MIN_HZ;
+    use mc683xx_bdm_proto::pod::NOT_READY_RETRIES;
+    use mc683xx_bdm_proto::pod::NOT_READY_TIMEOUT_US;
+    use mc683xx_bdm_proto::pod::Workload;
+    use mc683xx_bdm_proto::session::Link;
+    use mc683xx_bdm_proto::usb::MAX_MEMORY_BYTES;
     use mc683xx_bdm_proto::usb::PACKET;
     use mc683xx_bdm_proto::usb::PROTOCOL_VERSION;
     use mc683xx_bdm_proto::usb::ReplyError;
     use mc683xx_bdm_proto::usb::Request;
     use mc683xx_bdm_proto::usb::Status;
+    use mc683xx_target::entry::Entry;
     use mc683xx_target::function_code::FunctionCode;
 
     use super::Address;
@@ -417,7 +463,9 @@ mod tests {
     use super::Pod;
     use super::Register;
     use super::Size;
+    use super::TIMEOUT;
     use super::function_code;
+    use super::timeout;
     use crate::script::parsed;
     use crate::script::pod;
     use crate::script::pod_with_edges;
@@ -481,6 +529,55 @@ mod tests {
         for expected in (1..=255).chain(1..=2) {
             assert_eq!(pod.read_register(Register::D0).unwrap(), expected);
         }
+    }
+
+    /// The pod's time over `request` on a model whose every access
+    /// answers "not ready" just short of the pod's limit at `dsclk_hz`,
+    /// against the host's timeout for it.
+    fn pod_time_and_timeout(request: &Request<'_>, dsclk_hz: u32) -> (Duration, Duration) {
+        let mut target = Target::<256>::new(Address(0x1000));
+        target.enter_background(Entry::Breakpoint);
+        let word_us = 17 * 1_000_000 / dsclk_hz;
+        target.memory_busy = NOT_READY_RETRIES.min(NOT_READY_TIMEOUT_US / word_us - 1);
+        let mut pod = mc683xx_bdm_proto::pod::Pod::new(ModelBoard::new(target, true));
+        let mut packet = [0; PACKET];
+        let mut reply = [0; PACKET];
+        let length = Request::SetClock { dsclk_hz }.encode(1, &mut packet).unwrap();
+        block_on(pod.handle(&packet[..length], &mut reply));
+        let length = request.encode(2, &mut packet).unwrap();
+        let start = pod.board_mut().clock_us();
+        block_on(pod.handle(&packet[..length], &mut reply));
+        assert_eq!(reply[2], Status::Ok as u8, "{request:?} at {dsclk_hz} Hz");
+        let spent = Duration::from_micros(u64::from(pod.board_mut().clock_us().wrapping_sub(start)));
+        (spent, timeout(Workload::of(request), dsclk_hz))
+    }
+
+    #[test]
+    fn the_timeout_covers_the_slowest_request_at_each_rate() {
+        let data = [0; MAX_MEMORY_BYTES];
+        for dsclk_hz in [MIN_HZ, 100_000, 1_000_000, MAX_HZ] {
+            for request in [
+                Request::ReadMemory { address: Address(0x1000), size: Size::Byte, length: MAX_MEMORY_BYTES },
+                Request::WriteMemory { address: Address(0x1000), size: Size::Byte, data: &data },
+                Request::ReadRegister(Register::D0),
+            ] {
+                let (spent, timeout) = pod_time_and_timeout(&request, dsclk_hz);
+                assert!(spent + TIMEOUT <= timeout, "{request:?} at {dsclk_hz} Hz: {spent:?}, {timeout:?}");
+            }
+        }
+    }
+
+    #[test]
+    fn the_timeout_follows_the_rate_set() {
+        let mut pod = pod(&[&[0, 0x10, 0x27, 0, 0], &[0, 0x00, 0x09, 0x3D, 0]]);
+        assert_eq!(pod.dsclk_hz, MIN_HZ, "the slowest until told");
+        pod.set_clock(1).unwrap();
+        assert_eq!(pod.dsclk_hz, 10_000);
+        pod.set_clock(4_000_000).unwrap();
+        assert_eq!(pod.dsclk_hz, 4_000_000);
+        let read = Workload::of(&Request::ReadMemory { address: Address(0), size: Size::Byte, length: 56 });
+        assert!(timeout(read, MAX_HZ) < timeout(read, MIN_HZ));
+        assert!(timeout(read, MIN_HZ) < Duration::from_secs(4), "a lost pod is reported in seconds");
     }
 
     #[test]

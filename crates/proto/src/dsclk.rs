@@ -15,6 +15,11 @@ pub const DEFAULT_HZ: u32 = 1_000_000;
 /// 4.6 ns for U5 (SCLS378P 5.6, SCES351Y 5.6).
 pub const MAX_HZ: u32 = 4_000_000;
 
+/// The slowest rate the pod sets: a slower one is set to this.  It
+/// bounds a request's time (17 bits at 10 kHz is 1.7 ms a word), so a
+/// host's timeout covers the slowest request.
+pub const MIN_HZ: u32 = 10_000;
+
 /// Fraction bits in the PIO clock divider (8.8 in hardware's 16.8).
 const FRACTION_BITS: u32 = 8;
 /// The divider's limits as raw 16.8 fixed point: 1.0 to 65535 + 255/256.
@@ -30,15 +35,17 @@ pub struct Divider {
     pub dsclk_hz: u32,
 }
 
-/// The divider closest to, and no faster than, `dsclk_hz` (at most
-/// [`MAX_HZ`]) from a `sys_hz` system clock, held to the divider's
-/// range.
+/// The divider closest to, and no faster than, `dsclk_hz` held to
+/// [`MIN_HZ`]-[`MAX_HZ`], from a `sys_hz` system clock, held to the
+/// divider's range; never slower than [`MIN_HZ`] where the divider
+/// reaches it.
 #[must_use]
 pub fn divider(sys_hz: u32, dsclk_hz: u32) -> Divider {
-    let per_bit = u64::from(CYCLES_PER_BIT) * u64::from(dsclk_hz.clamp(1, MAX_HZ));
+    let per_bit = |hz: u32| u64::from(CYCLES_PER_BIT) * u64::from(hz);
     let scaled = u64::from(sys_hz) << FRACTION_BITS;
-    // Round up, so the rate never exceeds the one asked for.
-    let bits = scaled.div_ceil(per_bit);
+    // Round up, so the rate never exceeds the one asked for; at the
+    // floor, round down, so it is never slower than it.
+    let bits = scaled.div_ceil(per_bit(dsclk_hz.clamp(MIN_HZ, MAX_HZ))).min(scaled / per_bit(MIN_HZ));
     let bits = bits.clamp(u64::from(MIN_DIVIDER), u64::from(MAX_DIVIDER));
     let dsclk_hz = scaled / (u64::from(CYCLES_PER_BIT) * bits);
     Divider {
@@ -51,6 +58,7 @@ pub fn divider(sys_hz: u32, dsclk_hz: u32) -> Divider {
 mod tests {
     use super::Divider;
     use super::MAX_HZ;
+    use super::MIN_HZ;
     use super::divider;
 
     /// The RP2040's and RP2350's default system clocks.
@@ -85,8 +93,19 @@ mod tests {
     fn held_to_the_divider_range() {
         // Faster than sys / 16 from a slow system clock: divider 1.0.
         assert_eq!(divider(32_000_000, MAX_HZ), Divider { bits: 256, dsclk_hz: 2_000_000 });
-        // Slower than the largest divider allows.
-        assert_eq!(divider(RP2040_HZ, 1).bits, (1 << 24) - 1);
-        assert_eq!(divider(RP2040_HZ, 0).bits, (1 << 24) - 1);
+    }
+
+    #[test]
+    fn held_to_min_hz() {
+        // 125 MHz / 16 / 10 kHz = 781.25, exactly 200000/256.
+        for hz in [0, 1, 120, 9_999, MIN_HZ] {
+            assert_eq!(divider(RP2040_HZ, hz), Divider { bits: 200_000, dsclk_hz: MIN_HZ }, "{hz}");
+        }
+        assert_eq!(divider(RP2350_HZ, 0).dsclk_hz, MIN_HZ);
+        // A system clock that does not divide evenly: rounded to just
+        // above the floor, not below.
+        let d = divider(133_000_000, 1);
+        assert!(d.dsclk_hz >= MIN_HZ && d.dsclk_hz < MIN_HZ + 10, "{d:?}");
+        assert!(divider(RP2040_HZ, 10_001).dsclk_hz <= 10_001);
     }
 }
