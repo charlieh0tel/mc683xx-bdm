@@ -7,7 +7,7 @@ use std::env;
 use std::fs;
 use std::path::PathBuf;
 
-include!("../git-version.rs");
+include!("../../crates/git-version.rs");
 
 fn main() {
     println!("cargo:rustc-env=GIT_VERSION={}", git_version());

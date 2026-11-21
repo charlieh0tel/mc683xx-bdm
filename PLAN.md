@@ -246,14 +246,14 @@ mc683xx-bdm/
 │   ├── production/       # each release as ordered
 │   └── ee_tooling/      # shared KiCad tooling and house style (submodule, pinned)
 ├── crates/
-│   └── pod-proto/       # BDM words and command sequences; USB commands; no_std
+│   ├── pod-proto/       # BDM words and command sequences; USB commands; no_std
+│   └── git-version.rs   # the git commit in pod-fw's and pod-host's versions
 ├── host/
 │   ├── bdm-model/       # a CPU32 in background mode at the serial word, and a board around it; no_std; test target
 │   ├── pod-host/        # Rust library + `bdm` CLI (nusb)
 │   └── pod-py/          # Python bindings, `mc683xx_bdm` (PyO3, maturin, uv)
 ├── firmware/
-│   ├── pod-fw/          # Pico / Pico 2 firmware, embassy-rp, PIO; its own workspace
-│   └── git-version.rs   # the git commit in pod-fw's and pod-host's versions
+│   └── pod-fw/          # Pico / Pico 2 firmware, embassy-rp, PIO; its own workspace
 ├── packaging/           # Debian changelog, udev rule
 ├── third_party/         # vendor manuals + NOTICE
 ├── Cargo.toml           # the host workspace
