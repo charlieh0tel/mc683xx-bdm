@@ -22,6 +22,7 @@ use embassy_rp::pio::ShiftDirection;
 use embassy_rp::pio::StateMachine;
 use embassy_time::Instant;
 use fixed::FixedU32;
+use mc683xx_bdm_proto::dsclk::DSI_EXIT_HOLD_CYCLES;
 use mc683xx_bdm_proto::dsclk::Divider;
 use mc683xx_bdm_proto::session::Link;
 
@@ -39,6 +40,9 @@ const RELEASE_DSI: u32 = 1 << (LEFT_JUSTIFY - 1);
 const WORD_MASK: u32 = (1 << WORD_BITS) - 1;
 /// The OSR and ISR are 32 bits; the program pulls and pushes itself.
 const SHIFT_THRESHOLD: u8 = 32;
+// The program's exit path, from the last rise: `out y` and `jmp !y`,
+// `nop [4]`'s 5 cycles, then `set pins, 0` on the 8th.
+const _: () = assert!(DSI_EXIT_HOLD_CYCLES == 2 + 5 + 1);
 
 /// The PIO's pins (PLAN.md, Hardware): DSCLK (BKPT) on GP9, DSI on GP3,
 /// DSO on GP2, and `DSI_EN` on GP4, high to let FREEZE enable DSI.
@@ -72,9 +76,11 @@ impl<'d> PioLink<'d> {
         // Each phase is 8 cycles; DSO is sampled on the low phase's last
         // cycle, just before DSCLK rises.  The high phase's delay is on
         // the loop's back edge only, so after the 17th rise the OSR's
-        // next bit, RELEASE_DSI, is checked at once: if set, `set pins, 0`
-        // drops DSI_EN 3 cycles after the rise
-        // (PLAN.md, PIO program).
+        // next bit, RELEASE_DSI, is checked at once: if set, the `nop`
+        // holds DSI to the high phase's end and `set pins, 0` drops
+        // DSI_EN 8 cycles after the rise (`dsclk::DSI_EXIT_HOLD_CYCLES`):
+        // DSI held over one CLKOUT at any target clock DSCLK's rate is
+        // in spec for (PLAN.md, PIO program).
         let program = pio::pio_asm!(
             ".side_set 1 opt",
             ".wrap_target",
@@ -88,6 +94,7 @@ impl<'d> PioLink<'d> {
             "last:",
             "    out y, 1",
             "    jmp !y keep",
+            "    nop            [4]",
             "    set pins, 0",
             "keep:",
             "    push block",

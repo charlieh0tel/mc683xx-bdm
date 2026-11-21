@@ -222,8 +222,9 @@ Semantics:
   it BKPT is a breakpoint exception, vector $0C (MC68331UM 5.10.2.2.1,
   Table 5-3): the program takes it, and Halt answers NoFreeze.  The
   halt guard refuses it first where the pod knows.
-- Go and Call release DSI after their last word (PLAN.md, PIO
-  program); nothing is clocked after them while the target runs.
+- Go and Call release DSI after their last word, holding it to the end
+  of that word's last DSCLK high phase, at least one CLKOUT at any
+  target clock the rate is in spec for (PLAN.md, PIO program); nothing is clocked after them while the target runs.
   After their Ok the target runs: Go at RPC, Call at the address with
   the return address stacked (CPU32RM 7.2.8.12, 7.2.8.13).
 - Call waits up to 100 ms for FREEZE to fall.  If it stays high,
