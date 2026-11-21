@@ -70,10 +70,10 @@ temperature (SCLS316P 5.6, SCLS378P 5.6).  The manuals give no bound
 on how soon IFETCH is driven after FREEZE negates (MC68331UM Table A-7,
 Figure A-14); the series resistor limits any overlap's current.
 
-The Pico's DSI_EN is a PIO pin as well: the program drops it 3 PIO
-cycles after the last rising edge of GO's opcode or CALL's last word,
-about 190 ns at 1 MHz DSCLK (PIO program), which may beat FREEZE
-negating.  The firmware raises it once FREEZE asserts, or once a CALL
+The Pico's DSI_EN is a PIO pin as well: the program drops it 8 PIO
+cycles, the whole high phase, after the last rising edge of GO's
+opcode or CALL's last word, 500 ns at 1 MHz DSCLK and 125 ns at 4 MHz
+(PIO program), which may beat FREEZE negating.  The firmware raises it once FREEZE asserts, or once a CALL
 has left FREEZE high (Firmware).
 
 Pico pins (GPn):
@@ -192,6 +192,7 @@ bit:
 last:
     out y, 1                 ; release flag: the OSR bit after the word
     jmp !y keep
+    nop             [4]      ; DSI held to the high phase's end
     set pins, 0              ; DSI_EN low: DSI off
 keep:
     push block               ; 17 bits, right-justified
@@ -204,14 +205,25 @@ count 1).
 
 - The firmware pushes `word << 15`, with bit 14 set for the last word
   before the CPU leaves background mode (`Link::transfer_exit`): DSI
-  goes off 3 PIO cycles after that word's last rising edge, before the
+  goes off 8 PIO cycles after that word's last rising edge, before the
   `push`.  The firmware turns DSI on again when FREEZE next asserts.
+- DSI hold on that last bit: the CPU wants DSI held one CLKOUT after
+  the rise (CPU32RM 7.2.7.1, Protocol summary).  8 cycles is the whole
+  high phase, half a DSCLK period, and a DSCLK cycle is at least 2
+  CLKOUT for DSCLK to be in spec (MC68331UM Table A-7), so the hold
+  covers one CLKOUT at the slowest target clock the rate allows: twice
+  DSCLK (8 MHz at 4 MHz, 2 MHz at the 1 MHz default, 20 kHz at the
+  10 kHz floor).  At 4 MHz and the 68331's 16.78 MHz that is 125 ns
+  against 59.6 ns, 65 ns to spare; U3's and U2's disable delays (up
+  to 20 ns) only lengthen it.  FREEZE falling can cut DSI off sooner
+  in hardware, but only once the CPU has taken the bit
+  (`dsclk::DSI_EXIT_HOLD_CYCLES`, `dsclk::dsi_exit_hold_ns`).
 
 - Each phase is 8 PIO cycles, so DSCLK = PIO clock / 16; set it with
   clkdiv.  `.side_set 1 opt` leaves 3 delay bits, `[7]` at most.
 - The high phase's delay is on the loop's back edge, so after the 17th
-  rise the release check runs at once: `set pins` is the 3rd cycle
-  after the rise.
+  rise the release check runs at once, and only an exit word pays the
+  `nop`: `set pins` is the 8th cycle after the rise.
 - DSO is sampled one PIO cycle before DSCLK rises, 15 after the
   previous rise: the target's synchronizer (about 1.5 CLKOUT), its DSO
   delay and both translators' delays must fit in those 15.  At 1 MHz

@@ -20,6 +20,24 @@ pub const MAX_HZ: u32 = 4_000_000;
 /// host's timeout covers the slowest request.
 pub const MIN_HZ: u32 = 10_000;
 
+/// PIO cycles from the last DSCLK rise of GO's or CALL's last word to
+/// `DSI_EN` falling: the whole high phase (PLAN.md, PIO program: the
+/// release check's 2 cycles, `nop [4]`'s 5, then `set pins`).  Half a
+/// DSCLK period, so DSI is held at least one CLKOUT after the rise
+/// (CPU32RM 7.2.7.1) at any target clock DSCLK is in spec for:
+/// MC68331UM Table A-7 wants a DSCLK cycle of at least 2 CLKOUT.
+pub const DSI_EXIT_HOLD_CYCLES: u32 = CYCLES_PER_BIT / 2;
+
+/// Nanoseconds in a second.
+const NANOS_PER_SECOND: u64 = 1_000_000_000;
+
+/// How long DSI is held after GO's or CALL's last rise at `dsclk_hz`, in
+/// nanoseconds; the translators' disable delays add to it.
+#[must_use]
+pub fn dsi_exit_hold_ns(dsclk_hz: u32) -> u64 {
+    u64::from(DSI_EXIT_HOLD_CYCLES) * NANOS_PER_SECOND / (u64::from(CYCLES_PER_BIT) * u64::from(dsclk_hz))
+}
+
 /// Fraction bits in the PIO clock divider (8.8 in hardware's 16.8).
 const FRACTION_BITS: u32 = 8;
 /// The divider's limits as raw 16.8 fixed point: 1.0 to 65535 + 255/256.
@@ -59,7 +77,9 @@ mod tests {
     use super::Divider;
     use super::MAX_HZ;
     use super::MIN_HZ;
+    use super::NANOS_PER_SECOND;
     use super::divider;
+    use super::dsi_exit_hold_ns;
 
     /// The RP2040's and RP2350's default system clocks.
     const RP2040_HZ: u32 = 125_000_000;
@@ -93,6 +113,21 @@ mod tests {
     fn held_to_the_divider_range() {
         // Faster than sys / 16 from a slow system clock: divider 1.0.
         assert_eq!(divider(32_000_000, MAX_HZ), Divider { bits: 256, dsclk_hz: 2_000_000 });
+    }
+
+    #[test]
+    fn dsi_is_held_over_a_clkout_at_the_slowest_target_clock_in_spec() {
+        // At 4 MHz, 125 ns against 59.6 ns of CLKOUT at the 68331's
+        // 16.78 MHz: 65 ns to spare.
+        assert_eq!(dsi_exit_hold_ns(MAX_HZ), 125);
+        let clkout_ns = |hz: u64| NANOS_PER_SECOND.div_ceil(hz);
+        assert!(dsi_exit_hold_ns(MAX_HZ) >= clkout_ns(16_780_000) + 65);
+        // The slowest target clock DSCLK is in spec for is twice its
+        // rate (a DSCLK cycle of at least 2 CLKOUT): one CLKOUT there is
+        // the whole hold, at every rate.
+        for hz in [MIN_HZ, 100_000, 1_000_000, 3_000_000, MAX_HZ] {
+            assert!(dsi_exit_hold_ns(hz) >= NANOS_PER_SECOND / (2 * u64::from(hz)), "{hz}");
+        }
     }
 
     #[test]

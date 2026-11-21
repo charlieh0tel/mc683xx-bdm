@@ -19,9 +19,6 @@
   unpublished.  Each crate's metadata, then the publishing tokens as
   repository secrets.
 - DSCLK above 4 MHz, once the throughput test measures the margin.
-- From the review, decided (2026-11-21): DSI_EN held a few PIO
-  cycles longer after GO's and CALL's last word (over one CLKOUT at
-  the slowest target clock).
 - Report a watchdog reset to the host (WATCHDOG's REASON at start,
   say in Pins or Version, and in `bdm pins`): a protocol change, so
   `PROTOCOL_VERSION`, `docs/usb-protocol.md` and `mc683xx-bdm` with it.
