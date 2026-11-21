@@ -76,9 +76,11 @@ impl Workload {
             Request::Transfer(words) => {
                 Self { words: u32::try_from(words.len()).unwrap_or(u32::MAX), waits: 0 }
             }
-            Request::Version | Request::SetClock { .. } | Request::Hold | Request::ResetRun => {
-                Self { words: 0, waits: 0 }
-            }
+            Request::Version
+            | Request::SetClock { .. }
+            | Request::GetClock
+            | Request::Hold
+            | Request::ResetRun => Self { words: 0, waits: 0 },
             Request::Go => Self { words: 1, waits: 0 },
             Request::BerrPulse => Self { words: 0, waits: 1 },
             Request::Pins | Request::Halt | Request::ResetHalt => Self { words: ENTRY_WORDS, waits: 1 },
@@ -182,6 +184,10 @@ pub trait Board: Link {
     /// Sets DSCLK's rate, at most `dsclk_hz` where it can; returns the
     /// rate set (docs/usb-protocol.md, `SetClock`).
     fn set_clock(&mut self, dsclk_hz: u32) -> u32;
+
+    /// DSCLK's rate in effect: what the last [`Board::set_clock`]
+    /// returned, or the board's starting rate before one.
+    fn dsclk_hz(&self) -> u32;
 }
 
 /// Target VDD could not be read.
@@ -208,8 +214,8 @@ enum Answer {
 }
 
 /// Whether `request` waits on the ATEMP read after an entry.  Not those
-/// that touch no target (`Version`, `SetClock`, and Hello, which is no
-/// `Request`), so a host's Hello works over a link out of frame; not a
+/// that touch no target (`Version`, `SetClock`, `GetClock`, and Hello,
+/// which is no `Request`), so a host's Hello works over a link out of frame; not a
 /// reset, which makes the
 /// entry moot, nor `Resync`, which a link out of frame must not stop;
 /// not `Hold`, whose words would release BKPT, nor `BerrPulse`, for a
@@ -219,6 +225,7 @@ const fn reads_entry_first(request: &Request<'_>) -> bool {
         request,
         Request::Version
             | Request::SetClock { .. }
+            | Request::GetClock
             | Request::ResetHalt
             | Request::ResetRun
             | Request::Resync
@@ -367,6 +374,7 @@ impl<B: Board> Pod<B> {
             Request::Resync => self.resync_request().await.map(Answer::Atemp),
             Request::Halt => self.halt().await.map(Answer::Atemp),
             Request::SetClock { dsclk_hz } => Ok(Answer::Value(self.session.link_mut().set_clock(dsclk_hz))),
+            Request::GetClock => Ok(Answer::Value(self.session.link_mut().dsclk_hz())),
             Request::Go => self.command(&Command::Go).await.map(|_| Answer::Done),
             Request::Call(address) => self.call(address).await.map(|()| Answer::Done),
             Request::Version => Ok(Answer::Text(self.session.link_mut().version())),

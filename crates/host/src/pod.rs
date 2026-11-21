@@ -112,9 +112,11 @@ pub struct Pod<T> {
     /// FREEZE's edge count, low 8 bits, from the last reply that carried
     /// one.
     freeze_edges: Option<u8>,
-    /// DSCLK's rate as the last `SetClock` gave it; until one, the
-    /// slowest the pod sets, since the pod keeps a rate from one host to
-    /// the next.  Each reply's timeout is worked out from it.
+    /// DSCLK's rate as the pod last gave it, in `GetClock`'s reply at
+    /// the handshake or `SetClock`'s.  Until then the slowest the pod
+    /// sets, for `GetClock`'s own exchange, since the pod keeps a rate
+    /// from one host to the next.  Each reply's timeout is worked out
+    /// from it.
     dsclk_hz: u32,
 }
 
@@ -155,14 +157,19 @@ impl<T: Transport> Pod<T> {
         }
     }
 
-    /// What a host does first on a connection: says Hello, and checks
-    /// the pod speaks this host's protocol.
+    /// What a host does first on a connection: says Hello, checks the
+    /// pod speaks this host's protocol, and asks DSCLK's rate, which
+    /// sizes the timeouts from then on.
     ///
     /// # Errors
     /// As [`Error`]; [`Error::Protocol`] for another version.
     pub fn handshake(&mut self) -> Result<(), Error> {
         let version = self.hello()?;
-        if version == PROTOCOL_VERSION { Ok(()) } else { Err(Error::Protocol(version)) }
+        if version != PROTOCOL_VERSION {
+            return Err(Error::Protocol(version));
+        }
+        self.get_clock()?;
+        Ok(())
     }
 
     /// FREEZE, RESET and DS levels, and VDD.
@@ -268,6 +275,16 @@ impl<T: Transport> Pod<T> {
         let set = self.value(&Request::SetClock { dsclk_hz })?;
         self.dsclk_hz = set;
         Ok(set)
+    }
+
+    /// DSCLK's rate in effect, as the pod gives it.
+    ///
+    /// # Errors
+    /// As [`Error`].
+    pub fn get_clock(&mut self) -> Result<u32, Error> {
+        let rate = self.value(&Request::GetClock)?;
+        self.dsclk_hz = rate;
+        Ok(rate)
     }
 
     /// A data or address register.
@@ -449,6 +466,7 @@ mod tests {
     use mc683xx_bdm_proto::pod::NOT_READY_TIMEOUT_US;
     use mc683xx_bdm_proto::pod::Workload;
     use mc683xx_bdm_proto::session::Link;
+    use mc683xx_bdm_proto::usb::HELLO_REQUEST;
     use mc683xx_bdm_proto::usb::MAX_MEMORY_BYTES;
     use mc683xx_bdm_proto::usb::PACKET;
     use mc683xx_bdm_proto::usb::PROTOCOL_VERSION;
@@ -568,14 +586,72 @@ mod tests {
         }
     }
 
+    /// A pod that says Hello and answers `GetClock` with `dsclk_hz`, if
+    /// it has one, and nothing else: every other request times out.
+    struct Clocked {
+        dsclk_hz: Option<u32>,
+        /// The reply not yet received.
+        waiting: Option<Vec<u8>>,
+    }
+
+    impl Transport for Clocked {
+        fn send(&mut self, request: &[u8]) -> Result<(), TransportError> {
+            self.waiting = if request == HELLO_REQUEST {
+                Some([Status::Ok as u8].into_iter().chain(PROTOCOL_VERSION.to_le_bytes()).collect())
+            } else if let (Request::GetClock, Some(dsclk_hz)) = (parsed(request), self.dsclk_hz) {
+                Some([request[0], 0, Status::Ok as u8].into_iter().chain(dsclk_hz.to_le_bytes()).collect())
+            } else {
+                None
+            };
+            Ok(())
+        }
+
+        fn receive(&mut self, reply: &mut [u8; PACKET], timeout: Duration) -> Result<usize, TransportError> {
+            let next = self.waiting.take().ok_or(TransportError::NoReply(timeout))?;
+            reply[..next.len()].copy_from_slice(&next);
+            Ok(next.len())
+        }
+    }
+
+    /// The timeout a request's `result` reports, the pod not having
+    /// answered.
+    fn reported_timeout(result: Result<impl std::fmt::Debug, Error>) -> Duration {
+        match result {
+            Err(Error::Transport(TransportError::NoReply(timeout))) => timeout,
+            other => panic!("{other:?}"),
+        }
+    }
+
+    #[test]
+    fn the_handshake_asks_the_rate_and_times_out_by_it() {
+        let read = Request::ReadRegister(Register::D0);
+        for dsclk_hz in [MIN_HZ, 1_000_000, MAX_HZ] {
+            let mut pod = Pod::new(Clocked { dsclk_hz: Some(dsclk_hz), waiting: None });
+            pod.handshake().unwrap();
+            assert_eq!(pod.dsclk_hz, dsclk_hz);
+            let timeout_reported = reported_timeout(pod.read_register(Register::D0));
+            assert_eq!(timeout_reported, timeout(Workload::of(&read), dsclk_hz), "at {dsclk_hz} Hz");
+        }
+    }
+
+    #[test]
+    fn get_clock_is_timed_at_the_slowest() {
+        let mut pod = Pod::new(Clocked { dsclk_hz: None, waiting: None });
+        let timeout_reported = reported_timeout(pod.handshake());
+        assert_eq!(timeout_reported, timeout(Workload::of(&Request::GetClock), MIN_HZ));
+        assert_eq!(pod.dsclk_hz, MIN_HZ, "the slowest until the pod says");
+    }
+
     #[test]
     fn the_timeout_follows_the_rate_set() {
-        let mut pod = pod(&[&[0, 0x10, 0x27, 0, 0], &[0, 0x00, 0x09, 0x3D, 0]]);
-        assert_eq!(pod.dsclk_hz, MIN_HZ, "the slowest until told");
+        let mut pod = pod(&[&[0, 0x10, 0x27, 0, 0], &[0, 0x00, 0x09, 0x3D, 0], &[0, 0xA0, 0x86, 0x01, 0]]);
+        assert_eq!(pod.dsclk_hz, MIN_HZ, "the slowest until the pod says");
         pod.set_clock(1).unwrap();
         assert_eq!(pod.dsclk_hz, 10_000);
         pod.set_clock(4_000_000).unwrap();
         assert_eq!(pod.dsclk_hz, 4_000_000);
+        assert_eq!(pod.get_clock().unwrap(), 100_000);
+        assert_eq!(pod.dsclk_hz, 100_000, "as the pod gives it");
         let read = Workload::of(&Request::ReadMemory { address: Address(0), size: Size::Byte, length: 56 });
         assert!(timeout(read, MAX_HZ) < timeout(read, MIN_HZ));
         assert!(timeout(read, MIN_HZ) < Duration::from_secs(4), "a lost pod is reported in seconds");
@@ -678,9 +754,12 @@ mod tests {
     #[test]
     fn another_protocol_is_refused() {
         let reply = |version: u32| -> Vec<u8> { std::iter::once(0).chain(version.to_le_bytes()).collect() };
-        let mut pod = pod(&[&reply(PROTOCOL_VERSION), &reply(PROTOCOL_VERSION + 1)]);
+        let mut pod = pod(&[&reply(PROTOCOL_VERSION), &reply(MIN_HZ), &reply(PROTOCOL_VERSION + 1)]);
         pod.handshake().unwrap();
         assert!(matches!(pod.handshake(), Err(Error::Protocol(version)) if version == PROTOCOL_VERSION + 1));
+        let requests = pod.into_transport().requests;
+        assert_eq!(requests.len(), 3, "no GetClock after another version's Hello");
+        assert_eq!(parsed(&requests[1]), Request::GetClock);
     }
 
     #[test]

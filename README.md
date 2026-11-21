@@ -147,7 +147,7 @@ The names follow the emulator's bindings (`mc683xx`, in m683xx-emu's
 function_code=5)`, `Entry`, `BusError`, `TargetError`.  Blocks are
 `read_memory(address, length, *, size=1, function_code=5)` and
 `write_memory(address, data, ...)`; `pins`, `version`, `hello`,
-`set_clock`, `resync`, `call`, `reset` (to run) and `transfer` are the
+`set_clock`, `get_clock`, `resync`, `call`, `reset` (to run) and `transfer` are the
 pod's own.  Open it with `with mc683xx_bdm.Pod(...) as pod:`: leaving
 the block, or `close()`, puts back the program's SFC and DFC, as `bdm`
 does.  A Pod collected unclosed does the same, best effort, and issues

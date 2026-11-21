@@ -108,6 +108,7 @@ Then raise the rate and repeat:
 
 ```
 bdm clock 4000000                # replies with the rate set, at most 4 MHz
+bdm clock                        # the rate in effect; the pod keeps it
 bdm loopback --rounds 100
 ```
 

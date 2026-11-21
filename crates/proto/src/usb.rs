@@ -41,7 +41,7 @@ pub fn serial_number<'a>(id: &[u8; UNIQUE_ID_BYTES], text: &'a mut [u8; SERIAL_N
 
 /// This protocol's version, in the Hello reply: raised on any change
 /// to a request or reply (docs/usb-protocol.md).
-pub const PROTOCOL_VERSION: u32 = 10;
+pub const PROTOCOL_VERSION: u32 = 11;
 
 /// Bytes a request's or reply's tag takes.
 const TAG_BYTES: usize = 1;
@@ -77,6 +77,7 @@ const RESYNC: u8 = 0x10;
 const VERSION: u8 = 0x11;
 const HOLD: u8 = 0x12;
 const BERR_PULSE: u8 = 0x13;
+const GET_CLOCK: u8 = 0x14;
 
 /// Pin level bits in a Pins reply: set for high.
 const FREEZE: u8 = 1 << 0;
@@ -137,6 +138,8 @@ pub enum Request<'a> {
         /// The rate asked for.
         dsclk_hz: u32,
     },
+    /// DSCLK's rate in effect, as `SetClock`'s reply gave it.
+    GetClock,
     /// A data or address register; the reply is its value.
     ReadRegister(Register),
     /// Write a data or address register.
@@ -246,6 +249,7 @@ impl<'a> Request<'a> {
             BERR_PULSE => empty(Self::BerrPulse),
             HALT => empty(Self::Halt),
             GO => empty(Self::Go),
+            GET_CLOCK => empty(Self::GetClock),
             SET_CLOCK => Ok(Self::SetClock { dsclk_hz: long(exact::<LONG>(body).ok_or(length)?) }),
             READ_REGISTER => {
                 let [register] = exact::<1>(body).ok_or(length)?;
@@ -328,6 +332,9 @@ impl<'a> Request<'a> {
             }
             Self::SetClock { dsclk_hz } => {
                 out.put(&[SET_CLOCK]).put(&dsclk_hz.to_le_bytes());
+            }
+            Self::GetClock => {
+                out.put(&[GET_CLOCK]);
             }
             Self::ReadRegister(register) => {
                 out.put(&[READ_REGISTER, code_byte(register.code())]);
@@ -834,6 +841,7 @@ mod tests {
         round_trip(Request::Halt);
         round_trip(Request::Go);
         round_trip(Request::SetClock { dsclk_hz: 1_000_000 });
+        round_trip(Request::GetClock);
         round_trip(Request::ReadRegister(Register::A7));
         round_trip(Request::WriteRegister(Register::D3, 0xDEAD_BEEF));
         round_trip(Request::ReadSystemRegister(SystemRegister::Atemp));

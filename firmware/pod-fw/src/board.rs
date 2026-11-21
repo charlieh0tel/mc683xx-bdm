@@ -230,4 +230,8 @@ impl Board for PicoBoard<'_> {
         self.link.set_divider(divider);
         divider.dsclk_hz
     }
+
+    fn dsclk_hz(&self) -> u32 {
+        self.link.dsclk_hz()
+    }
 }

@@ -230,6 +230,11 @@ impl PodView {
         self.with_pod(py, |pod| pod.set_clock(dsclk_hz))
     }
 
+    /// DSCLK's rate in effect, as the pod gives it.
+    fn get_clock(&mut self, py: Python<'_>) -> Result<u32, Error> {
+        self.with_pod(py, Pod::get_clock)
+    }
+
     /// Brings a halted CPU's serial link back into frame, after a pod
     /// restart, without a reset; ATEMP, stale.
     fn resync(&mut self, py: Python<'_>) -> Result<Atemp, Error> {

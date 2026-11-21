@@ -284,4 +284,8 @@ impl<const RAM: usize> Board for ModelBoard<RAM> {
         self.dsclk_hz = dsclk_hz.clamp(MIN_HZ, MAX_HZ);
         self.dsclk_hz
     }
+
+    fn dsclk_hz(&self) -> u32 {
+        self.dsclk_hz
+    }
 }
