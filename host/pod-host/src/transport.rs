@@ -79,8 +79,8 @@ pub enum TransportError {
     /// knock, which needs the BOOTSEL button.
     #[error("the pod has no reset interface; hold BOOTSEL and replug it")]
     NoResetInterface,
-    /// The bootloader did not appear after the request.
-    #[error("no bootloader appeared within {BOOTLOADER_WAIT:?}")]
+    /// No new bootloader appeared after the request.
+    #[error("no new bootloader appeared within {BOOTLOADER_WAIT:?}")]
     NoBootloader,
     /// A stream message's length byte was 0 or more than a packet.
     #[error("bad message length {0}")]
@@ -263,15 +263,44 @@ impl UsbTransport {
     }
 }
 
+/// A USB device by where it is: one that enumerates again (a pod
+/// rebooted into its boot ROM) gets a new address.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct BusAddress {
+    /// The bus, as the OS names it.
+    bus: String,
+    /// The device's address on it.
+    address: u8,
+}
+
+/// Every boot ROM device (RP2040, RP2350) on USB.
+fn bootloaders() -> Result<Vec<BusAddress>, TransportError> {
+    Ok(nusb::list_devices()
+        .wait()?
+        .filter(|device| {
+            device.vendor_id() == BOOTLOADER_VID && BOOTLOADER_PIDS.contains(&device.product_id())
+        })
+        .map(|device| BusAddress { bus: device.bus_id().to_owned(), address: device.device_address() })
+        .collect())
+}
+
+/// Whether `now` lists a boot ROM device `before` did not: the pod,
+/// rebooted.  One already in BOOTSEL before the request is another
+/// board.
+fn appeared(before: &[BusAddress], now: &[BusAddress]) -> bool {
+    now.iter().any(|device| !before.contains(device))
+}
+
 /// Reboots the pod with serial number `serial`, or with `None` the only
 /// one connected, into the RP2040's USB bootloader, as `picotool reboot
-/// -u` does, and waits for a bootloader to appear.
+/// -u` does, and waits for a new boot ROM device to appear.
 ///
 /// # Errors
 /// No such pod, more than one where none was named, no reset interface,
-/// or no bootloader afterwards.
+/// or no new bootloader afterwards.
 pub fn reboot_to_bootloader(serial: Option<&str>) -> Result<(), TransportError> {
     let device = find_pod(serial)?.open().wait()?;
+    let before = bootloaders()?;
     let number = device
         .active_configuration()
         .map_err(|_| TransportError::NoResetInterface)?
@@ -289,14 +318,11 @@ pub fn reboot_to_bootloader(serial: Option<&str>) -> Result<(), TransportError> 
         data: &[],
     };
     // The pod leaves the bus before it can answer, so the transfer's
-    // own status says nothing: the bootloader appearing is the answer.
+    // own status says nothing: a new bootloader appearing is the answer.
     let sent = interface.control_out(request, TIMEOUT).wait();
     let started = std::time::Instant::now();
     while started.elapsed() < BOOTLOADER_WAIT {
-        let found = nusb::list_devices().wait()?.any(|device| {
-            device.vendor_id() == BOOTLOADER_VID && BOOTLOADER_PIDS.contains(&device.product_id())
-        });
-        if found {
+        if appeared(&before, &bootloaders()?) {
             return Ok(());
         }
         std::thread::sleep(BOOTLOADER_POLL);
@@ -418,16 +444,34 @@ mod tests {
 
     use pod_proto::usb::PACKET;
 
+    use super::BusAddress;
     use super::PodAddress;
     use super::StreamTransport;
     use super::Transport;
     use super::TransportError;
+    use super::appeared;
     use super::location;
     use super::read_message;
     use super::select;
 
     const A: &str = "E6613852833B2A2F";
     const B: &str = "E66138528361572C";
+
+    /// A boot ROM device at `address` on bus 1.
+    fn device(address: u8) -> BusAddress {
+        BusAddress { bus: "1".to_owned(), address }
+    }
+
+    #[test]
+    fn only_a_new_bootloader_is_the_pods() {
+        let other = device(5);
+        assert!(!appeared(&[], &[]));
+        assert!(!appeared(std::slice::from_ref(&other), std::slice::from_ref(&other)), "already in BOOTSEL");
+        assert!(appeared(std::slice::from_ref(&other), &[other.clone(), device(9)]));
+        assert!(appeared(&[], &[device(9)]));
+        assert!(appeared(&[device(9)], &[BusAddress { bus: "2".to_owned(), address: 9 }]), "another bus");
+        assert!(!appeared(&[other, device(9)], &[device(9)]), "one left, none came");
+    }
 
     #[test]
     fn one_pod_is_chosen_unnamed() {
