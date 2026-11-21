@@ -46,6 +46,22 @@ def stand_in_binary() -> Path:
     raise RuntimeError("cargo built no bdm-stand-in")
 
 
+def launch(binary: Path, socket: Path, *options: str) -> subprocess.Popen[bytes]:
+    """Starts bdm-stand-in on `socket` with `options`, once it listens;
+    the caller stops it."""
+    process = subprocess.Popen([binary, f"unix:{socket}", *options])
+    deadline = time.monotonic() + LISTEN_TIMEOUT_S
+    while not socket.exists():
+        if process.poll() is not None:
+            raise RuntimeError(f"bdm-stand-in exited with {process.returncode}")
+        if time.monotonic() > deadline:
+            process.kill()
+            process.wait()
+            raise RuntimeError(f"bdm-stand-in did not listen on {socket}")
+        time.sleep(LISTEN_POLL_S)
+    return process
+
+
 @pytest.fixture
 def stand_in(stand_in_binary: Path, tmp_path: Path) -> Iterator[Callable[..., str]]:
     """Starts a stand-in with bdm-stand-in's options; returns its pod
@@ -54,15 +70,7 @@ def stand_in(stand_in_binary: Path, tmp_path: Path) -> Iterator[Callable[..., st
 
     def start(*options: str) -> str:
         socket = tmp_path / f"pod{len(processes)}.sock"
-        process = subprocess.Popen([stand_in_binary, f"unix:{socket}", *options])
-        processes.append(process)
-        deadline = time.monotonic() + LISTEN_TIMEOUT_S
-        while not socket.exists():
-            if process.poll() is not None:
-                raise RuntimeError(f"bdm-stand-in exited with {process.returncode}")
-            if time.monotonic() > deadline:
-                raise RuntimeError(f"bdm-stand-in did not listen on {socket}")
-            time.sleep(LISTEN_POLL_S)
+        processes.append(launch(stand_in_binary, socket, *options))
         return f"unix:{socket}"
 
     yield start

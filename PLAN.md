@@ -559,7 +559,8 @@ code and no `unsafe`; no USB request, so the protocol is unchanged.
     while running (the breakpoint's word, SFC and DFC back) and SIGTERM
     waiting for gdb; the same
     from Python (`pod-py/tests/test_gdb.py`), with a signal handler's
-    exception waiting for gdb and while running.
+    exception waiting for gdb and while running, and raised still when
+    cleaning up after it fails (the failure its `__cause__`).
   - `step()` is in `Cpu32Target` (mc683xx-target 0.6): from RPC to
     where T1 would trap, before any handler's first instruction, the
     exceptions the instruction raised and an interrupt pending taken

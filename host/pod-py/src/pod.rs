@@ -341,7 +341,8 @@ impl PodView {
     /// connects.  The GIL is released while it waits on gdb or the pod;
     /// an exception from a signal's handler (Ctrl-C's
     /// `KeyboardInterrupt`) ends the session, gdb's breakpoints removed
-    /// and the target halted, and is raised.  `ready` must not call this
+    /// and the target halted, and is raised, a failure doing so as its
+    /// `__cause__`.  `ready` must not call this
     /// pod, which the session holds.
     #[pyo3(signature = (address = gdb::LISTEN, ready = None, *, scratch))]
     fn serve_gdb(
@@ -361,7 +362,7 @@ impl PodView {
             let connection = gdb::accept(address, ready, &check)?;
             gdb::serve(target, Address(scratch), connection, &check)
         });
-        Ok(ending.map_err(served)?.into())
+        Ok(ending.map_err(|error| served(py, error))?.into())
     }
 
     /// Raw serial words, each answered with the 17 bits shifted in.

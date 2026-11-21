@@ -14,8 +14,8 @@ from contextlib import contextmanager
 
 import pytest
 
-from conftest import RAM_BASE
-from mc683xx_bdm import BusError, Ending, Entry, Pod
+from conftest import RAM_BASE, launch
+from mc683xx_bdm import BusError, Ending, Entry, Pod, TransportError
 
 # The program, the step's scratch RAM and the supervisor stack.
 PROGRAM = RAM_BASE
@@ -114,16 +114,21 @@ class Client:
         self.thread.join(timeout=PROMPTLY_S)
 
 
+def load(pod: Pod) -> None:
+    """Halts `pod`'s target at PROGRAM with CODE there."""
+    assert pod.reset_with_breakpoint() == Entry.Breakpoint()
+    pod.write_memory(PROGRAM, CODE, size=2)
+    pod.write_memory(UNREACHED, UNREACHED_WORD, size=2)
+    pod.write_register("SR", SUPERVISOR)
+    pod.write_register("SP", STACK)
+    pod.write_register("PC", PROGRAM)
+
+
 @pytest.fixture
 def pod(stand_in) -> Iterator[Pod]:
     """A pod on a stand-in, halted at PROGRAM with CODE there."""
     with Pod(stand_in()) as pod:
-        assert pod.reset_with_breakpoint() == Entry.Breakpoint()
-        pod.write_memory(PROGRAM, CODE, size=2)
-        pod.write_memory(UNREACHED, UNREACHED_WORD, size=2)
-        pod.write_register("SR", SUPERVISOR)
-        pod.write_register("SP", STACK)
-        pod.write_register("PC", PROGRAM)
+        load(pod)
         yield pod
 
 
@@ -140,11 +145,12 @@ def pc(registers: str) -> int:
 
 
 @contextmanager
-def alarm() -> Iterator[Callable[[], None]]:
-    """A function that sends this thread SIGALRM, its handler raising
-    `Alarm`, for the length of the block."""
+def alarm(first: Callable[[], None] = lambda: None) -> Iterator[Callable[[], None]]:
+    """A function that sends this thread SIGALRM, its handler calling
+    `first` and then raising `Alarm`, for the length of the block."""
 
     def handler(number: int, frame: object) -> None:
+        first()
         raise Alarm
 
     main = threading.get_ident()
@@ -225,6 +231,32 @@ def test_a_signal_while_running_removes_the_breakpoints(pod):
     assert client.replies == ["OK"]
     assert pod.background is not None, "halted"
     assert pod.read_memory(UNREACHED, 2, size=2) == UNREACHED_WORD, "BGND gone"
+
+
+def test_a_signal_whose_clean_up_fails_is_raised(stand_in_binary, tmp_path):
+    socket = tmp_path / "pod.sock"
+    process = launch(stand_in_binary, socket)
+
+    def lose_the_pod() -> None:
+        process.kill()
+        process.wait()
+
+    try:
+        pod = Pod(f"unix:{socket}")
+        load(pod)
+        with alarm(first=lose_the_pod) as send:
+
+            def signal_when_running() -> None:
+                time.sleep(RUNNING_S)
+                send()
+
+            client = Client([f"Z0,{UNREACHED:x},2", "c!"], then=signal_when_running)
+            with pytest.raises(Alarm) as raised:
+                serve(pod, client)
+        assert isinstance(raised.value.__cause__, TransportError), "the clean-up's failure"
+        pod.close()
+    finally:
+        lose_the_pod()
 
 
 def test_ready_s_exception_is_raised(pod):

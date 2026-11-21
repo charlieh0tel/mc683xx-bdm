@@ -149,7 +149,8 @@ with mc683xx_bdm.Pod("usb") as pod:
 127.0.0.1:1234 and `ready(port)` is called once it listens.  It blocks
 with the GIL released; Ctrl-C (`KeyboardInterrupt`, or any signal
 handler's exception) ends the session, gdb's breakpoints removed and
-the target halted, and is raised.  Python leaves SIGTERM to its
+the target halted, and is raised; if removing them or halting fails,
+that failure is its `__cause__`.  Python leaves SIGTERM to its
 default, which ends the process with nothing removed: a script that
 may get one installs a handler that raises.
 
