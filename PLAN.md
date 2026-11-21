@@ -625,7 +625,9 @@ code and no `unsafe`; no USB request, so the protocol is unchanged.
   `Cpu32Target` and the types every crate here uses: Address, Size,
   Register, SystemRegister, FunctionCode, Entry.  Memory calls name
   their function code; halting returns the entry source decoded from
-  ATEMP.  From crates.io (0.6).
+  ATEMP.  From crates.io (0.7).  Its error type converts from
+  `mc683xx_target::Unsupported`, which a later trait method's default
+  body returns; `pod::Error::Unsupported` carries it.
 - Loading and init (agreed with m683xx-emu, 2026-11-01; pending:
   `mc683xx-debug` has not landed, and neither `bdm load` nor `bdm
   init` exists yet, TODO.md): `mc683xx-debug`, in m683xx-emu (MIT OR
@@ -674,7 +676,7 @@ code and no `unsafe`; no USB request, so the protocol is unchanged.
     from Python (`crates/py/tests/test_gdb.py`), with a signal handler's
     exception waiting for gdb and while running, and raised still when
     cleaning up after it fails (the failure its `__cause__`).
-  - `step()` is in `Cpu32Target` (mc683xx-target 0.6): from RPC to
+  - `step()` is in `Cpu32Target` (mc683xx-target 0.7): from RPC to
     where T1 would trap, before any handler's first instruction, the
     exceptions the instruction raised and an interrupt pending taken
     (its doc comment has the contract).  `PodTarget::step` (`step.rs`)

@@ -79,7 +79,10 @@ impl From<Error> for PyErr {
                 | pod::Error::Protocol(_),
             ) => ProtocolError::new_err(text),
             Error::Pod(
-                pod::Error::Reply(ReplyError::Failed(_)) | pod::Error::Step(_) | pod::Error::Reentered,
+                pod::Error::Reply(ReplyError::Failed(_))
+                | pod::Error::Step(_)
+                | pod::Error::Reentered
+                | pod::Error::Unsupported(_),
             ) => TargetError::new_err(text),
             Error::Pod(pod::Error::Request(_) | pod::Error::Length { .. })
             | Error::Register(_)

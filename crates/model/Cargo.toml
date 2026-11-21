@@ -11,7 +11,7 @@ publish = false
 
 [dependencies]
 mc683xx-bdm-proto.workspace = true
-mc683xx-target = "0.6.0"
+mc683xx-target = "0.7.0"
 
 [lints]
 workspace = true

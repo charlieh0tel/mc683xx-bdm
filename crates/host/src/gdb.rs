@@ -5,6 +5,7 @@
 //! ends the session as an error of its own would, gdb's breakpoints
 //! removed and the target halted, and is returned.
 
+use mc683xx_target::Unsupported;
 use std::fmt;
 use std::io;
 use std::net::SocketAddr;
@@ -51,6 +52,12 @@ pub enum Stopped<E> {
     /// The host ended the session.
     #[error(transparent)]
     Host(E),
+}
+
+impl<E> From<Unsupported> for Stopped<E> {
+    fn from(unsupported: Unsupported) -> Self {
+        Self::Target(unsupported.into())
+    }
 }
 
 /// Why a session ended other than as gdb asked.
@@ -121,9 +128,9 @@ impl<E: fmt::Debug> From<PollError<E>> for ServeError<E> {
 impl<E: fmt::Debug> From<SessionError<Stopped<E>, PollError<E>>> for ServeError<E> {
     fn from(error: SessionError<Stopped<E>, PollError<E>>) -> Self {
         match error {
-            SessionError::Target(Stopped::Target(error)) => Self::Target(error),
-            SessionError::Target(Stopped::Host(error)) => Self::Host(error),
-            SessionError::Connection(error) => error.into(),
+            SessionError::Target { error: Stopped::Target(error) } => Self::Target(error),
+            SessionError::Target { error: Stopped::Host(error) } => Self::Host(error),
+            SessionError::Connection { error } => error.into(),
             SessionError::Protocol(text) => Self::Protocol(text),
             SessionError::Unrestored(addresses) => Self::Unrestored(addresses),
             SessionError::Uncleaned { error, cleanup } => {
@@ -173,7 +180,9 @@ struct Checked<'t, 'c, T, C> {
     check: &'c C,
 }
 
-impl<T: Transport, E: std::error::Error, C: Fn() -> Result<(), E>> Cpu32Target for Checked<'_, '_, T, C> {
+impl<T: Transport, E: std::error::Error + 'static, C: Fn() -> Result<(), E>> Cpu32Target
+    for Checked<'_, '_, T, C>
+{
     type Error = Stopped<E>;
 
     fn reset_halted(&mut self) -> Result<Entry, Self::Error> {
@@ -265,14 +274,15 @@ pub fn accept<'c, E: fmt::Debug, C: Fn() -> Result<(), E>>(
 /// [`ServeError::Host`] with `check`'s error; the others as
 /// mc683xx-gdb's `serve` fails.  However it fails, gdb's breakpoints are
 /// removed, if they can be, and the target halted.
-pub fn serve<T: Transport, E: std::error::Error, C: Fn() -> Result<(), E>>(
+pub fn serve<T: Transport, E: std::error::Error + 'static, C: Fn() -> Result<(), E>>(
     target: &mut PodTarget<T>,
     scratch: Address,
     connection: Connection<'_, C>,
     check: &C,
 ) -> Result<Ending, ServeError<E>> {
     target.set_scratch(Some(scratch));
-    let served = mc683xx_gdb::serve(&mut Bdm(&mut Checked { target: &mut *target, check }), connection.0);
+    let served =
+        mc683xx_gdb::serve(&mut Bdm::new(&mut Checked { target: &mut *target, check }), connection.0);
     // The scratch is this session's: a later step must name its own.
     target.set_scratch(None);
     match served? {
@@ -303,16 +313,18 @@ mod tests {
 
     #[test]
     fn the_host_s_error_comes_back_from_the_target_or_the_connection() {
-        let from_target = ServeError::from(Session::Target(Stopped::Host(Stop)));
+        let from_target = ServeError::from(Session::Target { error: Stopped::Host(Stop) });
         assert!(matches!(from_target, ServeError::Host(Stop)));
-        let from_connection = ServeError::from(Session::Connection(PollError::Host(Stop)));
+        let from_connection = ServeError::from(Session::Connection { error: PollError::Host(Stop) });
         assert!(matches!(from_connection, ServeError::Host(Stop)));
     }
 
     #[test]
     fn a_failed_clean_up_keeps_both_errors() {
         let error = ServeError::from(Session::Uncleaned {
-            error: Box::new(Session::Connection(PollError::Connection(io::ErrorKind::UnexpectedEof.into()))),
+            error: Box::new(Session::Connection {
+                error: PollError::Connection(io::ErrorKind::UnexpectedEof.into()),
+            }),
             cleanup: Box::new(Session::Unrestored(vec![Address(0x0010_0010), Address(0x0010_0020)])),
         });
         assert_eq!(
