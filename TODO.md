@@ -12,12 +12,6 @@
 
 ## Firmware
 
-- Release workflow for the `mc683xx-bdm` package, calling
-  deb-workflows' `rust-build-deb`, once it can run a step before
-  `cargo deb`: the package ships the UF2 (`make uf2`: pod-fw for
-  thumbv6m-none-eabi, then picotool), which it does not build.
-  The step: a pre-build input added to `rust-build-deb` in
-  deb-workflows (owner's choice, 2026-11-21).
 - Publish from CI, beside mc683xx's crates and PyPI package (owner,
   2026-11-21): crates.io `mc683xx-bdm` (the library and `bdm`) and
   `mc683xx-bdm-proto`; PyPI `mc683xx-bdm` (import `mc683xx_bdm`, wheels

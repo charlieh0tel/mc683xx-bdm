@@ -1,0 +1,82 @@
+# The mc683xx-bdm Debian package, amd64 and arm64, through
+# deb-workflows' rust-build-deb, with the pod's UF2 it ships built
+# first.  A v* tag publishes a GitHub Release of the packages and the
+# UF2; a push to main or a pull request builds and tests them and
+# publishes nothing (rust-build-deb releases only on a tag), and main's
+# runs keep the cargo cache warm for the tag's.
+name: release
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+    branches: [main]
+
+permissions: {}
+
+jobs:
+  # `make uf2` takes elf2uf2-rs here: picotool 2 is not on the runner.
+  # The toolchain and its targets are rust-toolchain.toml's.
+  firmware:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      ELF2UF2_RS_VERSION: "2.2.0"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Toolchain
+        run: |
+          rustup toolchain install
+          rustup target add thumbv6m-none-eabi
+      - name: Cache elf2uf2-rs
+        id: cache-elf2uf2-rs
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cargo/bin/elf2uf2-rs
+          key: elf2uf2-rs-${{ runner.os }}-${{ runner.arch }}-${{ env.ELF2UF2_RS_VERSION }}
+      # Its deploy option links libudev.
+      - name: Install elf2uf2-rs
+        if: steps.cache-elf2uf2-rs.outputs.cache-hit != 'true'
+        run: |
+          sudo apt-get update && sudo apt-get install -y libudev-dev pkg-config
+          cargo install --locked elf2uf2-rs --version "$ELF2UF2_RS_VERSION"
+      - name: UF2
+        run: make uf2
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: pod-fw-uf2
+          path: firmware/pod-fw/target/pod-fw-rp2040.uf2
+          if-no-files-found: error
+          retention-days: 30
+
+  # The UF2 goes where crates/host's [package.metadata.deb] takes it
+  # from.  No build-deps: nusb needs no libudev.  No toolchain input:
+  # rust-build-deb reads rust-toolchain.toml.
+  deb:
+    needs: firmware
+    uses: charlieh0tel/deb-workflows/.github/workflows/rust-build-deb.yml@v1
+    permissions:
+      contents: write
+    with:
+      packages: "mc683xx-bdm"
+      prebuilt-artifact: pod-fw-uf2
+      prebuilt-path: firmware/pod-fw/target
+
+  # The UF2 on the release the deb job created, for flashing a pod
+  # without the package.
+  uf2:
+    needs: deb
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: pod-fw-uf2
+      - name: Attach the UF2
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "$GITHUB_REF_NAME" pod-fw-rp2040.uf2 -R "$GITHUB_REPOSITORY"

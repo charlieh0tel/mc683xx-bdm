@@ -27,8 +27,7 @@ jobs:
         run: make lint
       # Links what clippy only checks: a FLASH or RAM overflow or a
       # linker-script break fails here.  The sizes go to the run's
-      # summary.  Not `make deb`: its UF2 needs picotool 2's `uf2
-      # convert`, and ubuntu-latest's picotool package is older.
+      # summary.  Not `make deb`: release.yml builds the package.
       - name: Firmware
         shell: bash
         run: |
