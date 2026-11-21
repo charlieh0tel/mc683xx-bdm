@@ -23,6 +23,10 @@ pip install mc683xx-bdm        # the Python module mc683xx_bdm, from PyPI
 sudo apt install ./mc683xx-bdm_VERSION-1_amd64.deb   # from a GitHub Release: bdm, the udev rule, the UF2
 ```
 
+The Debian package is also in the APT repository at
+https://github.com/charlieh0tel/apt-repo (its README sets it up):
+`sudo apt-get install mc683xx-bdm`.
+
 `cargo install` and `pip install` carry no udev rule: on Linux without
 root, install `packaging/udev/70-mc683xx-pod.rules` (Host).  The pod's
 firmware is the release's `pod-fw-rp2040.uf2`, also in the Debian

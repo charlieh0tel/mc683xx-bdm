@@ -10,6 +10,7 @@ package: `[workspace.package]`'s in the root `Cargo.toml`, and
 | Package | Where | Built by |
 | --- | --- | --- |
 | `mc683xx-bdm` (Debian, `bdm`, the udev rule and the UF2), amd64 and arm64 | GitHub Release | deb-workflows' `rust-build-deb` |
+| `mc683xx-bdm` (Debian), amd64 and arm64 | APT repository (charlieh0tel/apt-repo) | the `trigger-apt-repo` job runs apt-repo's `update-repo.yml`, which takes the GitHub Release's `.deb`s |
 | `pod-fw-rp2040.uf2` | GitHub Release | `make uf2` (elf2uf2-rs) |
 | `mc683xx-bdm-proto`, `mc683xx-bdm` (the library and `bdm`) | crates.io | `cargo publish --workspace`: the first release by hand, then the `crates` job |
 | `mc683xx-bdm` (the Python package, import `mc683xx_bdm`, from `crates/py`) | PyPI | the `wheels`, `sdist` and `pypi` jobs |
@@ -75,8 +76,11 @@ Once, before the first release, after the repository is public.
    repository `mc683xx-bdm`, workflow `release.yml`, environment
    `crates-io`; a field that differs fails that crate's publish.  Every
    later release is published by the workflow only.
+4. APT repository: `mc683xx-bdm` listed in apt-repo's `packages.tsv`,
+   and the repository secret `APT_REPO_TOKEN` (apt-repo's
+   `set-apt-repo-token.sh`: Actions write on apt-repo only).
 
-No repository secret is needed: both registries mint a short-lived
+The registries need no repository secret: both mint a short-lived
 token for the run (`id-token: write` on the publishing jobs only).
 
 ## Cutting a release
