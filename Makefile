@@ -2,7 +2,7 @@
 # firmware in firmware/pod-fw; the hardware release is ee_tooling's
 # jlcpcb-release.
 
-.PHONY: deb hooks lint size uf2
+.PHONY: deb hooks lint render size uf2
 
 # cargo runs here with --locked and uv with UV_LOCKED: a Cargo.lock or
 # uv.lock that does not match its manifests is an error, not quietly
@@ -28,6 +28,15 @@ uf2:
 	else \
 		elf2uf2-rs $(POD_FW_ELF) $(UF2); \
 	fi
+
+# The carrier board's 3D render for the README, from its KiCad file
+# (kicad-cli, KiCad 9 or later).  Rerun after a board change.
+BOARD := hardware/mc683xx-pod/mc683xx-pod.kicad_pcb
+RENDER := docs/images/mc683xx-pod-top.png
+
+render:
+	mkdir -p $(dir $(RENDER))
+	kicad-cli pcb render --side top --width 1200 --height 900 --quality high -o $(RENDER) $(BOARD)
 
 # Use the repository's git hooks (.githooks/), once per clone.
 hooks:
