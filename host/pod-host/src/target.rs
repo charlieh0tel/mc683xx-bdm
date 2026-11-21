@@ -170,15 +170,24 @@ impl<T: Transport> PodTarget<T> {
         self.pod.reset_run()
     }
 
-    /// Brings the halted target's serial link back into frame;
-    /// forgets the halted state, whose entry source is now unknown.
+    /// Brings the halted target's serial link back into frame; its
+    /// entry source is now unknown.  The program's SFC and DFC are
+    /// kept, to be put back on resuming, and what the CPU holds is taken
+    /// as unknown: a write may have reached it before the link failed.
     ///
     /// # Errors
     /// As [`Error`].
     pub fn resync(&mut self) -> Result<Atemp, Error> {
-        self.halted = None;
+        let kept = self.halted.take();
         self.scratch_written = false;
-        self.pod.resync()
+        let atemp = self.pod.resync()?;
+        if let Some(kept) = kept
+            && let Ok(Some(entry)) = entry(atemp)
+        {
+            let unknown = |state: FunctionCodeRegister| FunctionCodeRegister { current: None, ..state };
+            self.halted = Some(Halted { entry, sfc: unknown(kept.sfc), dfc: unknown(kept.dfc) });
+        }
+        Ok(atemp)
     }
 
     /// `call` on the pod, the halted state forgotten if the pod found
@@ -334,6 +343,9 @@ impl<T: Transport> PodTarget<T> {
                 return Ok(());
             }
         }
+        // Unknown until the reply: the write may reach the CPU and its
+        // reply be lost, and resuming then puts the program's back.
+        self.function_code_state(register).current = None;
         self.request(|pod| pod.write_system_register(register, wanted))?;
         self.function_code_state(register).current = Some(wanted);
         Ok(())
@@ -822,6 +834,54 @@ mod tests {
                 Request::WriteMemory { address: Address(0x200), size: Size::Byte, data: &[7] },
                 Request::Go,
             ]
+        );
+    }
+
+    #[test]
+    fn resync_keeps_the_programs_sfc_to_restore() {
+        let mut target = target(&[
+            &halted(Atemp::Fresh(0)), // ResetHalt
+            &value(1),                // SFC, the program's
+            DONE,                     // SFC = 5
+            &[0, 9],                  // ReadMemory
+            &halted(Atemp::Stale(0)), // Resync
+            DONE,                     // SFC = 1, restored
+            DONE,                     // Go
+        ]);
+        target.reset_halted().unwrap();
+        let mut data = [0; 1];
+        target.read_memory(Address(0), FunctionCode::SUPERVISOR_DATA, Size::Byte, &mut data).unwrap();
+        target.resync().unwrap();
+        assert_eq!(target.halted().unwrap(), Some(Entry::Unknown { atemp: 0 }));
+        target.go().unwrap();
+        let sent = requests(target);
+        let sent: Vec<_> = sent.iter().map(|r| parsed(r)).collect();
+        assert_eq!(
+            sent[sent.len() - 3..],
+            [Request::Resync, Request::WriteSystemRegister(SystemRegister::Sfc, 1), Request::Go,]
+        );
+    }
+
+    #[test]
+    fn an_sfc_write_with_no_reply_is_restored() {
+        let mut target = target(&[
+            &halted(Atemp::Fresh(0)),    // ResetHalt
+            &value(1),                   // SFC, the program's
+            &[Status::Unexpected as u8], // SFC = 5, the reply lost
+            DONE,                        // SFC = 1, restored
+            DONE,                        // Go
+        ]);
+        target.reset_halted().unwrap();
+        let mut data = [0; 1];
+        assert!(
+            target.read_memory(Address(0), FunctionCode::SUPERVISOR_DATA, Size::Byte, &mut data).is_err()
+        );
+        target.go().unwrap();
+        let sent = requests(target);
+        let sent: Vec<_> = sent.iter().map(|r| parsed(r)).collect();
+        assert_eq!(
+            sent[sent.len() - 2..],
+            [Request::WriteSystemRegister(SystemRegister::Sfc, 1), Request::Go]
         );
     }
 
