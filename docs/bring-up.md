@@ -16,7 +16,7 @@ answers as the pod does and runs only NOP, MOVEQ, BRA.S, TRAP, ILLEGAL
 and BGND from its RAM (`mc683xx-bdm-model`'s `program`):
 
 ```
-cargo run -p mc683xx-bdm --bin bdm-stand-in -- unix:/tmp/pod.sock &
+cargo run -p mc683xx-bdm-stand-in -- unix:/tmp/pod.sock &
 bdm --pod unix:/tmp/pod.sock reset      # halted: breakpoint
 bdm --pod unix:/tmp/pod.sock regs
 ```

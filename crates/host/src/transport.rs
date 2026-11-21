@@ -3,6 +3,7 @@
 use std::io::Read;
 use std::io::Write;
 use std::net::TcpStream;
+#[cfg(unix)]
 use std::os::unix::net::UnixStream;
 use std::str::FromStr;
 use std::time::Duration;
@@ -130,6 +131,10 @@ pub enum TransportError {
 /// Shown for a pod with no serial number: firmware older than it.
 pub const NO_SERIAL: &str = "-";
 
+/// Why `unix:PATH` fails on a host without Unix sockets.
+#[cfg(not(unix))]
+const UNIX_ONLY: &str = "unix:PATH needs Unix sockets; use tcp:HOST:PORT";
+
 /// Serial numbers for a message, [`NO_SERIAL`] for a pod without one.
 fn serial_list(serials: &[Option<String>]) -> String {
     if serials.is_empty() {
@@ -174,7 +179,12 @@ impl PodAddress {
     pub fn connect(&self) -> Result<Box<dyn Transport + Send>, TransportError> {
         Ok(match self {
             Self::Usb(serial) => Box::new(UsbTransport::open(serial.as_deref())?),
+            #[cfg(unix)]
             Self::Unix(path) => Box::new(StreamTransport::unix(path)?),
+            #[cfg(not(unix))]
+            Self::Unix(_) => {
+                return Err(std::io::Error::new(std::io::ErrorKind::Unsupported, UNIX_ONLY).into());
+            }
             Self::Tcp(address) => Box::new(StreamTransport::tcp(address)?),
         })
     }
@@ -411,6 +421,7 @@ pub struct StreamTransport<S> {
     stream: S,
 }
 
+#[cfg(unix)]
 impl StreamTransport<UnixStream> {
     /// Connects to a Unix socket.
     ///
@@ -449,6 +460,7 @@ pub trait TimedStream: Read + Write {
     fn time_reads_out(&self, timeout: Duration) -> std::io::Result<()>;
 }
 
+#[cfg(unix)]
 impl TimedStream for UnixStream {
     fn time_reads_out(&self, timeout: Duration) -> std::io::Result<()> {
         self.set_read_timeout(Some(timeout.max(MIN_READ_TIMEOUT)))

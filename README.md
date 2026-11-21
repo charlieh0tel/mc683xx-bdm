@@ -23,7 +23,7 @@ registers and SIM registers, and reads 512 KB of flash correctly.
 | `docs/` | the host-pod protocol (`usb-protocol.md`), bring-up steps (`bring-up.md`); `oncore-vp/`, notes on the Motorola Oncore VP's BDM test points; `58503a/`, the HP 58503A's BDM header and reading its flash |
 | `hardware/` | the KiCad carrier board; `ee_tooling/`, the shared tooling (a submodule on ee_tooling's `release/0.2` branch), whose `jlcpcb-release` builds a JLCPCB order into `production/`, each release as ordered; `fastcheck.py`, a report on the BDM link's fast nets (`uv run python fastcheck.py mc683xx-pod/mc683xx-pod.kicad_pcb`) |
 | `Cargo.toml` | the host Rust workspace: `crates/` |
-| `crates/` | `proto/`, `mc683xx-bdm-proto`, shared by the firmware and the host; the host crates: `host/`, `mc683xx-bdm` (library and `bdm` CLI), `py/`, `mc683xx-bdm-py` (Python bindings), `model/`, `mc683xx-bdm-model` (a model CPU32, for tests) |
+| `crates/` | `proto/`, `mc683xx-bdm-proto`, shared by the firmware and the host; the host crates: `host/`, `mc683xx-bdm` (library and `bdm` CLI), `py/`, `mc683xx-bdm-py` (Python bindings), `model/`, `mc683xx-bdm-model` (a model CPU32, for tests), `stand-in/`, `mc683xx-bdm-stand-in` (`bdm-stand-in`, a pod on a socket over the model) |
 | `firmware/` | `pod-fw`, the pod's firmware, its own workspace (Pico targets) |
 | `packaging/` | the Debian changelog and the pod's udev rule |
 | `third_party/` | vendor documents and their provenance (`NOTICE`) |
@@ -31,7 +31,7 @@ registers and SIM registers, and reads 512 KB of flash correctly.
 ## Firmware
 
 ```
-cargo test                     # mc683xx-bdm-proto, mc683xx-bdm-model, mc683xx-bdm and mc683xx-bdm-py, on the host
+cargo test                     # every crate in crates/, on the host
 
 cd firmware/pod-fw
 cargo run --release            # Pico, defmt over RTT, through an SWD probe
@@ -52,7 +52,7 @@ cargo run -p mc683xx-bdm --bin bdm -- --pod unix:/path/to/socket regs   # a stan
 cargo run -p mc683xx-bdm --bin bdm -- list     # each pod on USB: serial number, bus-ports
 cargo run -p mc683xx-bdm --bin bdm -- --pod usb:E6613852833B2A2F regs    # one pod of several
 
-cargo run -p mc683xx-bdm --bin bdm-stand-in -- unix:/tmp/pod.sock &      # a pod on a model CPU32
+cargo run -p mc683xx-bdm-stand-in -- unix:/tmp/pod.sock &      # a pod on a model CPU32
 cargo run -p mc683xx-bdm --bin bdm -- --pod unix:/tmp/pod.sock reset
 ```
 

@@ -1,0 +1,27 @@
+[package]
+name = "mc683xx-bdm-stand-in"
+description = "bdm-stand-in: a pod on a socket, answering for a model CPU32, for tests"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+# A test aid over the unpublished mc683xx-bdm-model, in a crate of its
+# own so mc683xx-bdm publishes without the model (RELEASING.md).
+publish = false
+
+[[bin]]
+name = "bdm-stand-in"
+path = "src/main.rs"
+
+[lints]
+workspace = true
+
+[dependencies]
+anyhow = "1.0.104"
+clap = { version = "4.6.7", features = ["derive"] }
+mc683xx-bdm.workspace = true
+mc683xx-bdm-model.workspace = true
+mc683xx-bdm-proto.workspace = true
+mc683xx-target = "0.6.0"

@@ -1,21 +1,27 @@
 [package]
 name = "mc683xx-bdm"
-version = "0.1.0"
 description = "Host command line for the mc683xx CPU32 BDM pod"
+version.workspace = true
 edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
 license.workspace = true
+repository.workspace = true
 
 [dependencies]
 anyhow = "1.0.104"
 clap = { version = "4.6.7", features = ["derive"] }
 embassy-futures = "0.1.2"
-mc683xx-bdm-model = { version = "0.1.0", path = "../model" }
-mc683xx-bdm-proto = { version = "0.1.0", path = "../proto" }
+mc683xx-bdm-proto.workspace = true
 mc683xx-gdb = { version = "0.6.0", default-features = false }
 mc683xx-target = "0.6.0"
 nusb = "0.2.9"
 signal-hook = "0.4.6"
 thiserror = "2.0.21"
+
+# The model is the tests' target only: path-only, so a package drops it.
+[dev-dependencies]
+mc683xx-bdm-model.workspace = true
 
 [lints]
 workspace = true
@@ -24,8 +30,7 @@ workspace = true
 name = "bdm"
 path = "src/main.rs"
 
-# The Debian package: `make deb`.  Only `bdm` ships; `bdm-stand-in` is a
-# test aid.
+# The Debian package: `make deb`.  Only `bdm` ships.
 [package.metadata.deb]
 name = "mc683xx-bdm"
 maintainer = "Christopher Hoover <ch@murgatroid.com>"
