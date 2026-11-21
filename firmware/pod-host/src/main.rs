@@ -1,5 +1,6 @@
 //! `bdm`: the pod from the command line.
 
+use std::convert::Infallible;
 use std::io::ErrorKind;
 use std::io::Write;
 use std::path::Path;
@@ -12,16 +13,14 @@ use anyhow::bail;
 use clap::Parser;
 use clap::Subcommand;
 use clap::ValueEnum;
-use mc683xx_gdb::Ending;
-use mc683xx_gdb::bdm::Bdm;
-use mc683xx_gdb::connection::accept;
-use mc683xx_gdb::serve;
 use mc683xx_target::Cpu32Target;
 use mc683xx_target::address::Address;
 use mc683xx_target::entry::Entry;
 use mc683xx_target::function_code::FunctionCode;
 use mc683xx_target::register::Register;
 use mc683xx_target::size::Size;
+use pod_host::gdb;
+use pod_host::gdb::Ending;
 use pod_host::pod::Pod;
 use pod_host::register::Named;
 use pod_host::register::SYSTEM_REGISTERS;
@@ -175,7 +174,7 @@ enum Command {
         /// Where to listen, HOST:PORT; port 0 picks one, which standard
         /// error names.  It gives full control of the target: keep it
         /// on localhost or a trusted network.
-        #[arg(long, default_value = "127.0.0.1:1234")]
+        #[arg(long, default_value = gdb::LISTEN)]
         listen: String,
         /// RAM the program does not use, for a step's exception table
         /// and BGND stub (1026 bytes, even address).
@@ -400,17 +399,18 @@ fn gdb<T: Transport>(
     scratch: Address,
     out: &mut impl Write,
 ) -> Result<()> {
-    target.set_scratch(Some(scratch));
-    let stream = accept(listen, |at| -> Result<()> {
-        eprintln!("bdm: waiting for gdb on {at} (scratch {scratch}, {SCRATCH_BYTES} bytes)");
-        Ok(())
-    })
-    .with_context(|| format!("listening for gdb on {listen}"))?;
-    let ending = serve(&mut Bdm(target), stream)?;
-    match ending {
+    let check = || Ok::<(), Infallible>(());
+    let connection = gdb::accept(
+        listen,
+        |at| {
+            eprintln!("bdm: waiting for gdb on {at} (scratch {scratch}, {SCRATCH_BYTES} bytes)");
+            Ok(())
+        },
+        &check,
+    )?;
+    match gdb::serve(target, scratch, connection, &check)? {
         Ending::Detached => writeln!(out, "gdb detached: running")?,
         Ending::Killed => writeln!(out, "gdb killed: halted")?,
-        _ => writeln!(out, "gdb ended: {ending:?}")?,
     }
     Ok(())
 }

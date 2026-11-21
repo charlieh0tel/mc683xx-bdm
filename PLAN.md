@@ -502,7 +502,8 @@ code and no `unsafe`; no USB request, so the protocol is unchanged.
     `reset_halted`.  Init and load are not monitor commands yet.
   - `bdm gdb [--listen HOST:PORT] --scratch ADDRESS`: mc683xx-gdb
     (crates.io, default features off, so no chip or board crates)
-    serving its `bdm::Bdm` over `PodTarget`, one session.  Listens on
+    serving its `bdm::Bdm` over `PodTarget`, one session (`pod-host`'s
+    `gdb`, the session for every host).  Listens on
     127.0.0.1:1234 by default (mc683xx's `serve_gdb` default; localhost,
     since the session controls the target; port 0 picks one, named on
     standard error).  `--scratch` is required: Bdm always offers gdb a step,
