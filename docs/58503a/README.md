@@ -184,6 +184,29 @@ error instead: with SIMCR $614A, a read of $110000 (unmapped) replied
 
 DUMP at 1 MHz DSCLK: 512 KB of longs in 18.9 s, about 28 KB/s.
 
+## Programming the flash over BDM
+
+From one reset entry (firmware never run), with the chip selects set
+as the boot code sets them (CSORBT $6870 first, so no write reaches
+CSBOOT; CS6 $0005/$7070 and CS7 $0405/$7070 the write selects), the
+flash takes AMD's command words, one per byte lane (2026-11-21, stages
+A-C of smartclock's flash procedure):
+
+- Autoselect ($AAAA to base+$AAAA, $5555 to base+$5554, $9090 to
+  base+$AAAA): $0101 manufacturer, $2020 device at base and base+2,
+  both pairs: four Am29F010s.  Sector protect ($n*8000+4): $0000, all
+  sixteen sector pairs.  $F0F0 returns to read mode.
+- Program ($A0A0, then the word): $5AA5 at $70000 read back at once.
+- Sector erase ($8080, unlock, $3030 to the sector pair): $70000 in
+  0.48 s, $78000 in 0.52 s.
+- $78000's two sum words ($7FFFC $BCAE, $7FFFE $0C74) programmed
+  back; the whole 512 KB then hashed to the 3704 image again, and
+  `bdm reset --run` booted it.
+
+Each `bdm` command costs about 7 ms (a process, USB open and Hello
+each), so a whole image this way would take most of an hour; a
+sequence request or a RAM routine is the way for that.
+
 ## To check
 
 - After `bdm go` and a halt with the firmware's map set, the CPU left
