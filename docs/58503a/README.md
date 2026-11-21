@@ -159,6 +159,14 @@ ATEMP (illegal, then $0001) until `bdm reset`; nine seconds of idle
 halt without a restart did not.  A restart by `bdm bootsel`, which
 turns U1 off first, left it answering (2026-11-20).
 
+With U1 off between requests (pod 0.3.0), a replug of the pod's USB
+left the CPU answering, with no `bdm reset` or `bdm resync` first:
+halted by `bdm reset`, and halted by `bdm halt` from running (SIMCR
+$614A, so its watchdog stays frozen).  A replug during `bdm hold`
+left it refusing commands (illegal command, then unexpected
+responses); `bdm resync` did not clear that, `bdm reset` did
+(2026-11-21).
+
 ## gdb
 
 `bdm gdb` from a reset entry, gdb-multiarch with `set architecture
