@@ -127,7 +127,13 @@ watchdog reset about 8 s in (SYPCR $CC: 2^18 / 32.768 kHz), and the
 firmware restarted by itself (2026-11-21, step W5 of smartclock's
 checklist).  BKPT was high at that reset, so background mode is off
 afterwards: a halt then is a breakpoint exception.  RSR and warm_start
-after it are read through the firmware's console, not BDM.
+after it are read through the firmware's console, not BDM.  Read that
+way: warm_start ($1039AF) 1, the preserved region's restore 1, and the
+unit's log "Re-boot" at the reset (every reset by the pod logs "Power
+on"): a watchdog reset is a warm start, an external one cold.  The
+breakpoint-exception restarts in the reset log are logged "Re-boot"
+too.  A 15 s halt with the watchdog frozen still logged "Holdover
+started, invalid GPS 1PPS": the loop sees a long halt.
 
 ## Pod restarts
 
