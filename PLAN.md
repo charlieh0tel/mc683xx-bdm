@@ -299,8 +299,8 @@ FREEZE's edge count (low 8 bits), so a host sees a leave and re-entry
 that FREEZE's level hides.  The answer to each request is
 `mc683xx-bdm-proto`'s `pod`, over a `Board` trait: the firmware's board (`board.rs`) is the
 Pico's pins, ADC, PIO link and timeouts, so the request rules run in
-host tests too.  VID:PID 1209:0001, pid.codes' test pair, until
-the pod has its own.  Serial number string: the chip's unique ID in
+host tests too.  VID:PID 1209:0001, pid.codes' shared test pair: the
+pod has no PID of its own, and none is applied for.  Serial number string: the chip's unique ID in
 uppercase hex, 16 characters, read once at boot (`serial.rs`): the
 RP2040's flash unique ID (embassy-rp's `blocking_unique_id`), the
 RP2350's OTP chip ID; pico-sdk's `pico_unique_board_id` convention, so
@@ -767,10 +767,7 @@ How to run each item and what to expect: `docs/bring-up.md`.
 
 ## Open questions
 
-- A VID:PID of the pod's own: Raspberry Pi's PID program under VID
-  0x2E8A, for RP2040 and RP2350 products (github.com/raspberrypi/usb-pid,
-  request form there); the owner applies.  pid.codes needs a public
-  open-source project.
+None.
 
 ## References
 
