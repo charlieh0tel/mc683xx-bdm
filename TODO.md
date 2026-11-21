@@ -24,6 +24,12 @@
   `mc683xx-bdm-py`.  First the renames, then each crate's metadata and
   the publishing tokens as repository secrets.
 - DSCLK above 4 MHz, once the throughput test measures the margin.
+- From the review, decided (2026-11-21): a request tag the pod echoes,
+  so a reply left after a host timeout cannot be taken for the next
+  one's (protocol bump); a 10 kHz floor on SetClock; FREEZE checked
+  before every word, aborting with NoFreeze; DSI_EN held a few PIO
+  cycles longer after GO's and CALL's last word (over one CLKOUT at
+  the slowest target clock).
 - Report a watchdog reset to the host (WATCHDOG's REASON at start,
   say in Pins or Version, and in `bdm pins`): a protocol change, so
   `PROTOCOL_VERSION`, `docs/usb-protocol.md` and `pod-host` with it.
