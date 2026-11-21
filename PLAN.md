@@ -442,7 +442,8 @@ code and no `unsafe`; no USB request, so the protocol is unchanged.
   halt with the entry kept confirms it with Pins.  A memory call sets SFC or DFC to its function
   code, reading the program's value first; SFC/DFC reads and writes
   reach the program's value; go, call and `restore_function_codes` put
-  it back.
+  it back.  Resync keeps it, and takes the CPU's as unknown, as after
+  a write whose reply did not come: the next restore writes it.
 - `pod-host`'s `stand_in` and `bdm-stand-in`: `pod-proto`'s `pod` over
   `bdm-model`'s `ModelBoard` on a stream socket, one client at a time.
   `bdm` and `PodTarget` run end to end against it with no hardware
