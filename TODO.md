@@ -36,9 +36,7 @@
   before its input (a stronger or faster OE path than GP9's), so a
   power loss or replug cannot glitch BKPT either.
 - Python bindings (`pod-py`): `step` (and the scratch area) now that
-  `PodTarget::step` is in; `__init__.pyi` checked against the module
-  with mypy's stubtest, as cpu32-py's is, once mypy is agreed as a
-  dependency.
+  `PodTarget::step` is in.
 - `pod-host` integration test against `mc683xx-run --bdm` and its
   example image, once m683xx-emu's virtual cable lands.
 - A second Pico as a stand-in CPU32: a target-side PIO program around

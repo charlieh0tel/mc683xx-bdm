@@ -26,8 +26,10 @@ BUILDS = rp2040:thumbv6m-none-eabi rp235xa:thumbv8m.main-none-eabihf
 # Before each commit (AGENTS.md): rustfmt, clippy on the workspace (the
 # Python bindings with their `python` feature too) and on every firmware
 # build, warnings as errors, ee_tooling's schematic drawing-rule check,
-# ruff and pytest on hardware/'s own Python, and ruff and pytest on the
-# Python bindings (firmware/pod-py), which uv builds with maturin.
+# ruff and pytest on hardware/'s own Python, and ruff, pytest, mypy's
+# stubtest of the type stubs against the module and mypy on the tests
+# for the Python bindings (firmware/pod-py), which uv builds with
+# maturin.
 lint:
 	@# No wildcard imports, `use super::*` in tests included (AGENTS.md):
 	@# clippy's wildcard_imports does not report these.
@@ -45,4 +47,6 @@ lint:
 	done
 	cd hardware && uv run kicad-style-check mc683xx-pod/mc683xx-pod.kicad_sch
 	cd hardware && uv run ruff format --check && uv run ruff check && uv run pytest -q
-	cd firmware/pod-py && uv run ruff format --check && uv run ruff check && uv run pytest -q
+	cd firmware/pod-py && uv run ruff format --check && uv run ruff check && uv run pytest -q \
+		&& uv run python -m mypy.stubtest mc683xx_bdm --allowlist stubtest-allowlist.txt \
+		&& uv run mypy tests

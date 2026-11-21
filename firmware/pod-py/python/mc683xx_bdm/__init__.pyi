@@ -1,9 +1,25 @@
 """The mc683xx CPU32 BDM pod, for Python scripts: one open pod across
-calls (PLAN.md, Host)."""
+calls (PLAN.md, Host).  `make lint` checks these stubs against the
+module with mypy's stubtest."""
 
 from collections.abc import Callable
 from types import TracebackType
 from typing import ClassVar, final
+
+from typing_extensions import disjoint_base
+
+__all__ = [
+    "PROTOCOL_VERSION",
+    "Atemp",
+    "BusError",
+    "Ending",
+    "Entry",
+    "Pins",
+    "Pod",
+    "ProtocolError",
+    "TargetError",
+    "TransportError",
+]
 
 PROTOCOL_VERSION: int
 
@@ -29,6 +45,7 @@ class ProtocolError(RuntimeError):
     another protocol version, a request the pod cannot parse, or a
     malformed reply."""
 
+@disjoint_base
 class Entry:
     """Why the CPU entered background mode (CPU32RM Table 7-2), as the
     emulator's mc683xx.Entry."""
@@ -38,19 +55,22 @@ class Entry:
     class Breakpoint(Entry):
         """BKPT asserted."""
 
-        def __init__(self) -> None: ...
+        __match_args__ = ()
+        def __new__(cls) -> Entry.Breakpoint: ...
 
     @final
     class Background(Entry):
         """A BGND instruction."""
 
-        def __init__(self) -> None: ...
+        __match_args__ = ()
+        def __new__(cls) -> Entry.Background: ...
 
     @final
     class DoubleBusFault(Entry):
         """A double bus fault, with the second fault's SSW."""
 
-        def __init__(self, ssw: int) -> None: ...
+        __match_args__ = ("ssw",)
+        def __new__(cls, ssw: int) -> Entry.DoubleBusFault: ...
         @property
         def ssw(self) -> int: ...
 
@@ -59,10 +79,12 @@ class Entry:
         """An ATEMP Table 7-2 does not list, or one the pod read when it
         had not seen the entry."""
 
-        def __init__(self, atemp: int) -> None: ...
+        __match_args__ = ("atemp",)
+        def __new__(cls, atemp: int) -> Entry.Unknown: ...
         @property
         def atemp(self) -> int: ...
 
+@disjoint_base
 class Atemp:
     """ATEMP as the pod read it for the CPU's current stay in background
     mode."""
@@ -72,13 +94,15 @@ class Atemp:
     class Running(Atemp):
         """The CPU is not in background mode."""
 
-        def __init__(self) -> None: ...
+        __match_args__ = ()
+        def __new__(cls) -> Atemp.Running: ...
 
     @final
     class Fresh(Atemp):
         """Read first after entry: the entry source."""
 
-        def __init__(self, value: int) -> None: ...
+        __match_args__ = ("value",)
+        def __new__(cls, value: int) -> Atemp.Fresh: ...
         @property
         def value(self) -> int: ...
 
@@ -86,7 +110,8 @@ class Atemp:
     class Stale(Atemp):
         """Read when the pod had not seen the entry: not an entry source."""
 
-        def __init__(self, value: int) -> None: ...
+        __match_args__ = ("value",)
+        def __new__(cls, value: int) -> Atemp.Stale: ...
         @property
         def value(self) -> int: ...
 
@@ -94,7 +119,8 @@ class Atemp:
     class Unread(Atemp):
         """In background mode, but the read after entry failed."""
 
-        def __init__(self) -> None: ...
+        __match_args__ = ()
+        def __new__(cls) -> Atemp.Unread: ...
 
 @final
 class Pins:
@@ -129,7 +155,7 @@ class Pod:
     """The pod, open from construction until close.  One thread at a
     time."""
 
-    def __init__(self, pod: str = "usb") -> None: ...
+    def __new__(cls, pod: str = "usb") -> Pod: ...
     def close(self) -> None: ...
     @property
     def closed(self) -> bool: ...
@@ -156,7 +182,7 @@ class Pod:
     def write_register(self, name: str, value: int) -> None: ...
     def registers(self) -> dict[str, int]: ...
     def read_memory(
-        self, address: int, length: int, *, size: int = 1, function_code: int = 5
+        self, address: int, length: int, *, size: int = 1, function_code: int = ...
     ) -> bytes: ...
     def write_memory(
         self,
@@ -164,14 +190,14 @@ class Pod:
         data: bytes | bytearray,
         *,
         size: int = 1,
-        function_code: int = 5,
+        function_code: int = ...,
     ) -> None: ...
-    def bus_read(self, address: int, size: int, function_code: int = 5) -> int: ...
-    def bus_write(self, address: int, size: int, value: int, function_code: int = 5) -> None: ...
+    def bus_read(self, address: int, size: int, function_code: int = ...) -> int: ...
+    def bus_write(self, address: int, size: int, value: int, function_code: int = ...) -> None: ...
     def restore_function_codes(self) -> None: ...
     def serve_gdb(
         self,
-        address: str = "127.0.0.1:1234",
+        address: str = ...,
         ready: Callable[[int], object] | None = None,
         *,
         scratch: int,

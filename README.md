@@ -128,7 +128,8 @@ pod's own.  Leaving the `with` block, or `close()`, puts back the
 program's SFC and DFC, as `bdm` does.  Exceptions: `TransportError`
 (an `OSError`), `ProtocolError`, `TargetError`, `BusError`, and
 `ValueError` for a bad name, size or function code.  Types:
-`python/mc683xx_bdm/__init__.pyi`.
+`python/mc683xx_bdm/__init__.pyi`, which `make lint` checks against the
+module with mypy's stubtest.
 
 `serve_gdb` serves one gdb session over the open pod, as `bdm gdb`
 does, after a script has set the target up (chip selects, say), and
