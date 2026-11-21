@@ -218,6 +218,12 @@ $08-$11, the count's nibbles for $12-$17, and 0 for $18-$1F
 (2026-11-21, step W8 of smartclock's checklist; restore the select
 afterwards, as the firmware's fpga_read does).
 
+## No outer oven
+
+This board has no outer oven (owner, 2026-11-21).  PGP5, the outer
+oven's enable on related models, reads 0 (the 3704 firmware never
+raises it); what it drives here is not established.
+
 ## Programming the flash over BDM
 
 From one reset entry (firmware never run), with the chip selects set
