@@ -209,6 +209,15 @@ the /IRQ2 pin, reads 1 while the DUART's ISR AND IMR is $00 and 0
 while it is $02: /IRQ2 follows the DUART's enabled interrupts
 (2026-11-21, step W7 of smartclock's checklist).
 
+## The FPGA's read map
+
+Writing the select byte to $304001 ((fconf_regs[1] & 7) | select << 3)
+and reading $304000 in a halt, select $00-$1F: the high nibble is the
+seconds count; the low nibble reads 0 for $00-$01, 4 for $02-$07, 0 for
+$08-$11, the count's nibbles for $12-$17, and 0 for $18-$1F
+(2026-11-21, step W8 of smartclock's checklist; restore the select
+afterwards, as the firmware's fpga_read does).
+
 ## Programming the flash over BDM
 
 From one reset entry (firmware never run), with the chip selects set
