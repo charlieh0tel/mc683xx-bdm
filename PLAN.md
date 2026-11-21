@@ -462,7 +462,9 @@ code and no `unsafe`; no USB request, so the protocol is unchanged.
   Dump with `--output FILE` writes the raw bytes to FILE instead of a
   hex listing.
   Each run restores SFC and DFC before it exits, since the next run
-  knows nothing of it.
+  knows nothing of it.  So does a Python `Pod`, on close, leaving its
+  `with` block or, best effort, when collected unclosed (with a
+  `ResourceWarning`, as Python's files).
 - Scripting: Python bindings, `pod-py` (Python module `mc683xx_bdm`),
   PyO3 over `PodTarget`, so a script keeps one pod open across calls
   and uses Python's loops and polling.  No script mode in `bdm`, which

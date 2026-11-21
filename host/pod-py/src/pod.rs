@@ -2,6 +2,7 @@
 //! call a `PodTarget` or `Pod` call with the GIL released while it
 //! waits on the pod.
 
+use std::ffi::CString;
 use std::fmt;
 use std::net::SocketAddr;
 use std::sync::Mutex;
@@ -25,6 +26,7 @@ use pyo3::PyAny;
 use pyo3::PyErr;
 use pyo3::PyResult;
 use pyo3::Python;
+use pyo3::exceptions::PyResourceWarning;
 use pyo3::pybacked::PyBackedBytes;
 use pyo3::pyclass;
 use pyo3::pymethods;
@@ -47,8 +49,9 @@ type Target = PodTarget<Box<dyn Transport + Send>>;
 /// `bdm`'s and the emulator's.
 const SUPERVISOR_DATA: u32 = 5;
 
-/// The pod (Rust's `PodTarget`), open from construction until `close`.
-/// One thread at a time: a call from another thread while one waits on
+/// The pod (Rust's `PodTarget`), open from construction until `close`,
+/// best used as `with Pod(...) as pod:`; one collected unclosed closes
+/// itself with a `ResourceWarning`.  One thread at a time: a call from another thread while one waits on
 /// the pod raises `RuntimeError`.
 #[pyclass(name = "Pod", module = "mc683xx_bdm")]
 pub(crate) struct PodView {
@@ -63,6 +66,30 @@ pub(crate) struct PodView {
 impl fmt::Debug for PodView {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.debug_struct("PodView").field("name", &self.name).finish_non_exhaustive()
+    }
+}
+
+/// A pod collected unclosed is closed as `close` does, as Python's files
+/// are, and a `ResourceWarning` issued while the interpreter is still
+/// up.  A failure has nowhere to go: the program's SFC and DFC may then
+/// stay as a memory call left them.
+impl Drop for PodView {
+    fn drop(&mut self) {
+        let Some(mut target) = self.target.get_mut().unwrap_or_else(PoisonError::into_inner).take() else {
+            return;
+        };
+        let name = &self.name;
+        let warned = Python::try_attach(|py| {
+            py.detach(|| target.restore_function_codes()).ok();
+            let message = CString::new(format!("unclosed Pod '{name}'")).unwrap_or_default();
+            let category = py.get_type::<PyResourceWarning>();
+            if let Err(error) = PyErr::warn(py, &category, &message, 1) {
+                error.write_unraisable(py, None);
+            }
+        });
+        if warned.is_none() {
+            target.restore_function_codes().ok();
+        }
     }
 }
 

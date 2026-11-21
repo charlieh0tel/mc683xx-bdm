@@ -152,8 +152,9 @@ class Ending:
 
 @final
 class Pod:
-    """The pod, open from construction until close.  One thread at a
-    time."""
+    """The pod, open from construction until close; best used as
+    `with Pod(...) as pod:`.  One collected unclosed closes itself,
+    best effort, with a ResourceWarning.  One thread at a time."""
 
     def __new__(cls, pod: str = "usb") -> Pod: ...
     def close(self) -> None: ...
