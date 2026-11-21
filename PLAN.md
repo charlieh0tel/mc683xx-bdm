@@ -574,8 +574,10 @@ code and no `unsafe`; no USB request, so the protocol is unchanged.
     SR last.  A step that fails once VBR is changed (a refused write,
     frames that do not parse) gets VBR and SR's trace bits back, best
     effort, and reports its own error.  Stopped elsewhere (a stepped BGND, a double bus fault): VBR and
-    SR's trace bits back, and the entry reported.  Not at the stub in
-    100 ms: halted, and an error with RPC.  The program's T0 is not
+    SR's trace bits back, and the entry reported.  Not stopped in
+    100 ms: halted; then RPC past the stub (it got there as the wait
+    ended) is unwound as above, anything else gets VBR and the trace
+    bits back and an error with RPC.  The program's T0 is not
     honored (its change-of-flow trace is lost), and what the contract
     calls implementation-defined (a VBR read or MOVE from SR in the
     step sees the pod's) is the pod's.
