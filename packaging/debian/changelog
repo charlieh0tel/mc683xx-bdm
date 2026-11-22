@@ -1,3 +1,17 @@
+mc683xx-bdm (0.4.0-1) unstable; urgency=low
+
+  * Pod: U1 off between requests, so a pod restart (a USB replug)
+    while idle cannot glitch BKPT; the Pico's LED is lit while it is
+    on (Board gains rest()).
+  * Block reads about twice as fast: the firmware spins for a short
+    word's answer, and the host keeps up to 4 read requests in flight.
+    Block writes stay one request at a time.
+  * gdb: a step emulates MOVEC to and from VBR.
+  * pod-fw no longer depends on mc683xx-target.
+  * Protocol unchanged (11).
+
+ -- Christopher Hoover <ch@murgatroid.com>  Sat, 21 Nov 2026 19:00:00 -0800
+
 mc683xx-bdm (0.3.0-1) unstable; urgency=low
 
   * mc683xx-target and mc683xx-gdb 0.7: pod::Error gains Unsupported.
