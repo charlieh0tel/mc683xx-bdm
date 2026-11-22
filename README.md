@@ -52,17 +52,34 @@ are Rust.
 
 ## Status
 
-Works, on an MC68331 target: reset into background mode, halt and go,
-registers, memory and SIM register reads, a 512 KB flash read, writes,
-and gdb (registers, memory, disassembly, breakpoints, continue, step
-in RAM and ROM, through TRAP and RTE, in user mode and into an
-interrupt, Ctrl-C, detach and kill).  Flash programming, through the
-Python module and a routine loaded into the target's RAM (smartclock's
-flash tool, `docs/58503a/`).
+Works, on an MC68331 target (an HP 58503A, `docs/58503a/`), from a
+Linux host:
 
-Not yet tried on silicon (`TODO.md`): a flash-programming command in
-`bdm` itself; the Pico 2
-(RP2350) build; DSCLK above 4 MHz.
+- Reset into background mode, halt from running, go, and reset to run
+  (`bdm reset --run`); the entry told apart, BKPT from BGND (ATEMP).
+- Every register read; data and address registers, RPC, SR, USP, SSP,
+  VBR, SFC and DFC written.
+- Memory and SIM registers read and written; a block read of 512 KB in
+  5.8 s at 3 MHz DSCLK, 10.4 s at 1 MHz.
+- gdb (`bdm gdb`, gdb-multiarch): registers, memory, disassembly,
+  breakpoints in RAM, continue, Ctrl-C, step (in RAM and ROM, through
+  TRAP and RTE, in user mode, into an interrupt, over MOVEC to VBR),
+  detach and kill.
+- Flash programming: smartclock's flash tool, through the Python
+  module and a routine loaded into the target's RAM, erased,
+  programmed and verified two sector pairs and put them back.
+- The Python module (`mc683xx_bdm`) and `bdm` over one pod; `bdm hold`
+  through a target reset; firmware updates with `bdm bootsel`.
+- Unplugging the pod while it is idle leaves a halted target halted
+  and answering; the Pico's LED shows when it is not safe.
+- Releases: `bdm` on crates.io, the Python module on PyPI, and a
+  `.deb` (`bdm`, the udev rule, the UF2) in each GitHub Release and
+  the APT repository.
+
+Not yet tried (`TODO.md`): a flash-programming command in `bdm`
+itself; the Pico 2 (RP2350) build; DSCLK above 4 MHz (a 16.78 MHz
+target); a macOS or Windows host with a pod (their wheels and `bdm`
+build in CI); two pods at once.
 
 Keep DSCLK (`bdm clock`) at or below about a third of the target's
 system clock: the pod samples DSO 15/16 of a bit after each rise, and
