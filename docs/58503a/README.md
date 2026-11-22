@@ -323,6 +323,20 @@ Each `bdm` command costs about 7 ms (a process, USB open and Hello
 each), so a whole image this way would take most of an hour; a
 sequence request or a RAM routine is the way for that.
 
+smartclock's flash tool takes the second way: through the Python
+module, one `Pod` open per run, it writes a position-independent
+routine, a vector table and each sector pair's data into RAM, GOes,
+and polls `background` until the routine's BGND (`Entry.Background`,
+RPC its address plus 2); the routine erases, programs and verifies at
+bus speed.  Five runs at 1 MHz DSCLK (2026-11-21, pod at main
+a6330e9): a dry run (512 KB read, the 3704 image, 10.4 s with the
+setup); identify (four Am29F010s, $0101 and $2020, none protected);
+sector pairs $70000 and $78000 erased, programmed, verified and the
+whole flash hashed, 25.4 s; both restored, the flash the 3704 image
+again; then `Pod.reset` booted it (*IDN? 3704-C, self test OK).
+SIMCR read $60CF at each reset entry, closing the `Pod` left the CPU
+halted between runs, and the pod reported no error.
+
 ## To check
 
 - After `bdm go` and a halt with the firmware's map set, the CPU left

@@ -56,10 +56,12 @@ Works, on an MC68331 target: reset into background mode, halt and go,
 registers, memory and SIM register reads, a 512 KB flash read, writes,
 and gdb (registers, memory, disassembly, breakpoints, continue, step
 in RAM and ROM, through TRAP and RTE, in user mode and into an
-interrupt, Ctrl-C, detach and kill).
+interrupt, Ctrl-C, detach and kill).  Flash programming, through the
+Python module and a routine loaded into the target's RAM (smartclock's
+flash tool, `docs/58503a/`).
 
-Not yet tried on silicon (`TODO.md`): a flash-programming command
-(flash has been programmed with `bdm write` sequences); the Pico 2
+Not yet tried on silicon (`TODO.md`): a flash-programming command in
+`bdm` itself; the Pico 2
 (RP2350) build; DSCLK above 4 MHz.
 
 Keep DSCLK (`bdm clock`) at or below about a third of the target's

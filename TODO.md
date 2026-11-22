@@ -44,10 +44,9 @@
   - On the scope: PIO framing and idle high; IFETCH against FREEZE
     falling and U2's (74AHCT1G125) output turning off; U1 driving BKPT
     into 1 kOhm.
-  - On a target: BGND and a breakpoint after GO (fresh ATEMP 1 and 0,
-    DSI driven again); NOP / not-ready; external RAM; FILL throughput,
-    and DSCLK's limit on a 16.78 MHz target; a test program from RAM;
-    flash programming; the smartclock harness on silicon.
+  - On a target: NOP / not-ready; FILL throughput, and DSCLK's limit
+    on a 16.78 MHz target; a flash-programming command in `bdm`; the
+    smartclock harness on silicon.
   - Silicon questions for m683xx-emu: PCC after a reset double bus
     fault, BKPT out of LPSTOP, the halt monitor on a double fault in
     BDM.
