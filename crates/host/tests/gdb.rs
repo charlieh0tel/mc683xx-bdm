@@ -5,6 +5,7 @@
 use std::convert::Infallible;
 use std::io::BufRead;
 use std::io::BufReader;
+use std::io::ErrorKind;
 use std::io::Read;
 use std::io::Write;
 use std::net::TcpStream;
@@ -21,6 +22,7 @@ use std::time::Duration;
 use std::time::Instant;
 
 use mc683xx_bdm::gdb;
+use mc683xx_bdm::gdb::ServeError;
 use mc683xx_bdm::pod::Error;
 use mc683xx_bdm::pod::Pod;
 use mc683xx_bdm::stand_in::serve;
@@ -132,13 +134,8 @@ fn expanded(packet: &[u8]) -> Vec<u8> {
     bytes
 }
 
-/// A stand-in pod on a socket in the temporary directory, its model
-/// halted at [`PROGRAM`] with [`CODE`] there, and `bdm gdb` on it,
-/// waiting for gdb at the address returned.
-fn start(name: &str) -> (Child, String, Arc<Mutex<ModelPod>>) {
-    let path = std::env::temp_dir().join(format!("bdm-gdb-test-{}-{name}.sock", std::process::id()));
-    let _ = std::fs::remove_file(&path);
-    let listener = UnixListener::bind(&path).unwrap();
+/// A model pod halted at [`PROGRAM`] with [`CODE`] there.
+fn loaded() -> Arc<Mutex<ModelPod>> {
     let mut model = Target::<RAM>::new(Address(RAM_BASE));
     model.ram_mut()[..CODE.len()].copy_from_slice(&CODE);
     let unreached = usize::try_from(UNREACHED - RAM_BASE).unwrap();
@@ -148,7 +145,17 @@ fn start(name: &str) -> (Child, String, Arc<Mutex<ModelPod>>) {
     model.set_system_register(SystemRegister::Dfc, USER_DATA);
     model.set_register(Register::A7, STACK);
     model.set_system_register(SystemRegister::Rpc, PROGRAM);
-    let pod = Arc::new(Mutex::new(ModelPod::new(ModelBoard::new(model, true))));
+    Arc::new(Mutex::new(ModelPod::new(ModelBoard::new(model, true))))
+}
+
+/// A stand-in pod on a socket in the temporary directory, its model
+/// [`loaded`], and `bdm gdb` on it,
+/// waiting for gdb at the address returned.
+fn start(name: &str) -> (Child, String, Arc<Mutex<ModelPod>>) {
+    let path = std::env::temp_dir().join(format!("bdm-gdb-test-{}-{name}.sock", std::process::id()));
+    let _ = std::fs::remove_file(&path);
+    let listener = UnixListener::bind(&path).unwrap();
+    let pod = loaded();
     let served = Arc::clone(&pod);
     thread::spawn(move || {
         let (stream, _) = listener.accept().unwrap();
@@ -304,4 +311,61 @@ fn a_session_clears_its_scratch() {
     gdb::serve(&mut target, Address(SCRATCH), connection, &check).unwrap();
     client.join().unwrap();
     assert!(matches!(target.step(), Err(Error::Step(StepError::NoScratch))));
+}
+
+/// gdb hangs up, without detaching or killing, after `then` has been
+/// asked of a [`loaded`] model: the session ends at the end of the
+/// connection, gdb's breakpoints removed, the target halted.
+fn hang_up(then: impl FnOnce(&mut Gdb, &Mutex<ModelPod>) + Send + 'static) {
+    let (ours, theirs) = UnixStream::pair().unwrap();
+    let pod = loaded();
+    let served = Arc::clone(&pod);
+    thread::spawn(move || serve(theirs, &served).unwrap());
+    let mut target = PodTarget::new(Pod::new(StreamTransport::new(ours)));
+    let (tell, listening) = mpsc::channel();
+    let watched = Arc::clone(&pod);
+    let client = thread::spawn(move || {
+        let mut gdb = Gdb { stream: BufReader::new(TcpStream::connect(listening.recv().unwrap()).unwrap()) };
+        assert!(gdb.ask("?").starts_with("T05"));
+        assert_eq!(gdb.ask(&format!("Z0,{UNREACHED:x},2")), "OK");
+        then(&mut gdb, &watched);
+    });
+    let check = || Ok::<(), Infallible>(());
+    let ready = |at| {
+        tell.send(at).unwrap();
+        Ok(())
+    };
+    let connection = gdb::accept("127.0.0.1:0", ready, &check).unwrap();
+    let served = gdb::serve(&mut target, Address(SCRATCH), connection, &check);
+    client.join().unwrap();
+    assert!(
+        matches!(&served, Err(ServeError::Connection(error)) if error.kind() == ErrorKind::UnexpectedEof),
+        "{served:?}"
+    );
+    assert_eq!(word(&pod, UNREACHED), UNREACHED_WORD, "the word BGND replaced");
+    assert!(pod.lock().unwrap().board_mut().target().frozen());
+    target.restore_function_codes().unwrap();
+    assert_eq!(function_codes(&pod), (USER_DATA, USER_DATA), "the program's");
+}
+
+#[test]
+fn hanging_up_while_halted_ends_the_session() {
+    hang_up(|_, _| ());
+}
+
+#[test]
+fn hanging_up_while_running_removes_the_breakpoints() {
+    hang_up(|gdb, pod| {
+        gdb.send("c");
+        // Taken, so the hang-up leaves nothing unread: a close with
+        // bytes unread is a reset, not an end of file.
+        let mut ack = [0];
+        gdb.stream.read_exact(&mut ack).unwrap();
+        assert_eq!(ack, *b"+");
+        let deadline = Instant::now() + PLANTING;
+        while word(pod, UNREACHED) != BGND {
+            assert!(Instant::now() < deadline, "the breakpoint was never planted");
+            thread::sleep(PLANTING_POLL);
+        }
+    });
 }

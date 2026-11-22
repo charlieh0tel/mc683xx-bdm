@@ -225,27 +225,27 @@ impl<T: Transport, E: std::error::Error + 'static, C: Fn() -> Result<(), E>> Cpu
     fn read_memory(
         &mut self,
         address: Address,
-        function_code: FunctionCode,
         size: Size,
+        function_code: FunctionCode,
         data: &mut [u8],
     ) -> Result<(), Self::Error> {
-        self.target.read_memory(address, function_code, size, data).map_err(Stopped::Target)
+        self.target.read_memory(address, size, function_code, data).map_err(Stopped::Target)
     }
 
     fn write_memory(
         &mut self,
         address: Address,
-        function_code: FunctionCode,
         size: Size,
+        function_code: FunctionCode,
         data: &[u8],
     ) -> Result<(), Self::Error> {
-        self.target.write_memory(address, function_code, size, data).map_err(Stopped::Target)
+        self.target.write_memory(address, size, function_code, data).map_err(Stopped::Target)
     }
 }
 
 /// Listens at `address` for one gdb, tells `ready` where (a port of 0
 /// picks one), and takes its connection, asking `check` every
-/// [`POLL`](mc683xx_gdb::connection::POLL) meanwhile.
+/// [`POLL_INTERVAL`](mc683xx_gdb::connection::POLL_INTERVAL) meanwhile.
 ///
 /// # Errors
 ///

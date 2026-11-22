@@ -14,7 +14,7 @@ categories = ["embedded", "no-std", "hardware-support"]
 include = ["/src", "/README.md", "/LICENSE"]
 
 [dependencies]
-mc683xx-target = "0.7.0"
+mc683xx-target = "0.8.0"
 thiserror = { version = "2.0.21", default-features = false }
 
 [lints]

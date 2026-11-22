@@ -359,11 +359,11 @@ impl<T: Transport> PodTarget<T> {
                 return Err(StepError::TooManyFrames.into());
             }
             let mut head = [0; FRAME_HEAD];
-            self.read_memory(at, SUPERVISOR_DATA, Size::Word, &mut head)?;
+            self.read_memory(at, Size::Word, SUPERVISOR_DATA, &mut head)?;
             let bytes = frame_bytes(&head, at)?;
             let mut rest = vec![0; bytes - FRAME_HEAD];
             if !rest.is_empty() {
-                self.read_memory(at.offset(FRAME_HEAD as u32), SUPERVISOR_DATA, Size::Word, &mut rest)?;
+                self.read_memory(at.offset(FRAME_HEAD as u32), Size::Word, SUPERVISOR_DATA, &mut rest)?;
             }
             chain.push(Frame::from_head(&head, rest));
             at = at.offset(bytes as u32);
@@ -374,7 +374,7 @@ impl<T: Transport> PodTarget<T> {
         let stacked: Vec<u8> = frames.iter().flat_map(Frame::bytes).collect();
         let sp = Address(bottom.0.wrapping_sub(stacked.len() as u32));
         if !stacked.is_empty() {
-            self.write_memory(sp, SUPERVISOR_DATA, Size::Word, &stacked)?;
+            self.write_memory(sp, Size::Word, SUPERVISOR_DATA, &stacked)?;
         }
         // A7 while S is set, so SSP; an SR clearing S then makes USP A7.
         // SR last: until it is written a failure's `untrace` is right.
@@ -387,7 +387,7 @@ impl<T: Transport> PodTarget<T> {
     /// The handler in vector `vector` of the table at `table`.
     fn vector(&mut self, table: u32, vector: u32) -> Result<u32, Error> {
         let mut handler = [0; 4];
-        self.read_memory(vector_address(Address(table), vector), SUPERVISOR_DATA, Size::Word, &mut handler)?;
+        self.read_memory(vector_address(Address(table), vector), Size::Word, SUPERVISOR_DATA, &mut handler)?;
         Ok(u32::from_be_bytes(handler))
     }
 
@@ -402,7 +402,7 @@ impl<T: Transport> PodTarget<T> {
         let space = if supervisor { SUPERVISOR_PROGRAM } else { USER_PROGRAM };
         let word = |target: &mut Self, at: u32| {
             let mut bytes = [0; 2];
-            match target.read_memory(Address(at), space, Size::Word, &mut bytes) {
+            match target.read_memory(Address(at), Size::Word, space, &mut bytes) {
                 Ok(()) => Ok(Some(u16::from_be_bytes(bytes))),
                 Err(Error::Reply(ReplyError::Failed(Status::BusError))) => Ok(None),
                 Err(error) => Err(error),
@@ -451,7 +451,7 @@ impl<T: Transport> PodTarget<T> {
         let trace = Frame::trace(program_sr as u16, next, pc).bytes();
         let sp = self.read_register(Register::A7)?.wrapping_sub(trace.len() as u32);
         let handler = self.vector(vbr, TRACE_VECTOR)?;
-        self.write_memory(Address(sp), SUPERVISOR_DATA, Size::Word, &trace)?;
+        self.write_memory(Address(sp), Size::Word, SUPERVISOR_DATA, &trace)?;
         self.write_register(Register::A7, sp)?;
         self.write_system_register(SystemRegister::Rpc, handler)?;
         self.write_system_register(SystemRegister::Sr, program_sr & !SR_TRACE)?;
@@ -487,7 +487,7 @@ impl<T: Transport> PodTarget<T> {
     /// Sets SFC or DFC to `function_code` for a memory call, reading the
     /// program's value first so it can be restored.
     fn select(&mut self, register: SystemRegister, function_code: FunctionCode) -> Result<(), Error> {
-        let wanted = u32::from(function_code.bits());
+        let wanted = u32::from(function_code.get());
         let state = *self.function_code_state(register);
         if state.current == Some(wanted) {
             return Ok(());
@@ -497,7 +497,7 @@ impl<T: Transport> PodTarget<T> {
             let state = self.function_code_state(register);
             state.program = Some(value);
             state.current = Some(value);
-            if FunctionCode::new(value) == function_code {
+            if FunctionCode::from_low_bits(value) == function_code {
                 return Ok(());
             }
         }
@@ -579,7 +579,7 @@ impl<T: Transport> Cpu32Target for PodTarget<T> {
             }
         };
         if !self.scratch_written {
-            self.write_memory(scratch, SUPERVISOR_DATA, Size::Word, &scratch_image(scratch))?;
+            self.write_memory(scratch, Size::Word, SUPERVISOR_DATA, &scratch_image(scratch))?;
             self.scratch_written = true;
         }
         let stepped = self.trace(scratch, program_sr, program_vbr, effect);
@@ -629,8 +629,8 @@ impl<T: Transport> Cpu32Target for PodTarget<T> {
     fn read_memory(
         &mut self,
         address: Address,
-        function_code: FunctionCode,
         size: Size,
+        function_code: FunctionCode,
         data: &mut [u8],
     ) -> Result<(), Error> {
         self.halted_state()?;
@@ -641,8 +641,8 @@ impl<T: Transport> Cpu32Target for PodTarget<T> {
     fn write_memory(
         &mut self,
         address: Address,
-        function_code: FunctionCode,
         size: Size,
+        function_code: FunctionCode,
         data: &[u8],
     ) -> Result<(), Error> {
         self.halted_state()?;
@@ -921,7 +921,7 @@ mod tests {
         target.reset_halted().unwrap();
         let mut data = [0; 1];
         assert!(
-            target.read_memory(Address(0), FunctionCode::SUPERVISOR_DATA, Size::Byte, &mut data).is_err()
+            target.read_memory(Address(0), Size::Byte, FunctionCode::SUPERVISOR_DATA, &mut data).is_err()
         );
         assert_eq!(target.halted().unwrap(), None);
     }
@@ -945,7 +945,7 @@ mod tests {
         ]);
         target.reset_halted().unwrap();
         let mut data = [0; 1];
-        target.read_memory(Address(0), FunctionCode::SUPERVISOR_DATA, Size::Byte, &mut data).unwrap();
+        target.read_memory(Address(0), Size::Byte, FunctionCode::SUPERVISOR_DATA, &mut data).unwrap();
         assert!(matches!(target.read_register(Register::D0), Err(Error::Reentered)));
         assert_eq!(target.halted().unwrap(), Some(Entry::Breakpoint));
         target.go().unwrap();
@@ -968,7 +968,7 @@ mod tests {
         ]);
         target.reset_halted().unwrap();
         let mut data = [0; 1];
-        target.read_memory(Address(0), FunctionCode::SUPERVISOR_DATA, Size::Byte, &mut data).unwrap();
+        target.read_memory(Address(0), Size::Byte, FunctionCode::SUPERVISOR_DATA, &mut data).unwrap();
         target.hold().unwrap();
         assert_eq!(target.halted().unwrap(), Some(Entry::Breakpoint), "asks the pod after a hold");
         target.go().unwrap();
@@ -993,7 +993,7 @@ mod tests {
         ]);
         target.reset_halted().unwrap();
         let mut data = [0; 1];
-        target.read_memory(Address(0), FunctionCode::SUPERVISOR_DATA, Size::Byte, &mut data).unwrap();
+        target.read_memory(Address(0), Size::Byte, FunctionCode::SUPERVISOR_DATA, &mut data).unwrap();
         target.hold().unwrap();
         assert_eq!(target.halt().unwrap(), Entry::Breakpoint);
         target.go().unwrap();
@@ -1053,9 +1053,9 @@ mod tests {
         ]);
         target.reset_halted().unwrap();
         let mut data = [0; 2];
-        target.read_memory(Address(0x100), FunctionCode::SUPERVISOR_DATA, Size::Word, &mut data).unwrap();
+        target.read_memory(Address(0x100), Size::Word, FunctionCode::SUPERVISOR_DATA, &mut data).unwrap();
         assert_eq!(data, [0xAB, 0xCD]);
-        target.read_memory(Address(0x102), FunctionCode::SUPERVISOR_DATA, Size::Word, &mut data).unwrap();
+        target.read_memory(Address(0x102), Size::Word, FunctionCode::SUPERVISOR_DATA, &mut data).unwrap();
         assert_eq!(target.read_system_register(SystemRegister::Sfc).unwrap(), 1, "the program's, not 5");
         target.go().unwrap();
         let sent = requests(target);
@@ -1080,7 +1080,7 @@ mod tests {
         let mut target = target(&[&halted(Atemp::Fresh(0)), DONE, DONE, DONE]);
         target.reset_halted().unwrap();
         target.write_system_register(SystemRegister::Dfc, 1).unwrap();
-        target.write_memory(Address(0x200), FunctionCode::USER_DATA, Size::Byte, &[7]).unwrap();
+        target.write_memory(Address(0x200), Size::Byte, FunctionCode::USER_DATA, &[7]).unwrap();
         target.go().unwrap();
         let sent = requests(target);
         let sent: Vec<_> = sent.iter().map(|r| parsed(r)).collect();
@@ -1108,7 +1108,7 @@ mod tests {
         ]);
         target.reset_halted().unwrap();
         let mut data = [0; 1];
-        target.read_memory(Address(0), FunctionCode::SUPERVISOR_DATA, Size::Byte, &mut data).unwrap();
+        target.read_memory(Address(0), Size::Byte, FunctionCode::SUPERVISOR_DATA, &mut data).unwrap();
         target.resync().unwrap();
         assert_eq!(target.halted().unwrap(), Some(Entry::Unknown { atemp: 0 }));
         target.go().unwrap();
@@ -1132,7 +1132,7 @@ mod tests {
         target.reset_halted().unwrap();
         let mut data = [0; 1];
         assert!(
-            target.read_memory(Address(0), FunctionCode::SUPERVISOR_DATA, Size::Byte, &mut data).is_err()
+            target.read_memory(Address(0), Size::Byte, FunctionCode::SUPERVISOR_DATA, &mut data).is_err()
         );
         target.go().unwrap();
         let sent = requests(target);
@@ -1148,7 +1148,7 @@ mod tests {
         let mut target = target(&[&halted(Atemp::Fresh(0)), &value(5), &[0, 9], DONE]);
         target.reset_halted().unwrap();
         let mut data = [0; 1];
-        target.read_memory(Address(0), FunctionCode::SUPERVISOR_DATA, Size::Byte, &mut data).unwrap();
+        target.read_memory(Address(0), Size::Byte, FunctionCode::SUPERVISOR_DATA, &mut data).unwrap();
         target.go().unwrap();
         assert_eq!(requests(target).len(), 4, "no SFC write, either way");
     }

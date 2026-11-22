@@ -139,7 +139,7 @@ enum Command {
         size: Width,
         /// Function code, the address space: 5 supervisor data, 6
         /// supervisor program, 1 and 2 user, 7 CPU space.
-        #[arg(long, value_parser = function_code, default_value = "5")]
+        #[arg(long, default_value = "5")]
         fc: FunctionCode,
         /// Write the bytes read to FILE, created or truncated, instead
         /// of the hex listing.
@@ -156,7 +156,7 @@ enum Command {
         #[arg(long, value_enum, default_value_t = Width::Byte)]
         size: Width,
         /// Function code, as for dump.
-        #[arg(long, value_parser = function_code, default_value = "5")]
+        #[arg(long, default_value = "5")]
         fc: FunctionCode,
     },
     /// With DSI jumpered to DSO (GP3 to GP2) on a bare Pico, no
@@ -242,11 +242,6 @@ fn byte(text: &str) -> Result<u8> {
 
 fn word(text: &str) -> Result<u16> {
     u16::try_from(number(text)?).with_context(|| format!("not a 16-bit word: {text}"))
-}
-
-fn function_code(text: &str) -> Result<FunctionCode> {
-    mc683xx_bdm::pod::function_code(number(text)?)
-        .with_context(|| format!("not a function code, 0-7: {text}"))
 }
 
 /// A hex listing of `data`, read from `address`: `DUMP_LINE` bytes a
@@ -389,14 +384,14 @@ fn execute<T: Transport>(target: &mut PodTarget<T>, command: Command, out: &mut 
         Command::Set { register, value } => Named::parse(&register)?.write(target, value)?,
         Command::Dump { address, length, size, fc, output } => {
             let mut data = vec![0; usize::try_from(length)?];
-            target.read_memory(Address(address), fc, size.into(), &mut data)?;
+            target.read_memory(Address(address), size.into(), fc, &mut data)?;
             match output {
                 None => hex_listing(address, &data, out)?,
                 Some(path) => save_dump(address, &data, &path, out)?,
             }
         }
         Command::Write { address, bytes, size, fc } => {
-            target.write_memory(Address(address), fc, size.into(), &bytes)?
+            target.write_memory(Address(address), size.into(), fc, &bytes)?
         }
         Command::Loopback { rounds } => {
             let words = loopback_words();
@@ -566,6 +561,10 @@ mod tests {
 
     use std::process::ExitCode;
 
+    use clap::Parser;
+
+    use super::Cli;
+    use super::Command;
     use super::FunctionCode;
     use super::ReplyError;
     use super::Status;
@@ -574,7 +573,6 @@ mod tests {
     use super::SIGTERM;
     use super::Signaled;
     use super::finish;
-    use super::function_code;
     use super::hex_listing;
     use super::is_broken_pipe;
     use super::loopback_mismatch;
@@ -663,10 +661,16 @@ mod tests {
 
     #[test]
     fn function_codes() {
-        assert_eq!(function_code("5").unwrap(), FunctionCode::SUPERVISOR_DATA);
-        assert_eq!(function_code("7").unwrap(), FunctionCode::CPU_SPACE);
-        assert!(function_code("8").is_err());
-        assert!(function_code("0xD").is_err());
+        let fc = |text: &str| -> Result<FunctionCode, clap::Error> {
+            match Cli::try_parse_from(["bdm", "dump", "0", "4", "--fc", text])?.command {
+                Command::Dump { fc, .. } => Ok(fc),
+                command => panic!("parsed as {command:?}"),
+            }
+        };
+        assert_eq!(fc("5").unwrap(), FunctionCode::SUPERVISOR_DATA);
+        assert_eq!(fc("7").unwrap(), FunctionCode::CPU_SPACE);
+        assert!(fc("8").is_err());
+        assert!(fc("0xD").is_err());
     }
 
     #[test]

@@ -15,7 +15,7 @@ from contextlib import contextmanager
 import pytest
 
 from conftest import RAM_BASE, launch
-from mc683xx_bdm import BusError, Ending, Entry, Pod, TransportError
+from mc683xx_bdm import BusError, Ending, Entry, Pod, TargetError, TransportError
 
 # The program, the step's scratch RAM and the supervisor stack.
 PROGRAM = RAM_BASE
@@ -31,8 +31,9 @@ UNREACHED_WORD = bytes.fromhex("4e71")
 SUPERVISOR = 0x2700
 # An address no model memory answers: no room for a step's table.
 UNMAPPED = 0x10
-# gdb's Ctrl-C.
+# gdb's Ctrl-C, and a packet's ack.
 INTERRUPT = b"\x03"
+ACK = b"+"
 # PC's index in a `g` reply, and hex digits in a register.
 PC = 17
 REGISTER_DIGITS = 8
@@ -70,13 +71,17 @@ class Client:
     """gdb's end of the connection, in a thread: sends each item once
     the last is answered and keeps the replies.  An item is a packet's
     body; one ending in `!` is sent without waiting for its answer (a
-    continue gdb will interrupt); `^C` sends gdb's Ctrl-C.  Then it
+    continue gdb will interrupt), only its ack; `^C` sends gdb's Ctrl-C.  Then it
     calls `then` and stays connected until `done`, set once the session
-    has ended."""
+    has ended; or, with `hang_up`, closes the connection, as gdb's
+    `disconnect` does."""
 
-    def __init__(self, items: list[str], then: Callable[[], None] = lambda: None) -> None:
+    def __init__(
+        self, items: list[str], then: Callable[[], None] = lambda: None, *, hang_up: bool = False
+    ) -> None:
         self.items = items
         self.then = then
+        self.hang_up = hang_up
         self.replies: list[str] = []
         self.thread: threading.Thread | None = None
         self.done = threading.Event()
@@ -94,6 +99,12 @@ class Client:
                     gdb.sendall(INTERRUPT)
                 elif item.endswith("!"):
                     gdb.sendall(packet(item[:-1]))
+                    while ACK not in pending:
+                        data = gdb.recv(4096)
+                        if not data:
+                            return
+                        pending += data
+                    pending = pending[pending.index(ACK) + len(ACK) :]
                     continue
                 else:
                     gdb.sendall(packet(item))
@@ -103,10 +114,11 @@ class Client:
                         return
                     pending += data
                 pending = pending[match.end() :]
-                gdb.sendall(b"+")
+                gdb.sendall(ACK)
                 self.replies.append(decoded(match.group(1).decode()))
             self.then()
-            self.done.wait(timeout=PROMPTLY_S)
+            if not self.hang_up:
+                self.done.wait(timeout=PROMPTLY_S)
 
     def join(self) -> None:
         self.done.set()
@@ -201,6 +213,17 @@ def test_kill_leaves_it_halted(pod):
     client = Client(["?", "k!"])
     assert serve(pod, client) == Ending.KILLED
     assert pod.background is not None
+
+
+def test_hanging_up_while_running_removes_the_breakpoints(pod):
+    client = Client([f"Z0,{UNREACHED:x},2", "c!"], then=lambda: time.sleep(RUNNING_S), hang_up=True)
+    started = time.monotonic()
+    with pytest.raises(TargetError, match="unexpected end of file"):
+        serve(pod, client)
+    assert time.monotonic() - started < PROMPTLY_S
+    assert client.replies == ["OK"]
+    assert pod.background is not None, "halted"
+    assert pod.read_memory(UNREACHED, 2, size=2) == UNREACHED_WORD, "BGND gone"
 
 
 def test_the_pod_is_the_caller_s_again_after_a_session(pod):

@@ -84,9 +84,9 @@ fn a_session() {
 
     target.write_system_register(SystemRegister::Sfc, 1).unwrap();
     let data: Vec<u8> = (0..100).collect();
-    target.write_memory(Address(RAM_BASE), FunctionCode::SUPERVISOR_DATA, Size::Word, &data).unwrap();
+    target.write_memory(Address(RAM_BASE), Size::Word, FunctionCode::SUPERVISOR_DATA, &data).unwrap();
     let mut back = vec![0; 100];
-    target.read_memory(Address(RAM_BASE), FunctionCode::SUPERVISOR_DATA, Size::Long, &mut back).unwrap();
+    target.read_memory(Address(RAM_BASE), Size::Long, FunctionCode::SUPERVISOR_DATA, &mut back).unwrap();
     assert_eq!(back, data);
     assert_eq!(target.read_system_register(SystemRegister::Sfc).unwrap(), 1, "the program's");
 
@@ -109,9 +109,9 @@ fn blocks_go_with_requests_in_flight_and_a_failure_mid_block_leaves_no_reply_beh
     let (mut target, _pod) = stand_in(true);
     target.reset_halted().unwrap();
     let data: Vec<u8> = (0..RAM).map(|n| (n * 7) as u8).collect();
-    target.write_memory(Address(RAM_BASE), FunctionCode::SUPERVISOR_DATA, Size::Long, &data).unwrap();
+    target.write_memory(Address(RAM_BASE), Size::Long, FunctionCode::SUPERVISOR_DATA, &data).unwrap();
     let mut back = vec![0; RAM];
-    target.read_memory(Address(RAM_BASE), FunctionCode::SUPERVISOR_DATA, Size::Long, &mut back).unwrap();
+    target.read_memory(Address(RAM_BASE), Size::Long, FunctionCode::SUPERVISOR_DATA, &mut back).unwrap();
     assert_eq!(back, data);
 
     // Two chunks in RAM, then eight past its end: the third fails, and
@@ -119,7 +119,7 @@ fn blocks_go_with_requests_in_flight_and_a_failure_mid_block_leaves_no_reply_beh
     let tail = u32::try_from(RAM - 2 * 56).unwrap();
     let mut block = vec![0; 10 * 56];
     let result =
-        target.read_memory(Address(RAM_BASE + tail), FunctionCode::SUPERVISOR_DATA, Size::Long, &mut block);
+        target.read_memory(Address(RAM_BASE + tail), Size::Long, FunctionCode::SUPERVISOR_DATA, &mut block);
     assert!(matches!(result, Err(Error::Reply(ReplyError::Failed(Status::BusError)))), "{result:?}");
     assert_eq!(block[..2 * 56], data[RAM - 2 * 56..]);
     target.write_register(Register::D3, 0x1234_5678).unwrap();
@@ -183,11 +183,11 @@ fn stepping(program: &[u16]) -> (StandIn, Arc<Mutex<ModelPod>>) {
     target.set_scratch(Some(Address(SCRATCH)));
     target.reset_halted().unwrap();
     let code: Vec<u8> = program.iter().flat_map(|word| word.to_be_bytes()).collect();
-    target.write_memory(Address(PROGRAM), FunctionCode::SUPERVISOR_DATA, Size::Word, &code).unwrap();
+    target.write_memory(Address(PROGRAM), Size::Word, FunctionCode::SUPERVISOR_DATA, &code).unwrap();
     for (vector, handler) in [(TRAP_1, TRAP_HANDLER), (u32::from(DEVICE), INTERRUPT_HANDLER)] {
         let address = Address(TABLE + vector * VECTOR_BYTES);
         target
-            .write_memory(address, FunctionCode::SUPERVISOR_DATA, Size::Long, &handler.to_be_bytes())
+            .write_memory(address, Size::Long, FunctionCode::SUPERVISOR_DATA, &handler.to_be_bytes())
             .unwrap();
     }
     target.write_system_register(SystemRegister::Sr, SUPERVISOR).unwrap();
@@ -200,7 +200,7 @@ fn stepping(program: &[u16]) -> (StandIn, Arc<Mutex<ModelPod>>) {
 /// The long at `address`.
 fn long(target: &mut StandIn, address: u32) -> u32 {
     let mut data = [0; 4];
-    target.read_memory(Address(address), FunctionCode::SUPERVISOR_DATA, Size::Word, &mut data).unwrap();
+    target.read_memory(Address(address), Size::Word, FunctionCode::SUPERVISOR_DATA, &mut data).unwrap();
     u32::from_be_bytes(data)
 }
 
@@ -330,7 +330,7 @@ const PRIVILEGE_HANDLER: u32 = RAM_BASE + 0x280;
 /// Points the program's vector `vector` at `handler`.
 fn set_vector(target: &mut StandIn, vector: u32, handler: u32) {
     let address = Address(TABLE + vector * VECTOR_BYTES);
-    target.write_memory(address, FunctionCode::SUPERVISOR_DATA, Size::Long, &handler.to_be_bytes()).unwrap();
+    target.write_memory(address, Size::Long, FunctionCode::SUPERVISOR_DATA, &handler.to_be_bytes()).unwrap();
 }
 
 #[test]
@@ -376,7 +376,7 @@ fn a_stepped_rte_keeps_the_trace_bits_it_pops() {
     frame.extend_from_slice(&u16::try_from(SUPERVISOR | T1).unwrap().to_be_bytes());
     frame.extend_from_slice(&back.to_be_bytes());
     frame.extend_from_slice(&[0, 0]);
-    target.write_memory(Address(STACK - 8), FunctionCode::SUPERVISOR_DATA, Size::Word, &frame).unwrap();
+    target.write_memory(Address(STACK - 8), Size::Word, FunctionCode::SUPERVISOR_DATA, &frame).unwrap();
     target.write_register(Register::A7, STACK - 8).unwrap();
     assert_eq!(target.step().unwrap(), Entry::Breakpoint);
     assert_eq!(target.read_system_register(SystemRegister::Sr).unwrap(), SUPERVISOR | T1);
@@ -418,7 +418,7 @@ const SIX_WORD_FORMAT: u32 = 0x2000;
 /// Points vector `vector` of the table at `table` at `handler`.
 fn set_vector_in(target: &mut StandIn, table: u32, vector: u32, handler: u32) {
     let address = Address(table + vector * VECTOR_BYTES);
-    target.write_memory(address, FunctionCode::SUPERVISOR_DATA, Size::Long, &handler.to_be_bytes()).unwrap();
+    target.write_memory(address, Size::Long, FunctionCode::SUPERVISOR_DATA, &handler.to_be_bytes()).unwrap();
 }
 
 #[test]
@@ -472,7 +472,7 @@ fn a_stepped_movec_in_user_mode_is_a_privilege_violation() {
     let user_stack = RAM_BASE + 0x300;
     let (mut target, pod) = stepping(&[MOVEC_TO_CONTROL, D0_VBR]);
     let handler = Address(PRIVILEGE_HANDLER);
-    target.write_memory(handler, FunctionCode::SUPERVISOR_DATA, Size::Word, &NOP.to_be_bytes()).unwrap();
+    target.write_memory(handler, Size::Word, FunctionCode::SUPERVISOR_DATA, &NOP.to_be_bytes()).unwrap();
     set_vector(&mut target, PRIVILEGE, PRIVILEGE_HANDLER);
     target.write_register(Register::D0, NEW_TABLE).unwrap();
     target.write_system_register(SystemRegister::Usp, user_stack).unwrap();
