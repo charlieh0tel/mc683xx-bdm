@@ -303,7 +303,11 @@ as many reads waiting, so replies complete back to back.  No firmware
 or protocol change: the pod still answers one request at a time, in
 order.  On a failure the host sends nothing more, and the requests
 already sent run anyway (for a write, memory past the failed chunk may
-be written).  Each reply also carries
+be written).  With a request always waiting and its words spun for,
+nothing in the serve loop need await, so it yields after each reply:
+the watchdog's feeder, FREEZE's watcher and USB are joined with it in
+one task, and without the yield the pod reset itself 8 s into a long
+block read.  Each reply also carries
 FREEZE's edge count (low 8 bits), so a host sees a leave and re-entry
 that FREEZE's level hides.  The answer to each request is
 `mc683xx-bdm-proto`'s `pod`, over a `Board` trait: the firmware's board (`board.rs`) is the
@@ -801,7 +805,8 @@ How to run each item and what to expect: `docs/bring-up.md`.
       12.7 s at 1 MHz, 7.9 s at 3 MHz, with a short word's answer
       spun for (Firmware); about 0.65 ms a USB round trip is the rest
       (docs/58503a/).  With memory requests in flight (`IN_FLIGHT`):
-      PIPELINED.  On an 8.39 MHz target DUMP works at 3 MHz
+      10.4 s at 1 MHz, 5.8 s at 3 MHz, about 3.6 s of it fixed (0.4 ms
+      a request), the rest the wire.  On an 8.39 MHz target DUMP works at 3 MHz
       and fails at 3.5 MHz (docs/58503a/); a 16.78 MHz target and FILL
       not yet
 - [ ] Load and run a test program from RAM
