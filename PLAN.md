@@ -424,6 +424,14 @@ pods apart (`bdm --pod usb:SERIAL`).  Requests:
   word.  The cost is one register read a word; on the model,
   host-side, DUMP throughput did not change measurably (about
   70 MB/s either way).
+- A short word's answer is spun for (`PioLink::shift`): the word goes
+  into the empty TX FIFO, and the RX FIFO is polled for up to the
+  word's time plus 1 us when that is at most 50 us (DSCLK 400 kHz and
+  up); a slower word, or a spin that runs out, awaits the FIFO's
+  interrupt.  An await costs tens of microseconds a word, more than a
+  word at 1 MHz (17 us): on silicon it more than doubled a block
+  read's time (docs/58503a/, Throughput).  The one exception to no
+  blocking in an async task; a spin is at most 50 us.
 
 Watchdog (`watchdog.rs`, `mc683xx-bdm-proto`'s `watchdog`): the chip's
 hardware watchdog, 8 s on either chip, the RP2040's longest (2^24
@@ -780,8 +788,9 @@ How to run each item and what to expect: `docs/bring-up.md`.
       selects written by hand and a loop run from RAM under gdb
       (docs/58503a/)
 - [ ] Block DUMP/FILL throughput test; raise DSCLK until it fails,
-      back off.  DUMP at 1 MHz: 512 KB of longs in 18.9 s, about
-      28 KB/s, USB-limited.  On an 8.39 MHz target DUMP works at 3 MHz
+      back off.  DUMP of 512 KB of longs: 12.7 s at 1 MHz, 7.9 s at
+      3 MHz, with a short word's answer spun for (Firmware); about
+      0.65 ms a USB round trip is the rest (docs/58503a/).  On an 8.39 MHz target DUMP works at 3 MHz
       and fails at 3.5 MHz (docs/58503a/); a 16.78 MHz target and FILL
       not yet
 - [ ] Load and run a test program from RAM

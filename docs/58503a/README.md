@@ -207,13 +207,25 @@ error instead: with SIMCR $614A, a read of $110000 (unmapped) replied
 
 ## Throughput
 
-DUMP at 1 MHz DSCLK: 512 KB of longs in 18.9 s, about 28 KB/s.
+The 512 KB flash, `bdm dump 0 0x80000 --size long --output FILE`,
+each read the same as the others (2026-11-21):
+
+| Pod | 1 MHz | 2 MHz | 3 MHz |
+|---|---|---|---|
+| 65f92ba | 19.0 s | | |
+| 0.3.0 (U1 off between requests) | 24.0 s | 20.8 s | |
+| a short word's answer spun for (PLAN.md, Firmware) | 12.7 s | 9.0 s | 7.9 s |
+
+With the spin, `--size word` at 1 MHz takes 16.3 s.  The slowdown from
+65f92ba to 0.3.0 came from added work on each word's path, mostly with
+FREEZE before every word (20.6 s to 25.0 s), while an await for each
+word's answer cost tens of microseconds; the wire's share at 1 MHz is
+about 5.6 s.
 
 ## DSCLK
 
 The 512 KB flash (`bdm dump 0 0x80000 --size long`) read the same as at
-1 MHz at 2, 2.5 and 3 MHz: 24.0 s at 1 MHz, 20.8 s at 2 MHz, so
-USB-limited.  At 3.5 and 4 MHz it failed ("unexpected response from
+1 MHz at 2, 2.5 and 3 MHz (Throughput).  At 3.5 and 4 MHz it failed ("unexpected response from
 target"), and only `bdm reset` recovered (`bdm resync` did not) (pod
 0.3.0, protocol 11, 2026-11-21).  The system clock is 8.39 MHz (Clock),
 so MC68331UM Table A-7 allows DSCLK up to 4.19 MHz; 3.5 MHz is about

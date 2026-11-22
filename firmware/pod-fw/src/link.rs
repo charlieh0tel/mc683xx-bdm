@@ -20,6 +20,7 @@ use embassy_rp::pio::Pin;
 use embassy_rp::pio::ShiftConfig;
 use embassy_rp::pio::ShiftDirection;
 use embassy_rp::pio::StateMachine;
+use embassy_time::Duration;
 use embassy_time::Instant;
 use fixed::FixedU32;
 use mc683xx_bdm_proto::dsclk::DSI_EXIT_HOLD_CYCLES;
@@ -40,6 +41,15 @@ const RELEASE_DSI: u32 = 1 << (LEFT_JUSTIFY - 1);
 const WORD_MASK: u32 = (1 << WORD_BITS) - 1;
 /// The OSR and ISR are 32 bits; the program pulls and pushes itself.
 const SHIFT_THRESHOLD: u8 = 32;
+/// The longest word [`PioLink::shift`] spins for rather than awaiting
+/// the RX FIFO's interrupt: DSCLK at 400 kHz and up.  An await costs
+/// tens of microseconds, more than a word at 1 MHz (17 us); a spin this
+/// short holds up no other task for long (PLAN.md, Firmware: the one spin
+/// in a request).
+const SPIN_LIMIT_US: u64 = 50;
+/// PIO cycles in a word: 17 bits of two 8-cycle phases, and the pull,
+/// `set` and push around them.
+const WORD_CYCLES: u64 = WORD_BITS as u64 * 16 + 8;
 // The program's exit path, from the last rise: `out y` and `jmp !y`,
 // `nop [4]`'s 5 cycles, then `set pins, 0` on the 8th.
 const _: () = assert!(DSI_EXIT_HOLD_CYCLES == 2 + 5 + 1);
@@ -55,6 +65,10 @@ pub(crate) struct PioLink<'d> {
     /// DSCLK's level: as [`PioLink::set_dsclk`] left it, high after
     /// each word.
     dsclk_high: bool,
+    /// How long [`PioLink::shift`] spins for a word's answer, or `None`
+    /// to await it: a word's time at this rate, if within
+    /// [`SPIN_LIMIT_US`].
+    spin: Option<Duration>,
 }
 
 /// The pins [`PioLink::new`] takes over.
@@ -125,7 +139,7 @@ impl<'d> PioLink<'d> {
         sm.set_pin_dirs(Direction::Out, &[&dsclk, &dsi, &dsi_enable]);
         sm.set_pin_dirs(Direction::In, &[&dso]);
         sm.set_enable(true);
-        Self { sm, dsclk, dsi_enable, dsclk_hz: divider.dsclk_hz, dsclk_high: true }
+        Self { sm, dsclk, dsi_enable, dsclk_hz: divider.dsclk_hz, dsclk_high: true, spin: spin(divider) }
     }
 
     /// Drives DSCLK (BKPT) between words: low to request a halt.
@@ -149,6 +163,7 @@ impl<'d> PioLink<'d> {
     pub(crate) fn set_divider(&mut self, divider: Divider) {
         self.sm.set_clock_divider(FixedU32::from_bits(divider.bits));
         self.dsclk_hz = divider.dsclk_hz;
+        self.spin = spin(divider);
     }
 
     /// DSCLK's rate, as the divider in effect gives it.
@@ -157,9 +172,26 @@ impl<'d> PioLink<'d> {
     }
 
     /// One word out and in; each counts as progress for the watchdog.
+    /// A short word's answer is spun for (`spin`), a long one's awaited.
     async fn shift(&mut self, osr: u32) -> u32 {
-        self.sm.tx().wait_push(osr).await;
-        let word = self.sm.rx().wait_pull().await & WORD_MASK;
+        if !self.sm.tx().try_push(osr) {
+            self.sm.tx().wait_push(osr).await;
+        }
+        let spun = self.spin.and_then(|spin| {
+            let deadline = Instant::now() + spin;
+            loop {
+                if let Some(word) = self.sm.rx().try_pull() {
+                    return Some(word);
+                }
+                if Instant::now() > deadline {
+                    return None;
+                }
+            }
+        });
+        let word = match spun {
+            Some(word) => word,
+            None => self.sm.rx().wait_pull().await,
+        } & WORD_MASK;
         // The word's last rise leaves it high.
         self.dsclk_high = true;
         ACTIVITY.step();
@@ -186,4 +218,12 @@ impl Link for PioLink<'_> {
     fn freeze_high(&self) -> bool {
         freeze::level()
     }
+}
+
+/// A word's time at `divider`'s rate, if short enough to spin for
+/// ([`SPIN_LIMIT_US`]); a microsecond more for the rounding.
+fn spin(divider: Divider) -> Option<Duration> {
+    // Each phase is 8 PIO cycles: a PIO cycle is 1/16 of DSCLK's period.
+    let word_us = WORD_CYCLES * 1_000_000 / (u64::from(divider.dsclk_hz) * 16) + 1;
+    (word_us <= SPIN_LIMIT_US).then(|| Duration::from_micros(word_us))
 }
