@@ -22,7 +22,6 @@ embassy-time = "0.5.1"
 embassy-usb = "0.6.0"
 fixed = "1.31.0"
 mc683xx-bdm-proto = { version = "0.3.0", path = "../../crates/proto" }
-mc683xx-target = "0.6.0"
 panic-probe = { version = "1.0.0", features = ["print-defmt"], optional = true }
 # embassy-rp 0.10 loads pio 0.3 programs.
 pio = "0.3.0"
