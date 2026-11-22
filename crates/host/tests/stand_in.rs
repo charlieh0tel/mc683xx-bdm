@@ -105,6 +105,28 @@ fn a_session() {
 }
 
 #[test]
+fn blocks_go_with_requests_in_flight_and_a_failure_mid_block_leaves_no_reply_behind() {
+    let (mut target, _pod) = stand_in(true);
+    target.reset_halted().unwrap();
+    let data: Vec<u8> = (0..RAM).map(|n| (n * 7) as u8).collect();
+    target.write_memory(Address(RAM_BASE), FunctionCode::SUPERVISOR_DATA, Size::Long, &data).unwrap();
+    let mut back = vec![0; RAM];
+    target.read_memory(Address(RAM_BASE), FunctionCode::SUPERVISOR_DATA, Size::Long, &mut back).unwrap();
+    assert_eq!(back, data);
+
+    // Two chunks in RAM, then eight past its end: the third fails, and
+    // the requests sent behind it are answered after it.
+    let tail = u32::try_from(RAM - 2 * 56).unwrap();
+    let mut block = vec![0; 10 * 56];
+    let result =
+        target.read_memory(Address(RAM_BASE + tail), FunctionCode::SUPERVISOR_DATA, Size::Long, &mut block);
+    assert!(matches!(result, Err(Error::Reply(ReplyError::Failed(Status::BusError)))), "{result:?}");
+    assert_eq!(block[..2 * 56], data[RAM - 2 * 56..]);
+    target.write_register(Register::D3, 0x1234_5678).unwrap();
+    assert_eq!(target.read_register(Register::D3).unwrap(), 0x1234_5678, "its own reply, not a stale one");
+}
+
+#[test]
 fn halt_without_bdm_enabled_fails() {
     let (mut target, _pod) = stand_in(false);
     assert!(target.halt().is_err());

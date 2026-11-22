@@ -18,6 +18,7 @@ mod watchdog;
 use defmt_rtt as _;
 use embassy_executor::Spawner;
 use embassy_futures::join::join4;
+use embassy_futures::yield_now;
 use embassy_rp::adc;
 use embassy_rp::adc::Adc;
 use embassy_rp::bind_interrupts;
@@ -173,6 +174,11 @@ async fn serve(
             if to_host.write(&reply[..length]).await.is_err() {
                 break;
             }
+            // With a request already waiting and its words spun for
+            // (`link.rs`), nothing above need await; the watchdog's
+            // feeder, FREEZE's watcher and USB, joined with this loop,
+            // run only when it yields.
+            yield_now().await;
         }
     }
 }
