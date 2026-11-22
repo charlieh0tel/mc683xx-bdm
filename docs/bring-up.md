@@ -290,7 +290,10 @@ time bdm dump RAM 4096 --size long --output /dev/null
 
 Record bytes per second.  Raise `bdm clock` until DUMPs fail (wrong
 data, Unexpected), then back off; record the margin in PLAN.md.  The pod
-caps DSCLK at 4 MHz until this test says otherwise (`dsclk::MAX_HZ`).
+caps DSCLK at 4 MHz until this test says otherwise (`dsclk::MAX_HZ`),
+but not from the target's clock: above about a third of the system
+clock DSO is sampled too early (README, Status), and after a failure
+only `bdm reset` recovers.
 
 ## 13. Silicon questions
 
