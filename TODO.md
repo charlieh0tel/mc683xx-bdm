@@ -7,7 +7,11 @@
 
 ## Firmware
 
-- DSCLK above 4 MHz, once the throughput test measures the margin.
+- DSCLK above 4 MHz, on a 16.78 MHz target, once the throughput test
+  measures the margin there (docs/58503a/: an 8.39 MHz target fails at
+  3.5 MHz).
+- Cap DSCLK from the target's system clock (read SYNCR at entry, or let
+  the host pass the clock): the 4 MHz cap assumes 16.78 MHz.
 - Report a watchdog reset to the host (WATCHDOG's REASON at start,
   say in Pins or Version, and in `bdm pins`): a protocol change, so
   `PROTOCOL_VERSION`, `docs/usb-protocol.md` and `mc683xx-bdm` with it.
@@ -16,10 +20,10 @@
   at reset (SIMCR $60CF), but a program may clear it, and then the
   watchdog runs while the CPU is halted: an init script sets it
   again.
-- `bdm gdb` on silicon with a real m68k gdb: registers, memory and
-  disassembly work (docs/58503a/); still to try: breakpoints, continue,
-  Ctrl-C, and `PodTarget::step` on a TRAP, an interrupt, user mode,
-  code in ROM (PLAN.md, Host, gdb).
+- `bdm gdb` on silicon with a real m68k gdb: registers, memory,
+  disassembly, breakpoints, continue, Ctrl-C, a step over a branch,
+  detach and kill work (docs/58503a/); still to try: `PodTarget::step`
+  on a TRAP, an interrupt, user mode, code in ROM (PLAN.md, Host, gdb).
 - `monitor init` and `monitor load` in `bdm gdb`, once `mc683xx-debug`
   is in (PLAN.md, Host, Loading and init).
 - The next carrier revision's changes: `hardware/README.md`, Next
@@ -35,8 +39,8 @@
     falling and U2's (74AHCT1G125) output turning off; U1 driving BKPT
     into 1 kOhm.
   - On a target: BGND and a breakpoint after GO (fresh ATEMP 1 and 0,
-    DSI driven again); NOP / not-ready; external RAM; DUMP/FILL
-    throughput, raising DSCLK until it fails; a test program from RAM;
+    DSI driven again); NOP / not-ready; external RAM; FILL throughput,
+    and DSCLK's limit on a 16.78 MHz target; a test program from RAM;
     flash programming; the smartclock harness on silicon.
   - Silicon questions for m683xx-emu: PCC after a reset double bus
     fault, BKPT out of LPSTOP, the halt monitor on a double fault in
