@@ -10,8 +10,18 @@
 - DSCLK above 4 MHz, on a 16.78 MHz target, once the throughput test
   measures the margin there (docs/58503a/: an 8.39 MHz target fails at
   3.5 MHz).
-- Cap DSCLK from the target's system clock (read SYNCR at entry, or let
-  the host pass the clock): the 4 MHz cap assumes 16.78 MHz.
+- Throughput, parked (512 KB of longs on an 8.39 MHz target: 10.4 s
+  at 1 MHz, 5.8 s at 3 MHz; about 0.4 ms a request, the rest the wire;
+  PLAN.md, Bring-up checklist):
+  - A ReadMemory answered with several IN packets (a protocol change):
+    most of the 0.4 ms a request, about 3 s of a 512 KB read at any
+    rate.
+  - The next DUMP in place of a result's closing NOP: a third of a
+    long's words, half a word's; care after a bus error or not-ready,
+    where the CPU has taken that DUMP as a command.
+  - DSO sampled just after the next rise instead of before it: DSCLK
+    up to half the system clock (3 to about 4 MHz at 8.39 MHz), if the
+    CPU holds DSO long enough; on a scope first.
 - Report a watchdog reset to the host (WATCHDOG's REASON at start,
   say in Pins or Version, and in `bdm pins`): a protocol change, so
   `PROTOCOL_VERSION`, `docs/usb-protocol.md` and `mc683xx-bdm` with it.

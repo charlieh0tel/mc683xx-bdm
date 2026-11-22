@@ -61,8 +61,12 @@ Not yet tried on silicon (`TODO.md`): a flash-programming command
 (flash has been programmed with `bdm write` sequences); the Pico 2
 (RP2350) build; DSCLK above 4 MHz.
 
-DSCLK is limited to half the target's system clock, which on a slow
-target (`docs/58503a/`) is below the pod's 4 MHz cap.
+Keep DSCLK (`bdm clock`) at or below about a third of the target's
+system clock: the pod samples DSO 15/16 of a bit after each rise, and
+the CPU may take up to 2 system clocks, plus about 40 ns of delays, to
+put it out (PLAN.md, Protocol summary).  On an 8.39 MHz target that is
+3 MHz (`docs/58503a/`); above it the link fails and only `bdm reset`
+recovers.  The pod caps DSCLK at 4 MHz whatever the target.
 
 Known limit: a pod restart (a USB replug, say) during `bdm hold` or in
 the middle of a request can disturb a halted target until `bdm reset`.
