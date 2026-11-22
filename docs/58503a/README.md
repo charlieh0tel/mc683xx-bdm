@@ -215,7 +215,7 @@ each read the same as the others (2026-11-21):
 | 65f92ba | 19.0 s | | |
 | 0.3.0 (U1 off between requests) | 24.0 s | 20.8 s | |
 | a short word's answer spun for (PLAN.md, Firmware) | 12.7 s | 9.0 s | 7.9 s |
-| and 4 memory requests in flight (PLAN.md, USB) | 10.4 s | 7.0 s | 5.8 s |
+| and 4 read requests in flight (PLAN.md, USB) | 10.4 s | 7.0 s | 5.8 s |
 
 With the spin, `--size word` at 1 MHz takes 16.3 s; with requests in
 flight 13.9 s.  At 3.3 MHz a short read works and a 512 KB one failed.  The slowdown from

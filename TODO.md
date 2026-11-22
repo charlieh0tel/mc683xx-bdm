@@ -38,9 +38,6 @@
   - On the scope: PIO framing and idle high; IFETCH against FREEZE
     falling and U2's (74AHCT1G125) output turning off; U1 driving BKPT
     into 1 kOhm.
-  - Memory requests in flight (`IN_FLIGHT`): time a block write
-    against one request at a time (reads: PLAN.md, Bring-up
-    checklist, throughput).
   - On a target: BGND and a breakpoint after GO (fresh ATEMP 1 and 0,
     DSI driven again); NOP / not-ready; external RAM; FILL throughput,
     and DSCLK's limit on a 16.78 MHz target; a test program from RAM;

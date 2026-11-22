@@ -371,26 +371,19 @@ impl<T: Transport> Pod<T> {
     }
 
     /// Writes `data` at `address` in `size` accesses, through DFC, as
-    /// many requests as it takes, up to [`IN_FLIGHT`] of them
-    /// outstanding.
+    /// many requests as it takes, one at a time: unlike a read, a write
+    /// behind a failed one would change memory, so none is sent ahead.
     ///
     /// # Errors
     /// As [`Error`]; a length that is not whole accesses.  The first
-    /// failure is returned at once and nothing more is sent, but the
-    /// chunks already sent behind the failed one (up to one fewer than
-    /// [`IN_FLIGHT`]) still run: memory past the failed chunk may be
+    /// failure is returned at once; nothing past the failed chunk is
     /// written.
     pub fn write_memory(&mut self, address: Address, size: Size, data: &[u8]) -> Result<(), Error> {
         check_length(size, data.len())?;
-        self.pipeline(
-            chunk_count(data.len()),
-            |n, tag, packet| {
-                let range = chunk(data.len(), n);
-                Request::WriteMemory { address: at(address, range.start), size, data: &data[range] }
-                    .encode(tag, packet)
-            },
-            |_, body| empty(body),
-        )
+        (0..chunk_count(data.len())).try_for_each(|n| {
+            let range = chunk(data.len(), n);
+            self.done(&Request::WriteMemory { address: at(address, range.start), size, data: &data[range] })
+        })
     }
 
     /// Raw serial words, each answered with the 17 bits shifted in, as
@@ -933,12 +926,13 @@ mod tests {
     }
 
     #[test]
-    fn memory_writes_keep_requests_in_flight() {
+    fn memory_writes_go_one_at_a_time() {
         let mut pod = Pod::new(Queued::new(None));
         pod.write_memory(Address(0x2000), Size::Word, &[0; 6 * MAX_MEMORY_BYTES]).unwrap();
         let transport = pod.into_transport();
-        assert_eq!(transport.log, pipelined(6));
-        assert_eq!(transport.most_outstanding(), IN_FLIGHT);
+        let expected: Vec<_> = (1..=6).flat_map(|n| [Event::Sent(n), Event::Received(n)]).collect();
+        assert_eq!(transport.log, expected);
+        assert_eq!(transport.most_outstanding(), 1);
         let expected: Vec<_> = (0..6).map(|n| Address(0x2000 + n * 56)).collect();
         assert_eq!(transport.written, expected);
     }
@@ -976,16 +970,15 @@ mod tests {
     }
 
     #[test]
-    fn writes_sent_behind_a_failed_one_still_run() {
-        let mut pod = Pod::new(Queued::new(Some(Address(0x2000))));
+    fn a_failed_write_writes_nothing_past_it() {
+        // The second chunk fails.
+        let mut pod = Pod::new(Queued::new(Some(Address(0x2000 + 56))));
         assert!(matches!(
             pod.write_memory(Address(0x2000), Size::Byte, &[0; 8 * MAX_MEMORY_BYTES]),
             Err(Error::Reply(ReplyError::Failed(Status::NoFreeze)))
         ));
-        pod.read_register(Register::D0).unwrap();
-        let expected: Vec<_> =
-            (1..IN_FLIGHT).map(|n| Address(0x2000 + 56 * u32::try_from(n).unwrap())).collect();
-        assert_eq!(pod.into_transport().written, expected);
+        assert_eq!(pod.transport.sent(), [1, 2], "none after the failure");
+        assert_eq!(pod.into_transport().written, [Address(0x2000)]);
     }
 
     #[test]

@@ -57,8 +57,9 @@ Either way:
 
 - The pod answers requests one at a time, in order: each reply before
   the next request is read.  A host may send a few requests before
-  reading the first one's reply (the `bdm` host keeps up to 4 memory
-  requests of a block outstanding, `IN_FLIGHT`); the later ones wait
+  reading the first one's reply (the `bdm` host keeps up to 4
+  ReadMemory requests of a block outstanding, `IN_FLIGHT`; writes go
+  one at a time, so none runs behind a failed one); the later ones wait
   in the endpoint or the socket, and the pod starts each as soon as it
   has written the reply before.  Tags tell their replies apart.  A
   reply's timeout runs from when the host starts waiting for it, since

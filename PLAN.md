@@ -295,15 +295,16 @@ byte the reply echoes, so a host that gave up on a reply (a timeout,
 Ctrl-C) discards it when it comes later instead of taking it for the
 next request's; Hello is untagged and fixed across versions, so a
 version mismatch is still reported as one.  The tags also let the
-host keep several requests outstanding: a memory block keeps up to 4
+host keep several requests outstanding: a block read keeps up to 4
 sent ahead (`IN_FLIGHT`, `crates/host/src/pod.rs`), so the pod, which
 reads the next request as soon as it has written a reply, starts it
 without waiting a USB round trip for the host; the USB transport keeps
 as many reads waiting, so replies complete back to back.  No firmware
 or protocol change: the pod still answers one request at a time, in
-order.  On a failure the host sends nothing more, and the requests
-already sent run anyway (for a write, memory past the failed chunk may
-be written).  With a request always waiting and its words spun for,
+order.  On a failure the host sends nothing more, and the reads
+already sent run anyway, their replies discarded later as stale.  A
+block write stays one request at a time: a write sent ahead would
+change memory past a failed chunk.  With a request always waiting and its words spun for,
 nothing in the serve loop need await, so it yields after each reply:
 the watchdog's feeder, FREEZE's watcher and USB are joined with it in
 one task, and without the yield the pod reset itself 8 s into a long
