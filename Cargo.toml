@@ -8,7 +8,7 @@ resolver = "3"
 
 # One version for the crates and the Python package (RELEASING.md).
 [workspace.package]
-version = "0.3.0"
+version = "0.4.0"
 edition = "2024"
 # The toolchain rust-toolchain.toml pins, the one CI builds and tests
 # with; no older compiler is checked, so none is claimed.
@@ -23,9 +23,9 @@ keywords = ["bdm", "cpu32", "m68k", "mc68331", "debugger"]
 # so a host never mixes two releases' crates.  The version follows
 # [workspace.package]'s (RELEASING.md).
 [workspace.dependencies]
-mc683xx-bdm = { path = "crates/host", version = "=0.3.0" }
+mc683xx-bdm = { path = "crates/host", version = "=0.4.0" }
 mc683xx-bdm-model = { path = "crates/model" }
-mc683xx-bdm-proto = { path = "crates/proto", version = "=0.3.0" }
+mc683xx-bdm-proto = { path = "crates/proto", version = "=0.4.0" }
 
 [workspace.lints.rust]
 missing_debug_implementations = "warn"

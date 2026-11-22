@@ -4,7 +4,7 @@
 
 [package]
 name = "pod-fw"
-version = "0.3.0"
+version = "0.4.0"
 edition = "2024"
 license = "GPL-3.0-only"
 
@@ -21,7 +21,7 @@ embassy-sync = "0.8.0"
 embassy-time = "0.5.1"
 embassy-usb = "0.6.0"
 fixed = "1.31.0"
-mc683xx-bdm-proto = { version = "0.3.0", path = "../../crates/proto" }
+mc683xx-bdm-proto = { version = "0.4.0", path = "../../crates/proto" }
 panic-probe = { version = "1.0.0", features = ["print-defmt"], optional = true }
 # embassy-rp 0.10 loads pio 0.3 programs.
 pio = "0.3.0"
