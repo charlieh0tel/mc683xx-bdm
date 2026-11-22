@@ -30,10 +30,6 @@
   at reset (SIMCR $60CF), but a program may clear it, and then the
   watchdog runs while the CPU is halted: an init script sets it
   again.
-- `bdm gdb` on silicon with a real m68k gdb: registers, memory,
-  disassembly, breakpoints, continue, Ctrl-C, a step over a branch,
-  detach and kill work (docs/58503a/); still to try: `PodTarget::step`
-  on a TRAP, an interrupt, user mode, code in ROM (PLAN.md, Host, gdb).
 - `monitor init` and `monitor load` in `bdm gdb`, once `mc683xx-debug`
   is in (PLAN.md, Host, Loading and init).
 - The next carrier revision's changes: `hardware/README.md`, Next

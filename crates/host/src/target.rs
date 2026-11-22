@@ -1,7 +1,8 @@
 //! [`Cpu32Target`] over the pod: the trait's halts, registers and
 //! memory, with what it needs kept between requests (the entry source,
 //! the program's SFC and DFC), and its step by T1 trace through an
-//! exception table in scratch RAM (`step`).  The pod reads ATEMP first
+//! exception table in scratch RAM (`step`), MOVEC to or from VBR
+//! emulated.  The pod reads ATEMP first
 //! after each entry and reports it (`mc683xx_bdm_proto::entry`); this never
 //! reads ATEMP.
 
@@ -24,11 +25,14 @@ use crate::pod::Pod;
 use crate::step::FRAME_HEAD;
 use crate::step::Frame;
 use crate::step::MAX_FRAMES;
+use crate::step::MOVEC_BYTES;
 use crate::step::SR_S;
 use crate::step::SR_T1;
 use crate::step::SR_TRACE;
 use crate::step::StepError;
+use crate::step::TRACE_VECTOR;
 use crate::step::TraceEffect;
+use crate::step::VbrMove;
 use crate::step::after_stub;
 use crate::step::frame_bytes;
 use crate::step::scratch_image;
@@ -48,6 +52,20 @@ const SUPERVISOR_DATA: FunctionCode = FunctionCode::SUPERVISOR_DATA;
 /// The program spaces a stepped instruction is read from, by SR's S.
 const SUPERVISOR_PROGRAM: FunctionCode = FunctionCode::SUPERVISOR_PROGRAM;
 const USER_PROGRAM: FunctionCode = FunctionCode::USER_PROGRAM;
+
+/// What a step does with the instruction at RPC.
+#[derive(Clone, Copy, Debug)]
+enum Stepped {
+    /// Traces it, which leaves the trace bits so.
+    Traced(TraceEffect),
+    /// Emulates a MOVEC to or from VBR, the instruction at `pc`.
+    Emulated {
+        /// The move.
+        movement: VbrMove,
+        /// Where it is.
+        pc: u32,
+    },
+}
 
 /// One of SFC and DFC: the program's value, and what the CPU holds now.
 /// Both `None` until read or written; they differ only after a memory
@@ -351,12 +369,7 @@ impl<T: Transport> PodTarget<T> {
             at = at.offset(bytes as u32);
         }
         let bottom = at;
-        let chain = unwind(chain, stub, program_sr, effect, |vector| {
-            let mut handler = [0; 4];
-            let address = vector_address(Address(program_vbr), vector);
-            self.read_memory(address, SUPERVISOR_DATA, Size::Word, &mut handler)?;
-            Ok::<_, Error>(u32::from_be_bytes(handler))
-        })?;
+        let chain = unwind(chain, stub, program_sr, effect, |vector| self.vector(program_vbr, vector))?;
         let (cpu, frames) = chain.split_first().expect("the chain starts with the CPU");
         let stacked: Vec<u8> = frames.iter().flat_map(Frame::bytes).collect();
         let sp = Address(bottom.0.wrapping_sub(stacked.len() as u32));
@@ -371,12 +384,22 @@ impl<T: Transport> PodTarget<T> {
         self.write_system_register(SystemRegister::Sr, u32::from(cpu.sr))
     }
 
-    /// What the instruction at RPC does to SR's trace bits, read from
-    /// the program space SR's S selects.  One that cannot be read (a
-    /// bus error) is no SR writer: the step faults on its fetch first.
-    fn trace_effect(&mut self, program_sr: u32) -> Result<TraceEffect, Error> {
+    /// The handler in vector `vector` of the table at `table`.
+    fn vector(&mut self, table: u32, vector: u32) -> Result<u32, Error> {
+        let mut handler = [0; 4];
+        self.read_memory(vector_address(Address(table), vector), SUPERVISOR_DATA, Size::Word, &mut handler)?;
+        Ok(u32::from_be_bytes(handler))
+    }
+
+    /// What a step does with the instruction at RPC, read from the
+    /// program space SR's S selects: a MOVEC to or from VBR in
+    /// supervisor mode is emulated, anything else traced.  A word that
+    /// cannot be read (a bus error) is no SR writer and no MOVEC: the
+    /// step faults on its fetch first.
+    fn stepped(&mut self, program_sr: u32) -> Result<Stepped, Error> {
         let pc = self.read_system_register(SystemRegister::Rpc)?;
-        let space = if program_sr & SR_S != 0 { SUPERVISOR_PROGRAM } else { USER_PROGRAM };
+        let supervisor = program_sr & SR_S != 0;
+        let space = if supervisor { SUPERVISOR_PROGRAM } else { USER_PROGRAM };
         let word = |target: &mut Self, at: u32| {
             let mut bytes = [0; 2];
             match target.read_memory(Address(at), space, Size::Word, &mut bytes) {
@@ -385,12 +408,54 @@ impl<T: Transport> PodTarget<T> {
                 Err(error) => Err(error),
             }
         };
-        let Some(opcode) = word(self, pc)? else { return Ok(TraceEffect::Kept) };
-        if !TraceEffect::needs_immediate(opcode) {
-            return Ok(TraceEffect::of(opcode, 0));
+        let Some(opcode) = word(self, pc)? else { return Ok(Stepped::Traced(TraceEffect::Kept)) };
+        if !TraceEffect::needs_immediate(opcode) && !VbrMove::needs_extension(opcode) {
+            return Ok(Stepped::Traced(TraceEffect::of(opcode, 0)));
         }
-        let Some(immediate) = word(self, pc.wrapping_add(2))? else { return Ok(TraceEffect::Kept) };
-        Ok(TraceEffect::of(opcode, immediate))
+        let Some(second) = word(self, pc.wrapping_add(2))? else {
+            return Ok(Stepped::Traced(TraceEffect::Kept));
+        };
+        Ok(match VbrMove::of(opcode, second) {
+            Some(movement) if supervisor => Stepped::Emulated { movement, pc },
+            _ => Stepped::Traced(TraceEffect::of(opcode, second)),
+        })
+    }
+
+    /// Emulates the MOVEC to or from VBR at `pc`, in supervisor mode,
+    /// and the program's own trace after it if its SR has T1: the
+    /// six-word frame stacked and RPC its handler, through the VBR the
+    /// move left.
+    fn move_vbr(
+        &mut self,
+        movement: VbrMove,
+        pc: u32,
+        program_sr: u32,
+        program_vbr: u32,
+    ) -> Result<Entry, Error> {
+        let vbr = match movement {
+            VbrMove::To(register) => {
+                let vbr = self.read_register(register)?;
+                self.write_system_register(SystemRegister::Vbr, vbr)?;
+                vbr
+            }
+            VbrMove::From(register) => {
+                self.write_register(register, program_vbr)?;
+                program_vbr
+            }
+        };
+        let next = pc.wrapping_add(MOVEC_BYTES);
+        if program_sr & SR_T1 == 0 {
+            self.write_system_register(SystemRegister::Rpc, next)?;
+            return Ok(Entry::Breakpoint);
+        }
+        let trace = Frame::trace(program_sr as u16, next, pc).bytes();
+        let sp = self.read_register(Register::A7)?.wrapping_sub(trace.len() as u32);
+        let handler = self.vector(vbr, TRACE_VECTOR)?;
+        self.write_memory(Address(sp), SUPERVISOR_DATA, Size::Word, &trace)?;
+        self.write_register(Register::A7, sp)?;
+        self.write_system_register(SystemRegister::Rpc, handler)?;
+        self.write_system_register(SystemRegister::Sr, program_sr & !SR_TRACE)?;
+        Ok(Entry::Breakpoint)
     }
 
     /// The step from VBR at the stub's table on: SR's T1 set, GO, and
@@ -488,6 +553,13 @@ impl<T: Transport> Cpu32Target for PodTarget<T> {
     /// the trace bits back, best effort; frames it had begun to unwind
     /// stay as they were left.
     ///
+    /// A MOVEC to or from VBR in supervisor mode is emulated, not
+    /// traced (PLAN.md, Host, gdb): VBR or Rn written, RPC past it, or
+    /// at the program's trace handler if its SR has T1.  An interrupt
+    /// pending is not taken by that step; the next step or GO takes it.
+    /// An emulation that fails leaves what it had written.  In user
+    /// mode MOVEC is traced, to the privilege violation.
+    ///
     /// # Errors
     /// [`StepError`]: no scratch RAM, a step that did not stop (it is
     /// then halted), or frames not as a step stacks them; or as
@@ -500,7 +572,12 @@ impl<T: Transport> Cpu32Target for PodTarget<T> {
         self.halted_state()?;
         let program_sr = self.read_system_register(SystemRegister::Sr)?;
         let program_vbr = self.read_system_register(SystemRegister::Vbr)?;
-        let effect = self.trace_effect(program_sr)?;
+        let effect = match self.stepped(program_sr)? {
+            Stepped::Traced(effect) => effect,
+            Stepped::Emulated { movement, pc } => {
+                return self.move_vbr(movement, pc, program_sr, program_vbr);
+            }
+        };
         if !self.scratch_written {
             self.write_memory(scratch, SUPERVISOR_DATA, Size::Word, &scratch_image(scratch))?;
             self.scratch_written = true;

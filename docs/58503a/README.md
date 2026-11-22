@@ -194,6 +194,28 @@ loop at $100000: `addq.l #1,d0; addq.l #1,d1; bra.s`.
 - Ctrl-C in gdb during `continue` halted the target ("Program received
   signal SIGINT"); a `stepi` then worked; `detach` left it running.
 
+Steps in ROM, through TRAP and RTE, and in user mode, pod at main
+4009549 and later, 2026-11-21: `bdm gdb --scratch 0x108000` from a
+reset entry, the RAM chip selects set as the firmware sets them, the
+watchdog off.
+
+- `stepi` in ROM at $550 over `move.w #$2700,sr` and `movea.l #0,a0`
+  worked.
+- `stepi` onto TRAP #0, VBR $101000, vector 32 to $100100: stopped at
+  the handler's first instruction, SSP down 8.
+- `stepi` over the handler's MOVEQ and RTE: back at the instruction
+  after the TRAP, SSP restored.
+- User mode (SR $0000, USP $10F000): steps kept SR user, SP USP.
+- TRAP #0 stepped from user mode: stopped at the handler, S set, on
+  SSP.
+- `stepi` on the boot code's `movec a0,vbr` (4E7B 8801), before the
+  host emulated MOVEC to VBR: "target: step: the step did not stop;
+  halted at 0x001005b8", the session ended, and VBR was back at
+  $101000, the program's write lost.  With the host's MOVEC to VBR
+  emulation (PLAN.md, Host, gdb): `stepi` from $550 over MOVE to SR,
+  MOVEA, `movec a0,vbr`, `movea.l (a0),sp` and the SYPCR write, VBR
+  $00000000 after, SSP $10FFFE from the vector table.
+
 Single-step on the running primary, halted at $133EE, scratch $106000,
 SIMCR $414A for the session (2026-11-21): the first `stepi` took a
 pending level-6 interrupt and stopped at its handler's entry ($12FB2,
