@@ -344,9 +344,9 @@ dependencies = [
 
 [[package]]
 name = "mc683xx-cpu32"
-version = "0.7.0"
+version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "79bbaa77ea8f810045e8ee18391c893c3073062bae883218483c545af0edbfef"
+checksum = "540d1cea5b90f574bb7d87964f7ee0bf650251e295cbc3da2ffdc9a5e2b691f8"
 dependencies = [
  "mc683xx-target",
  "postcard",
@@ -356,9 +356,9 @@ dependencies = [
 
 [[package]]
 name = "mc683xx-gdb"
-version = "0.7.0"
+version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "16720525032ed0771e6db6c31ab840752fd6ac0d5940c6d82ff4e77d89838028"
+checksum = "befa6743723d1d48b1aaa703bc6289d58ed36f5b5317fb25ce945253e71efd10"
 dependencies = [
  "gdbstub",
  "mc683xx-cpu32",
@@ -368,9 +368,9 @@ dependencies = [
 
 [[package]]
 name = "mc683xx-target"
-version = "0.7.0"
+version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e9ef09db084b633b34d918c0e151aac787fe6bbe2ac8fc4b61cdd6debc4d2b6f"
+checksum = "8933f9c2a5d0eb0170129efbf4d14e82a13695273045d1b9ed884b93c7cdd902"
 dependencies = [
  "serde",
  "thiserror",

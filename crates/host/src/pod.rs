@@ -34,7 +34,6 @@ use mc683xx_bdm_proto::usb::parse_reply_header;
 use mc683xx_bdm_proto::usb::parse_transfer_reply;
 use mc683xx_bdm_proto::usb::parse_value;
 use mc683xx_target::address::Address;
-use mc683xx_target::function_code::FunctionCode;
 use mc683xx_target::register::Register;
 use mc683xx_target::register::SystemRegister;
 use mc683xx_target::size::Size;
@@ -114,13 +113,6 @@ fn timeout(workload: Workload, dsclk_hz: u32) -> Duration {
     let word_us = WORD_BITS * MICROS_PER_SECOND / u64::from(dsclk_hz.max(1)) + WORD_OVERHEAD_US;
     let wait_us = u64::from(NOT_READY_TIMEOUT_US).min((u64::from(NOT_READY_RETRIES) + 1) * word_us) + word_us;
     TIMEOUT + Duration::from_micros(u64::from(workload.words) * word_us + u64::from(workload.waits) * wait_us)
-}
-
-/// The function code `bits` gives, if it fits FC\[2:0\].
-#[must_use]
-pub fn function_code(bits: u32) -> Option<FunctionCode> {
-    let code = FunctionCode::new(bits);
-    (u32::from(code.bits()) == bits).then_some(code)
 }
 
 /// The pod, over a transport.
@@ -576,7 +568,6 @@ mod tests {
     use mc683xx_bdm_proto::usb::Request;
     use mc683xx_bdm_proto::usb::Status;
     use mc683xx_target::entry::Entry;
-    use mc683xx_target::function_code::FunctionCode;
 
     use super::Address;
     use super::Atemp;
@@ -586,7 +577,6 @@ mod tests {
     use super::Register;
     use super::Size;
     use super::TIMEOUT;
-    use super::function_code;
     use super::timeout;
     use crate::script::parsed;
     use crate::script::pod;
@@ -1027,13 +1017,5 @@ mod tests {
         let requests = pod.into_transport().requests;
         assert_eq!(requests.len(), 3, "no GetClock after another version's Hello");
         assert_eq!(parsed(&requests[1]), Request::GetClock);
-    }
-
-    #[test]
-    fn function_codes() {
-        assert_eq!(function_code(5), Some(FunctionCode::SUPERVISOR_DATA));
-        assert_eq!(function_code(7), Some(FunctionCode::CPU_SPACE));
-        assert_eq!(function_code(8), None);
-        assert_eq!(function_code(0xD), None);
     }
 }

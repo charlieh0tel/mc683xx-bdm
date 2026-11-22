@@ -21,8 +21,8 @@ pub(crate) const fn size(bytes: u32) -> Result<Size, Error> {
 }
 
 /// The function code `bits` gives: 0 to 7.
-pub(crate) fn function_code(bits: u32) -> Result<FunctionCode, Error> {
-    mc683xx_bdm::pod::function_code(bits).ok_or(Error::FunctionCode(bits))
+pub(crate) fn function_code(bits: u8) -> Result<FunctionCode, Error> {
+    FunctionCode::new(bits).ok_or(Error::FunctionCode(bits))
 }
 
 /// `value` as one big-endian access of `size`: the bytes, of which the

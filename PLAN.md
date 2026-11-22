@@ -597,7 +597,7 @@ code and no `unsafe`; no USB request, so the protocol is unchanged.
   write, xfer, loopback, gdb (Host, gdb), through `PodTarget` (bootsel
   and list excepted).  Halt and reset print the entry
   source.  Clock with a rate sets it (SetClock), without one shows the
-  rate in effect (GetClock).  Dump and write take `--fc`, default 5 (supervisor data).
+  rate in effect (GetClock).  Dump and write take `--fc`, 0 to 7 as `FunctionCode` parses it, default 5 (supervisor data).
   Dump with `--output FILE` writes the raw bytes to FILE instead of a
   hex listing.
   Each run restores SFC and DFC before it exits, since the next run
@@ -667,7 +667,7 @@ code and no `unsafe`; no USB request, so the protocol is unchanged.
   `Cpu32Target` and the types every crate here uses: Address, Size,
   Register, SystemRegister, FunctionCode, Entry.  Memory calls name
   their function code; halting returns the entry source decoded from
-  ATEMP.  From crates.io (0.7).  Its error type converts from
+  ATEMP.  From crates.io (0.8).  Its error type converts from
   `mc683xx_target::Unsupported`, which a later trait method's default
   body returns; `pod::Error::Unsupported` carries it.
 - Loading and init (agreed with m683xx-emu, 2026-11-01; pending:
@@ -718,7 +718,7 @@ code and no `unsafe`; no USB request, so the protocol is unchanged.
     from Python (`crates/py/tests/test_gdb.py`), with a signal handler's
     exception waiting for gdb and while running, and raised still when
     cleaning up after it fails (the failure its `__cause__`).
-  - `step()` is in `Cpu32Target` (mc683xx-target 0.7): from RPC to
+  - `step()` is in `Cpu32Target` (mc683xx-target 0.8): from RPC to
     where T1 would trap, before any handler's first instruction, the
     exceptions the instruction raised and an interrupt pending taken
     (its doc comment has the contract).  `PodTarget::step` (`step.rs`)

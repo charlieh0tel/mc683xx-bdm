@@ -19,6 +19,7 @@ use mc683xx_bdm::transport::Transport;
 use mc683xx_bdm_proto::bdm::byte_count;
 use mc683xx_target::Cpu32Target;
 use mc683xx_target::address::Address;
+use mc683xx_target::function_code::FunctionCode;
 use mc683xx_target::register::Register;
 use pyo3::Bound;
 use pyo3::Py;
@@ -47,7 +48,7 @@ type Target = PodTarget<Box<dyn Transport + Send>>;
 
 /// The default function code: supervisor data (CPU32RM Table 5-1), as
 /// `bdm`'s and the emulator's.
-const SUPERVISOR_DATA: u32 = 5;
+const SUPERVISOR_DATA: u8 = FunctionCode::SUPERVISOR_DATA.get();
 
 /// The pod (Rust's `PodTarget`), open from construction until `close`,
 /// best used as `with Pod(...) as pod:`; one collected unclosed closes
@@ -294,12 +295,12 @@ impl PodView {
         address: u32,
         length: usize,
         size: u32,
-        function_code: u32,
+        function_code: u8,
     ) -> Result<Bound<'py, PyBytes>, Error> {
         let (size, function_code) = (access::size(size)?, access::function_code(function_code)?);
         let data = self.with(py, |target| {
             let mut data = vec![0; length];
-            target.read_memory(Address(address), function_code, size, &mut data)?;
+            target.read_memory(Address(address), size, function_code, &mut data)?;
             Ok(data)
         })?;
         Ok(PyBytes::new(py, &data))
@@ -313,27 +314,21 @@ impl PodView {
         address: u32,
         data: PyBackedBytes,
         size: u32,
-        function_code: u32,
+        function_code: u8,
     ) -> Result<(), Error> {
         let (size, function_code) = (access::size(size)?, access::function_code(function_code)?);
-        self.with(py, |target| Ok(target.write_memory(Address(address), function_code, size, &data)?))
+        self.with(py, |target| Ok(target.write_memory(Address(address), size, function_code, &data)?))
     }
 
     /// One access of `size` bytes (1, 2 or 4) at `address` in
     /// `function_code`'s space, its value; as the emulator's `bus_read`.
     #[pyo3(signature = (address, size, function_code = SUPERVISOR_DATA))]
-    fn bus_read(
-        &mut self,
-        py: Python<'_>,
-        address: u32,
-        size: u32,
-        function_code: u32,
-    ) -> Result<u32, Error> {
+    fn bus_read(&mut self, py: Python<'_>, address: u32, size: u32, function_code: u8) -> Result<u32, Error> {
         let (size, function_code) = (access::size(size)?, access::function_code(function_code)?);
         let bytes = self.with(py, |target| {
             let mut bytes = [0; 4];
             let access = &mut bytes[..byte_count(size)];
-            target.read_memory(Address(address), function_code, size, access)?;
+            target.read_memory(Address(address), size, function_code, access)?;
             Ok(bytes)
         })?;
         Ok(access::decode(&bytes[..byte_count(size)]))
@@ -347,13 +342,13 @@ impl PodView {
         address: u32,
         size: u32,
         value: u32,
-        function_code: u32,
+        function_code: u8,
     ) -> Result<(), Error> {
         let (size, function_code) = (access::size(size)?, access::function_code(function_code)?);
         let bytes = access::encode(size, value)?;
         self.with(py, |target| {
             let access = &bytes[..byte_count(size)];
-            Ok(target.write_memory(Address(address), function_code, size, access)?)
+            Ok(target.write_memory(Address(address), size, function_code, access)?)
         })
     }
 

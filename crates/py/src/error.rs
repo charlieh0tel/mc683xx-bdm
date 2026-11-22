@@ -19,7 +19,7 @@ pub(crate) enum Error {
     Size(u32),
     /// A function code wider than FC\[2:0\].
     #[error("no function code {0}: FC[2:0] is 0 to 7")]
-    FunctionCode(u32),
+    FunctionCode(u8),
     /// A value wider than its access.
     #[error("{value:#x} does not fit {bytes} bytes")]
     Width {
