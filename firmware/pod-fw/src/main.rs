@@ -97,8 +97,8 @@ async fn main(_spawner: Spawner) {
         reset: Input::new(p.PIN_12, Pull::None),
         ds: Input::new(p.PIN_6, Pull::None),
         berr: Input::new(p.PIN_8, Pull::None),
+        led: Output::new(p.PIN_25, Level::Low),
     };
-    let _led = Output::new(p.PIN_25, Level::High);
 
     let Pio { mut common, sm0, .. } = Pio::new(p.PIO0, Irqs);
     let pins = LinkPins { dsclk: p.PIN_9, dsi: p.PIN_3, dso: p.PIN_2, dsi_enable: p.PIN_4 };

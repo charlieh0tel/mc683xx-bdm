@@ -34,8 +34,9 @@ cd firmware/pod-fw
 cargo run --release              # flashes over SWD, then shows defmt logs
 ```
 
-Expect `mc683xx-pod up` in the log, and the Pico's LED (GP25) on; an
-RP2040-Zero has none there (its RGB LED on GP16 stays dark).
+Expect `mc683xx-pod up` in the log, and the Pico's LED (GP25) dark: it
+is lit only while U1 drives BKPT (step 5).  An RP2040-Zero has none
+there (its RGB LED on GP16 stays dark).
 
 Without a probe, flash a build without RTT over USB.  A blank Pico is
 in BOOTSEL already.  A flashed one reboots into it with `bdm bootsel`
@@ -180,14 +181,17 @@ pod.  What still can glitch BKPT: a power loss, a replug, a panic in
 the `rtt` build or a watchdog reset with no panic (no software runs
 before it) in the middle of a request or during `bdm hold`.  After
 such a restart: `bdm reset` (or `bdm resync`, if only the link's
-framing is off).  A watchdog reset of the pod should be rare (PLAN.md,
+framing is off).  The Pico's LED (GP25) shows U1: lit while it is on,
+during a request (milliseconds) and through `bdm hold`; dark, the pod
+is safe to replug.  A watchdog reset of the pod should be rare (PLAN.md,
 Firmware, Watchdog).
 
 Check, halted (`bdm reset`): unplug the pod's USB for a few seconds,
 plug it back in, then `bdm regs`: it answers, with no `bdm reset` or
 `bdm resync` first.  The same after `bdm halt` from running.  After
 `bdm hold`, the same restart is expected to leave `bdm regs` failing
-until `bdm reset`; `bdm resync` may not clear it (docs/58503a/).
+until `bdm reset`; `bdm resync` may not clear it (docs/58503a/).  The
+LED is dark while idle and lit through `bdm hold`.
 
 To leave the target running: `bdm go` straight after `bdm reset`
 starts it from the reset vector; `bdm reset --run` resets it to run

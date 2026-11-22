@@ -47,12 +47,33 @@ const ADC_REFERENCE_MV: u32 = 3300;
 /// Hardware): 5.5 V reads as 2.75 V.
 const VDD_DIVIDER: u32 = 2;
 
+/// U1's BKPT/DSCLK output enable, shown on the Pico's LED: the two
+/// pins change together, so the LED cannot drift from U1.
+struct DsclkEnable<'d> {
+    /// Q3's gate: high enables U1's output (its OE is pulled up to
+    /// target VDD and Q3 pulls it low).
+    gate: Output<'d>,
+    /// Lit while U1 drives BKPT/DSCLK, when a pod restart could glitch
+    /// BKPT: dark, the pod is safe to unplug.
+    led: Output<'d>,
+}
+
+impl DsclkEnable<'_> {
+    fn is_on(&self) -> bool {
+        self.gate.is_set_high()
+    }
+
+    fn set(&mut self, on: bool) {
+        let level = Level::from(on);
+        self.gate.set_level(level);
+        self.led.set_level(level);
+    }
+}
+
 /// The pod's side of the target connector.
 pub(crate) struct PicoBoard<'d> {
     link: PioLink<'d>,
-    /// Q3's gate: high enables U1's BKPT/DSCLK output (its OE
-    /// is pulled up to target VDD and Q3 pulls it low).
-    dsclk_enable: Output<'d>,
+    dsclk_enable: DsclkEnable<'d>,
     /// U1 turned off by [`Board::rest`] with the link driven: the next
     /// word turns it back on.
     resting: bool,
@@ -69,8 +90,10 @@ pub(crate) struct PicoBoard<'d> {
 
 /// The pod's pins, bundled for [`PicoBoard::new`].
 pub(crate) struct Lines<'d> {
-    /// See [`PicoBoard`].
+    /// See [`DsclkEnable`].
     pub(crate) dsclk_enable: Output<'d>,
+    /// See [`DsclkEnable`].
+    pub(crate) led: Output<'d>,
     /// See [`PicoBoard`].
     pub(crate) reset_drive: Output<'d>,
     /// See [`PicoBoard`].
@@ -87,7 +110,7 @@ impl<'d> PicoBoard<'d> {
     pub(crate) fn new(link: PioLink<'d>, lines: Lines<'d>, adc: Adc<'d, Async>, vdd: Channel<'d>) -> Self {
         Self {
             link,
-            dsclk_enable: lines.dsclk_enable,
+            dsclk_enable: DsclkEnable { gate: lines.dsclk_enable, led: lines.led },
             resting: false,
             reset_drive: lines.reset_drive,
             berr_drive: lines.berr_drive,
@@ -108,8 +131,8 @@ impl<'d> PicoBoard<'d> {
     /// waits for it if it was off.
     fn enable_dsclk(&mut self) {
         self.resting = false;
-        if self.dsclk_enable.is_set_low() {
-            self.dsclk_enable.set_high();
+        if !self.dsclk_enable.is_on() {
+            self.dsclk_enable.set(true);
             spin(DSCLK_ENABLE_SETTLE);
         }
     }
@@ -195,7 +218,7 @@ impl Board for PicoBoard<'_> {
     /// BKPT is held low, and a rising edge now would be a bit to the
     /// CPU, putting every later word out of frame.
     fn drive_link(&mut self) {
-        if self.dsclk_enable.is_set_low() {
+        if !self.dsclk_enable.is_on() {
             self.link.set_dsclk(Level::High);
             self.enable_dsclk();
         }
@@ -205,8 +228,8 @@ impl Board for PicoBoard<'_> {
     /// R3 holds BKPT high once U1 is off; GP9 low (BKPT held low) keeps
     /// it on.
     fn rest(&mut self) {
-        if self.dsclk_enable.is_set_high() && self.link.dsclk_high() {
-            self.dsclk_enable.set_low();
+        if self.dsclk_enable.is_on() && self.link.dsclk_high() {
+            self.dsclk_enable.set(false);
             self.resting = true;
         }
     }

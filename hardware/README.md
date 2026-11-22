@@ -38,6 +38,19 @@ each fixes something seen on the bench.
    FET's output capacitance) and 2.3 mA from VDD while DSCLK is low.
 2. Silkscreen revision text bumped with the title blocks
    (`AGENTS.md`, Hardware).
+3. Status LEDs on the carrier, visible with the Pico mounted (a pod
+   in a case may hide the Pico's GP25 LED, lit while U1 is on).
+   Required: target VDD, lit while the target is powered.  Either
+   wired straight from target VDD (works with the pod unpowered; loads
+   target VDD a few mA) or driven by the firmware from the VDD sense
+   reading (no load on the target; needs a spare GPIO).  Optional, on
+   one or two more LEDs (mono, bicolor or tricolor, not decided),
+   driven by the firmware from spare GPIOs: target halted (FREEZE
+   high) or running (FREEZE low, also with no target); safe or not
+   safe to remove (U1 off or on).  Pins: one GPIO per LED or color,
+   from the spare GPIOs (GP0, GP1, GP13-GP22, GP27, GP28; PLAN.md, pin
+   table).  With item 1's inverting stage a replug is always safe, so
+   that indication could show activity or errors instead.
 
 `fastcheck.py` reports on the BDM link's fast nets
 (`uv run python fastcheck.py mc683xx-pod/mc683xx-pod.kicad_pcb`).
