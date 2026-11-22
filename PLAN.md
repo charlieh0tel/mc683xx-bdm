@@ -777,8 +777,8 @@ code and no `unsafe`; no USB request, so the protocol is unchanged.
     to SFC kept; the unwinding itself on frames
     (`step.rs`'s tests), an interrupt above the trace among them.
     On silicon: a step over a branch and off a breakpoint in RAM, in
-    ROM, through TRAP and RTE, in user mode and into an interrupt
-    (docs/58503a/); the MOVEC emulation not yet.
+    ROM, through TRAP and RTE, in user mode, into an interrupt
+    and over MOVEC to VBR (docs/58503a/).
 
 ---
 
@@ -813,15 +813,18 @@ How to run each item and what to expect: `docs/bring-up.md`.
   - BKPT on a CPU in STOP or LPSTOP: enters background mode or not
   - A double bus fault with BDM enabled: whether the SIM halt monitor
     still resets
-  - PCC after a reset entry, no fault: $FFFFFFFF (docs/58503a/)
+  - PCC after a reset entry, no fault: $FFFFFFFF
+    (https://github.com/charlieh0tel/smartclock/blob/main/docs/58503a-bdm.md#at-a-reset-entry)
 - [ ] NOP / not-ready handling
 - [x] RDREG D0; RSREG RPC: `bdm regs`, RPC the reset vector's PC
 - [x] Read SIMCR (0xFFFA00) and other SIM regs; compare to reset
       values: after a reset entry SIMCR $60CF (FRZSW and FRZBM set),
-      CSBARBT $0007, CSORBT $7B70 (docs/58503a/)
+      CSBARBT $0007, CSORBT $7B70
+      (https://github.com/charlieh0tel/smartclock/blob/main/docs/58503a-bdm.md#at-a-reset-entry)
 - [ ] Write chip-select init; read/write external RAM.  Chip selects
       written and read through (CSBOOT and CS1: a 512 KB flash read
-      back identical to a known image; docs/58503a/); RAM's chip
+      back identical to a known image;
+      https://github.com/charlieh0tel/smartclock/blob/main/docs/58503a-bdm.md#reading-the-flash); RAM's chip
       selects written by hand and a loop run from RAM under gdb
       (docs/58503a/)
 - [ ] Block DUMP/FILL throughput test; raise DSCLK until it fails,

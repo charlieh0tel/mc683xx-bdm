@@ -15,9 +15,9 @@ host:
   breakpoints in RAM, continue, Ctrl-C, step (in RAM and ROM, through
   TRAP and RTE, in user mode, into an interrupt, over MOVEC to VBR),
   detach and kill.
-- Flash programming: smartclock's flash tool, through the Python module
-  and a routine loaded into the target's RAM, erased, programmed and
-  verified two sector pairs and put them back.
+- Flash programming: [smartclock's flash tool](https://github.com/charlieh0tel/smartclock/blob/main/tools/bdm/README.md), through the
+  Python module and a routine loaded into the target's RAM, erased,
+  programmed and verified two sector pairs and put them back.
 - The Python module and `bdm` over one pod; `bdm hold` through a target
   reset; firmware updates with `bdm bootsel`.
 - Unplugging an idle pod leaves a halted target halted and answering.

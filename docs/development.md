@@ -18,7 +18,7 @@ release steps.
 | `crates/stand-in/` | `mc683xx-bdm-stand-in`: `bdm-stand-in`, a pod on a socket over the model |
 | `firmware/pod-fw/` | the pod's firmware, its own workspace |
 | `hardware/` | the KiCad carrier and its revisions (`README.md`); `production/`, each release as ordered; `ee_tooling/`, the shared tooling (a submodule); `fastcheck.py`, a report on the BDM link's fast nets |
-| `docs/` | the host-pod protocol (`usb-protocol.md`), bring-up steps (`bring-up.md`), target notes (`58503a/`, `oncore-vp/`), images (`make render`) |
+| `docs/` | the host-pod protocol (`usb-protocol.md`), bring-up steps (`bring-up.md`), the pod on an HP 58503A (`58503a/`); the Oncore VP's notes are smartclock's ([oncore-vp-board.md](https://github.com/charlieh0tel/smartclock/blob/main/docs/oncore-vp-board.md), [test points](https://charlieh0tel.github.io/smartclock/oncore-vp-test-points.html)), images (`make render`) |
 | `packaging/` | the Debian changelog and the udev rule |
 | `scripts/` | `published-crates.sh`, for the release workflow |
 | `third_party/` | vendor documents and their provenance (`NOTICE`) |
