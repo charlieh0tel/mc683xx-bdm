@@ -26,7 +26,7 @@ pod's.
 
 ## 1. Bare Pico: firmware and USB
 
-Set up once: the udev rule (`README.md`), and the Raspberry Pi Debug
+Set up once: the udev rule (`usage.md`), and the Raspberry Pi Debug
 Probe on the Pico's SWD pads (J2 on the carrier).
 
 ```
@@ -296,7 +296,7 @@ Record bytes per second.  Raise `bdm clock` until DUMPs fail (wrong
 data, Unexpected), then back off; record the margin in PLAN.md.  The pod
 caps DSCLK at 4 MHz until this test says otherwise (`dsclk::MAX_HZ`),
 but not from the target's clock: above about a third of the system
-clock DSO is sampled too early (README, Status), and after a failure
+clock DSO is sampled too early (`status.md`, Limits), and after a failure
 only `bdm reset` recovers.
 
 ## 13. Silicon questions
