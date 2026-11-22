@@ -25,18 +25,20 @@ const REQUEST_BOOTSEL: u8 = 0x01;
 const DISABLE_MASK: u16 = 0x7F;
 /// GP10, Q3's gate: U1's BKPT/DSCLK output enable (PLAN.md, pin table).
 const DSCLK_ENABLE_GPIO: u32 = 10;
+/// GP25, the Pico's LED, which shows GP10 (`board`'s `DsclkEnable`).
+const LED_GPIO: u32 = 25;
 /// U1's output is off in 10 ns (SCLS378P 5.6); R3 has BKPT high long
 /// before this.
 const DSCLK_RELEASE: Duration = Duration::from_micros(10);
 const MICROS_PER_SECOND: u64 = 1_000_000;
 
-/// Turns U1 off before a chip reset, so R3 holds BKPT high through it: as
+/// Turns U1 off, and its LED, before a chip reset, so R3 holds BKPT high through it: as
 /// the chip resets, GP9 (U1's input) may fall before GP10 turns U1 off, a
 /// BKPT low pulse to a running CPU or a lone DSCLK edge to a halted one.
-/// The board owns GP10; this is its last use.  A busy wait ([`spin`]),
+/// The board owns GP10 and GP25; this is their last use.  A busy wait ([`spin`]),
 /// as in a panic.
 pub(crate) fn release_dsclk() {
-    SIO.gpio_out(0).value_clr().write_value(1 << DSCLK_ENABLE_GPIO);
+    SIO.gpio_out(0).value_clr().write_value(1 << DSCLK_ENABLE_GPIO | 1 << LED_GPIO);
     spin(DSCLK_RELEASE);
 }
 

@@ -71,7 +71,8 @@ recovers.  The pod caps DSCLK at 4 MHz whatever the target.
 
 Known limit: a pod restart (a USB replug, say) during `bdm hold` or in
 the middle of a request can disturb a halted target until `bdm reset`.
-A restart between requests is safe (`docs/bring-up.md`, step 5).  The
+A restart between requests is safe (`docs/bring-up.md`, step 5); the
+Pico's LED is lit while it is unsafe.  The
 fix is planned for the next carrier revision (`hardware/README.md`,
 Next revision).
 

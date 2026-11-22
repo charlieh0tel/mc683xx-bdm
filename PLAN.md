@@ -91,7 +91,7 @@ Pico pins (GPn):
 | 10 | BKPT/DSCLK driver enable (Q3 gate) | out, high enables |
 | 11 | RESET drive (Q1 gate) | out, high asserts RESET |
 | 12 | RESET sense | in |
-| 25 | LED (on the Pico) | out |
+| 25 | LED (on the Pico and Pico 2; the Pico W's is on its wireless chip, unsupported) | out, lit while U1 drives BKPT: don't unplug |
 | 26 | VDD sense (ADC0) | analog |
 
 Board: a 4-layer carrier (JLCPCB JLC04161H-7628 stackup, ENIG) with the
@@ -367,10 +367,13 @@ pods apart (`bdm --pod usb:SERIAL`).  Requests:
   the next word, lone edge or `drive_link` turns U1 back on, DSCLK
   already high, and waits 1 us for Q3 and U1 before clocking.  A long
   DUMP or FILL is a request per USB packet, so U1 is off between
-  packets too.  The model board models U1 and DSCLK's level, a lone
+  packets too.  The Pico's LED (GP25) is set with GP10 (`DsclkEnable`):
+  lit while U1 is on, so dark means a replug is safe; a short request
+  lights it for milliseconds, a hold or a long read for its length.
+  The model board models U1 and DSCLK's level, a lone
   BKPT rise to a halted CPU as a bit, and a pod restart
   (`ModelBoard::restart_pod`).
-- Bootsel turns U1 off (GP10 low, then 10 us) before the boot ROM's
+- Bootsel turns U1 off (GP10 low, with the LED, then 10 us) before the boot ROM's
   reboot, so a Pico reset in a request or a hold cannot glitch BKPT
   low either; this needs embassy-rp's `unstable-pac` for the one
   register write.  The production build's panic handler does the same
