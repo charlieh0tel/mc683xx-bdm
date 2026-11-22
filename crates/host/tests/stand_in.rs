@@ -398,3 +398,109 @@ fn a_privileged_sr_write_in_user_mode_is_a_privilege_violation() {
     assert_eq!(long(&mut target, sp) >> 16, 0, "the program's SR, no T1: the instruction did not run");
     clean(&pod);
 }
+
+/// MOVEC (CPU32RM 4, MOVEC): from Rn to a control register and back,
+/// and its extension words for D0, A0 and D1 with VBR's code and SFC's.
+const MOVEC_TO_CONTROL: u16 = 0x4E7B;
+const MOVEC_FROM_CONTROL: u16 = 0x4E7A;
+const D0_VBR: u16 = 0x0801;
+const A0_VBR: u16 = 0x8801;
+const D1_VBR: u16 = 0x1801;
+const D0_SFC: u16 = 0x0000;
+/// A second exception table the program moves VBR to, and where its
+/// TRAP #1 and trace handlers are.
+const NEW_TABLE: u32 = RAM_BASE + 0xC00;
+const NEW_TRAP_HANDLER: u32 = RAM_BASE + 0x140;
+const NEW_TRACE_HANDLER: u32 = RAM_BASE + 0x240;
+/// A format $2 frame's format in its format/vector word.
+const SIX_WORD_FORMAT: u32 = 0x2000;
+
+/// Points vector `vector` of the table at `table` at `handler`.
+fn set_vector_in(target: &mut StandIn, table: u32, vector: u32, handler: u32) {
+    let address = Address(table + vector * VECTOR_BYTES);
+    target.write_memory(address, FunctionCode::SUPERVISOR_DATA, Size::Long, &handler.to_be_bytes()).unwrap();
+}
+
+#[test]
+fn a_stepped_movec_to_vbr_moves_the_table_the_next_step_uses() {
+    for (register, extension) in [(Register::D0, D0_VBR), (Register::A0, A0_VBR)] {
+        let (mut target, pod) = stepping(&[MOVEC_TO_CONTROL, extension, TRAP_1_OPCODE]);
+        set_vector_in(&mut target, NEW_TABLE, TRAP_1, NEW_TRAP_HANDLER);
+        target.write_register(register, NEW_TABLE).unwrap();
+        assert_eq!(target.step().unwrap(), Entry::Breakpoint, "{register}");
+        assert_eq!(target.read_system_register(SystemRegister::Vbr).unwrap(), NEW_TABLE, "{register}");
+        assert_eq!(target.read_system_register(SystemRegister::Rpc).unwrap(), PROGRAM + 4, "{register}");
+        assert_eq!(target.read_system_register(SystemRegister::Sr).unwrap(), SUPERVISOR, "{register}");
+        assert_eq!(target.read_register(Register::A7).unwrap(), STACK, "{register}");
+        assert_eq!(target.step().unwrap(), Entry::Breakpoint, "{register}");
+        assert_eq!(target.read_system_register(SystemRegister::Rpc).unwrap(), NEW_TRAP_HANDLER, "{register}");
+        assert_eq!(target.read_register(Register::A7).unwrap(), STACK - 8, "{register}");
+        assert_eq!(target.read_system_register(SystemRegister::Vbr).unwrap(), NEW_TABLE, "{register}");
+        clean(&pod);
+    }
+}
+
+#[test]
+fn a_stepped_movec_to_vbr_traced_by_the_program_goes_to_its_new_trace_handler() {
+    let (mut target, pod) = stepping(&[MOVEC_TO_CONTROL, D0_VBR, NOP]);
+    set_vector_in(&mut target, NEW_TABLE, TRACE, NEW_TRACE_HANDLER);
+    target.write_register(Register::D0, NEW_TABLE).unwrap();
+    target.write_system_register(SystemRegister::Sr, SUPERVISOR | T1).unwrap();
+    assert_eq!(target.step().unwrap(), Entry::Breakpoint);
+    assert_eq!(target.read_system_register(SystemRegister::Rpc).unwrap(), NEW_TRACE_HANDLER);
+    assert_eq!(target.read_system_register(SystemRegister::Sr).unwrap(), SUPERVISOR);
+    let sp = target.read_register(Register::A7).unwrap();
+    assert_eq!(sp, STACK - 12, "the program's own six-word trace frame");
+    assert_eq!(long(&mut target, sp), ((SUPERVISOR | T1) << 16) | ((PROGRAM + 4) >> 16));
+    assert_eq!(long(&mut target, sp + 4), ((PROGRAM + 4) << 16) | SIX_WORD_FORMAT | (TRACE * VECTOR_BYTES));
+    assert_eq!(long(&mut target, sp + 8), PROGRAM, "the traced instruction's address");
+    clean(&pod);
+}
+
+#[test]
+fn a_stepped_movec_from_vbr_reads_the_programs_table() {
+    let (mut target, pod) = stepping(&[MOVEC_FROM_CONTROL, D1_VBR, NOP]);
+    assert_eq!(target.step().unwrap(), Entry::Breakpoint);
+    assert_eq!(target.read_register(Register::D1).unwrap(), TABLE, "not the step's own");
+    assert_eq!(target.read_system_register(SystemRegister::Rpc).unwrap(), PROGRAM + 4);
+    assert_eq!(target.read_system_register(SystemRegister::Vbr).unwrap(), TABLE);
+    clean(&pod);
+}
+
+#[test]
+fn a_stepped_movec_in_user_mode_is_a_privilege_violation() {
+    let user_stack = RAM_BASE + 0x300;
+    let (mut target, pod) = stepping(&[MOVEC_TO_CONTROL, D0_VBR]);
+    let handler = Address(PRIVILEGE_HANDLER);
+    target.write_memory(handler, FunctionCode::SUPERVISOR_DATA, Size::Word, &NOP.to_be_bytes()).unwrap();
+    set_vector(&mut target, PRIVILEGE, PRIVILEGE_HANDLER);
+    target.write_register(Register::D0, NEW_TABLE).unwrap();
+    target.write_system_register(SystemRegister::Usp, user_stack).unwrap();
+    target.write_system_register(SystemRegister::Sr, 0).unwrap();
+    assert_eq!(target.step().unwrap(), Entry::Breakpoint);
+    assert_eq!(target.read_system_register(SystemRegister::Rpc).unwrap(), PRIVILEGE_HANDLER);
+    assert_eq!(target.read_system_register(SystemRegister::Vbr).unwrap(), TABLE, "not run");
+    assert_eq!(target.read_system_register(SystemRegister::Sr).unwrap(), SUPERVISOR);
+    let sp = target.read_register(Register::A7).unwrap();
+    assert_eq!(sp, STACK - 8);
+    assert_eq!(long(&mut target, sp), PROGRAM >> 16, "the program's SR, user, no T1");
+    // The handler's first instruction steps as any other.
+    assert_eq!(target.step().unwrap(), Entry::Breakpoint);
+    assert_eq!(target.read_system_register(SystemRegister::Rpc).unwrap(), PRIVILEGE_HANDLER + 2);
+    assert_eq!(target.read_register(Register::A7).unwrap(), STACK - 8);
+    clean(&pod);
+}
+
+#[test]
+fn a_stepped_movec_to_sfc_is_kept_after_the_step() {
+    let sfc = 3;
+    let (mut target, pod) = stepping(&[MOVEC_TO_CONTROL, D0_SFC, NOP]);
+    target.write_register(Register::D0, sfc).unwrap();
+    assert_eq!(target.step().unwrap(), Entry::Breakpoint);
+    assert_eq!(target.read_system_register(SystemRegister::Rpc).unwrap(), PROGRAM + 4);
+    assert_eq!(target.read_system_register(SystemRegister::Sfc).unwrap(), sfc);
+    target.restore_function_codes().unwrap();
+    let in_cpu = pod.lock().unwrap().board_mut().target().system_register(SystemRegister::Sfc);
+    assert_eq!(in_cpu, sfc);
+    clean(&pod);
+}

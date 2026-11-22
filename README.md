@@ -54,8 +54,9 @@ are Rust.
 
 Works, on an MC68331 target: reset into background mode, halt and go,
 registers, memory and SIM register reads, a 512 KB flash read, writes,
-and gdb (registers, memory, disassembly, breakpoints, continue, step,
-Ctrl-C, detach and kill).
+and gdb (registers, memory, disassembly, breakpoints, continue, step
+in RAM and ROM, through TRAP and RTE, in user mode and into an
+interrupt, Ctrl-C, detach and kill).
 
 Not yet tried on silicon (`TODO.md`): a flash-programming command
 (flash has been programmed with `bdm write` sequences); the Pico 2

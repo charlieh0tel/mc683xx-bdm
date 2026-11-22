@@ -3,9 +3,11 @@
 //! the frames stacked on the way to its BGND stub are unwound into the
 //! state `Cpu32Target::step` promises, the CPU before the first
 //! instruction of the last handler a program's own table would have
-//! entered.
+//! entered.  MOVEC to or from VBR, which the pod's table would break,
+//! is decoded here to be emulated instead (`VbrMove`).
 
 use mc683xx_target::address::Address;
+use mc683xx_target::register::Register;
 
 /// SR's trace bits (CPU32RM 2.3.3): T1 traces every instruction, T0
 /// changes of flow.
@@ -22,7 +24,7 @@ pub(crate) const BGND: [u8; 2] = [0x4A, 0xFA];
 const VECTORS: u32 = 256;
 const VECTOR_BYTES: u32 = 4;
 /// The trace vector (CPU32RM Table 6-1).
-const TRACE_VECTOR: u32 = 9;
+pub(crate) const TRACE_VECTOR: u32 = 9;
 
 /// Where the stub sits in scratch RAM: after the table.
 const STUB_OFFSET: u32 = VECTORS * VECTOR_BYTES;
@@ -103,6 +105,51 @@ impl TraceEffect {
             Self::Combined { immediate, .. } => program_sr ^ immediate,
         };
         bits & trace
+    }
+}
+
+/// MOVEC (CPU32RM 4, MOVEC): from a control register to Rn, and from Rn
+/// to one; then its extension word, Rn as a BDM register code (A/D and
+/// the number) above the control register's code.
+pub(crate) const MOVEC_FROM_CONTROL: u16 = 0x4E7A;
+pub(crate) const MOVEC_TO_CONTROL: u16 = 0x4E7B;
+const MOVEC_REGISTER_SHIFT: u16 = 12;
+const MOVEC_CONTROL_FIELD: u16 = 0x0FFF;
+/// VBR's control register code.
+const VBR_CODE: u16 = 0x801;
+/// Bytes in a MOVEC: the opcode and its extension word.
+pub(crate) const MOVEC_BYTES: u32 = 4;
+
+/// A MOVEC to or from VBR, which a step emulates: traced, it would
+/// read the pod's table's address, or replace the table its own trace
+/// goes through.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum VbrMove {
+    /// `movec rn,vbr`.
+    To(Register),
+    /// `movec vbr,rn`.
+    From(Register),
+}
+
+impl VbrMove {
+    /// Whether `opcode` is a MOVEC, whose extension word
+    /// [`VbrMove::of`] then needs.
+    pub(crate) const fn needs_extension(opcode: u16) -> bool {
+        matches!(opcode, MOVEC_FROM_CONTROL | MOVEC_TO_CONTROL)
+    }
+
+    /// The VBR move whose words are `opcode` and `extension`, if it is
+    /// one.
+    pub(crate) fn of(opcode: u16, extension: u16) -> Option<Self> {
+        if extension & MOVEC_CONTROL_FIELD != VBR_CODE {
+            return None;
+        }
+        let register = Register::from_code(extension >> MOVEC_REGISTER_SHIFT)?;
+        match opcode {
+            MOVEC_TO_CONTROL => Some(Self::To(register)),
+            MOVEC_FROM_CONTROL => Some(Self::From(register)),
+            _ => None,
+        }
     }
 }
 
@@ -200,6 +247,13 @@ impl Frame {
         }
     }
 
+    /// The six-word trace frame (CPU32RM 6.2.10) of the instruction at
+    /// `instruction`, stacked with `sr` and the next instruction's `pc`.
+    pub(crate) fn trace(sr: u16, pc: u32, instruction: u32) -> Self {
+        let format_vector = (SIX_WORD.0 << FORMAT_SHIFT) | (TRACE_VECTOR * VECTOR_BYTES) as u16;
+        Self { sr, pc, format_vector, rest: instruction.to_be_bytes().to_vec() }
+    }
+
     /// The CPU's SR and PC, as a frame with no format.
     pub(crate) const fn cpu(sr: u16, pc: u32) -> Self {
         Self { sr, pc, format_vector: 0, rest: Vec::new() }
@@ -276,11 +330,13 @@ mod tests {
     use std::convert::Infallible;
 
     use mc683xx_target::address::Address;
+    use mc683xx_target::register::Register;
 
     use super::Frame;
     use super::SCRATCH_BYTES;
     use super::StepError;
     use super::TraceEffect;
+    use super::VbrMove;
     use super::frame_bytes;
     use super::scratch_image;
     use super::stub;
@@ -435,6 +491,27 @@ mod tests {
             assert_eq!(TraceEffect::of(opcode, 0), TraceEffect::Kept, "{opcode:04x}");
             assert!(!TraceEffect::needs_immediate(opcode));
         }
+    }
+
+    #[test]
+    fn vbr_moves_are_known_by_their_words() {
+        assert_eq!(VbrMove::of(0x4E7B, 0x8801), Some(VbrMove::To(Register::A0)));
+        assert_eq!(VbrMove::of(0x4E7B, 0x0801), Some(VbrMove::To(Register::D0)));
+        assert_eq!(VbrMove::of(0x4E7A, 0xF801), Some(VbrMove::From(Register::A7)));
+        assert!(VbrMove::needs_extension(0x4E7A) && VbrMove::needs_extension(0x4E7B));
+        // SFC, DFC and USP: traced as they are.
+        for control in [0x000, 0x001, 0x800] {
+            assert_eq!(VbrMove::of(0x4E7B, control), None, "{control:03x}");
+        }
+        assert!(!VbrMove::needs_extension(0x4E71));
+        assert_eq!(VbrMove::of(0x4E71, 0x0801), None);
+    }
+
+    #[test]
+    fn a_trace_frame_is_six_words_for_vector_9() {
+        let trace = Frame::trace(0xA000, 0x2004, 0x2000);
+        assert_eq!(trace.vector(), 9);
+        assert_eq!(trace.bytes(), [0xA0, 0, 0, 0, 0x20, 0x04, 0x20, 0x24, 0, 0, 0x20, 0x00]);
     }
 
     #[test]

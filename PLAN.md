@@ -583,8 +583,8 @@ code and no `unsafe`; no USB request, so the protocol is unchanged.
   5 V; a halt or reset enters with a breakpoint, and a reset keeps
   registers and memory.  Not the emulator: once resumed the model runs
   only NOP, MOVEQ, BRA.S, TRAP #n, ILLEGAL, BGND, MOVE/ANDI/ORI/EORI
-  #imm to SR and RTE from a $0 or $2 frame (the SR writers privileged)
-  from its RAM, with
+  #imm to SR, RTE from a $0 or $2 frame and MOVEC to and from SFC,
+  DFC, USP and VBR (privileged) from its RAM, with
   T1/T0 trace, exception frames $0 and $2 through VBR, a requested
   interrupt, and A7 as SSP or USP by SR's S (`mc683xx-bdm-model`'s `program`);
   any other instruction, an access outside RAM or 1000 instructions
@@ -743,8 +743,24 @@ code and no `unsafe`; no USB request, so the protocol is unchanged.
     ended) is unwound as above, anything else gets VBR and the trace
     bits back and an error with RPC.  The program's T0 is not
     honored (its change-of-flow trace is lost), and what the contract
-    calls implementation-defined (a VBR read or MOVE from SR in the
-    step sees the pod's) is the pod's.
+    calls implementation-defined (MOVE from SR in the step sees the
+    step's T1) is the pod's.
+  - MOVEC to or from VBR in supervisor mode is emulated, not traced:
+    traced, a MOVEC to VBR sends its own trace through the program's
+    new table and "VBR back" then undoes the write (found on the
+    58503A), and a MOVEC from VBR reads the pod's table.  The
+    instruction is read at RPC with the SR writers' check ($4E7B or
+    $4E7A, extension word control code $801); the host reads Rn and
+    writes VBR, or writes Rn the program's VBR, and sets RPC past the
+    four bytes.  With the program's own T1 set it stacks the six-word
+    trace frame on SSP and sets RPC to vector 9 of the VBR the move
+    left, T1 and T0 clear.  An interrupt pending is not taken by that
+    step; the next step or GO takes it.  In user mode MOVEC is traced,
+    to the privilege violation.
+  - SFC and DFC need no emulation: the step puts the program's back
+    before its GO, and the halt after it starts a fresh halted state
+    that reads them again, so a stepped MOVEC to SFC or DFC is kept
+    (and USP is not the pod's).
   - Every vector the stub, not the trace vector alone in the program's
     table (copied to RAM when in ROM): the contract stops before every
     handler, which only a table of the pod's own sees (decided
@@ -752,10 +768,14 @@ code and no `unsafe`; no USB request, so the protocol is unchanged.
   - Tested against `bdm-stand-in`'s model (`crates/host/tests/stand_in.rs`):
     one instruction, user mode, TRAP, an interrupt pending, BGND, no
     stop, no scratch, MOVE to SR setting and clearing T1, ORI to SR,
-    RTE popping T1, a privilege violation; the unwinding itself on frames
+    RTE popping T1, a privilege violation; MOVEC D0 and A0 to VBR (the
+    next step through the new table), MOVEC to VBR under the program's
+    T1, MOVEC from VBR, MOVEC in user mode and a step after it, MOVEC
+    to SFC kept; the unwinding itself on frames
     (`step.rs`'s tests), an interrupt above the trace among them.
-    On silicon: a step over a branch and off a breakpoint in RAM
-    (docs/58503a/).
+    On silicon: a step over a branch and off a breakpoint in RAM, in
+    ROM, through TRAP and RTE, in user mode and into an interrupt
+    (docs/58503a/); the MOVEC emulation not yet.
 
 ---
 

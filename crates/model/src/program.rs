@@ -1,10 +1,10 @@
 //! The instructions the model runs once resumed, and the exceptions
 //! they and an interrupt raise (CPU32RM 4, 6): NOP, MOVEQ, BRA.S, TRAP,
 //! ILLEGAL and BGND; the SR writers MOVE #imm,SR, ANDI, ORI and EORI
-//! #imm,SR and RTE from a format $0 or $2 frame, privileged; with T1
-//! and T0 tracing.  Another instruction (MOVE to SR from anything but
-//! an immediate, RTE from another format), a
-//! fetch, stacking or vector read outside RAM, or a run past
+//! #imm,SR and RTE from a format $0 or $2 frame, and MOVEC to and from
+//! SFC, DFC, USP and VBR, privileged; with T1 and T0 tracing.  Another
+//! instruction (MOVE to SR from anything but an immediate, RTE from
+//! another format), a fetch, stacking or vector read outside RAM, or a run past
 //! [`RUN_LIMIT`] instructions is a program the model cannot follow: it
 //! is left running, as a CPU running code no one watches.
 
@@ -71,6 +71,20 @@ const ANDI_TO_SR: u16 = 0x027C;
 const ORI_TO_SR: u16 = 0x007C;
 const EORI_TO_SR: u16 = 0x0A7C;
 const RTE: u16 = 0x4E73;
+/// MOVEC (CPU32RM 4, MOVEC): from a control register to Rn, and from Rn
+/// to one.  Its extension word holds Rn as a BDM register code (A/D and
+/// the number, D0-D7 then A0-A7) above the control register's code.
+const MOVEC_FROM_CONTROL: u16 = 0x4E7A;
+const MOVEC_TO_CONTROL: u16 = 0x4E7B;
+const MOVEC_REGISTER_SHIFT: u16 = 12;
+const MOVEC_CONTROL_FIELD: u16 = 0x0FFF;
+/// The control registers MOVEC names on the CPU32, by code.
+const CONTROL_REGISTERS: [(u16, SystemRegister); 4] = [
+    (0x000, SystemRegister::Sfc),
+    (0x001, SystemRegister::Dfc),
+    (0x800, SystemRegister::Usp),
+    (0x801, SystemRegister::Vbr),
+];
 /// SR's bits that exist on the CPU32 (CPU32RM 2.3.3): T1, T0, S, the
 /// mask and the condition codes.
 const SR_IMPLEMENTED: u32 = 0xE71F;
@@ -172,7 +186,10 @@ impl<const RAM: usize> Target<RAM> {
                 self.set_pc(next.wrapping_add(displacement));
                 changed_flow = true;
             }
-            MOVE_TO_SR_IMMEDIATE | ANDI_TO_SR | ORI_TO_SR | EORI_TO_SR | RTE if self.sr() & SR_S == 0 => {
+            MOVE_TO_SR_IMMEDIATE | ANDI_TO_SR | ORI_TO_SR | EORI_TO_SR | RTE | MOVEC_FROM_CONTROL
+            | MOVEC_TO_CONTROL
+                if self.sr() & SR_S == 0 =>
+            {
                 // privileged, so not executed and not traced
                 self.exception(PRIVILEGE_VECTOR, start, None)?;
                 return Ok(Flow::Next);
@@ -192,6 +209,23 @@ impl<const RAM: usize> Target<RAM> {
             RTE => {
                 self.return_from_exception()?;
                 changed_flow = true;
+            }
+            MOVEC_FROM_CONTROL | MOVEC_TO_CONTROL => {
+                let extension = self.fetch(next)?;
+                let register = Register::from_code(extension >> MOVEC_REGISTER_SHIFT).ok_or(Lost)?;
+                let code = extension & MOVEC_CONTROL_FIELD;
+                let Some((_, control)) = CONTROL_REGISTERS.into_iter().find(|(known, _)| *known == code)
+                else {
+                    // not executed, so not traced (CPU32RM 6.2.10)
+                    self.exception(ILLEGAL_VECTOR, start, None)?;
+                    return Ok(Flow::Next);
+                };
+                if opcode == MOVEC_TO_CONTROL {
+                    self.set_system_register(control, self.register(register));
+                } else {
+                    self.set_register(register, self.system_register(control));
+                }
+                self.set_pc(next.wrapping_add(WORD_BYTES));
             }
             _ => return Err(Lost),
         }
