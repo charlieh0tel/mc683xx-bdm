@@ -24,12 +24,17 @@ use nusb::transfer::In;
 use nusb::transfer::Out;
 use nusb::transfer::Recipient;
 
+use crate::pod::IN_FLIGHT;
+
 /// How long the bootloader knock may wait for its answer.
 const KNOCK_TIMEOUT: Duration = Duration::from_secs(1);
 
 /// Request packets sent and not yet taken by the pod before the host
-/// stops sending more: the pod is stuck.
-const MAX_UNTAKEN: usize = 4;
+/// stops sending more: the pod is stuck.  A working pod leaves fewer:
+/// up to one fewer than [`IN_FLIGHT`] sent behind a block's failed
+/// request, and as many again sent by the next block before the pod
+/// has taken any.
+const MAX_UNTAKEN: usize = 2 * IN_FLIGHT;
 
 /// The shortest read timeout a socket is given: a zero timeout is an
 /// error to the OS.
@@ -378,18 +383,22 @@ impl UsbTransport {
         if self.to_pod.pending() >= MAX_UNTAKEN { Err(TransportError::Untaken(MAX_UNTAKEN)) } else { Ok(()) }
     }
 
-    /// Keeps a read waiting for the next reply.
+    /// Keeps a read waiting for each of the next [`IN_FLIGHT`] replies,
+    /// so the host controller takes replies to requests outstanding
+    /// back to back, without a turn through the host between them.
     fn read_ahead(&mut self) {
-        if self.from_pod.pending() == 0 {
+        for _ in self.from_pod.pending()..IN_FLIGHT {
             self.from_pod.submit(Buffer::new(PACKET));
         }
     }
 }
 
-/// A request goes out without waiting for the pod to take it, and a
-/// read always waits for the next reply: a pod still writing a reply
-/// the host gave up on takes no request until that reply is read, so
-/// waiting for the request first would wait for ever.
+/// A request goes out without waiting for the pod to take it, and reads
+/// always wait for the next replies: a pod still writing a reply the
+/// host gave up on takes no request until that reply is read, so
+/// waiting for the request first would wait for ever.  Replies complete
+/// in order, so a read left waiting by a timeout takes a stale reply,
+/// which the next receive returns for the caller to discard.
 impl Transport for UsbTransport {
     fn send(&mut self, request: &[u8]) -> Result<(), TransportError> {
         self.collect_sent()?;

@@ -3,6 +3,8 @@
 //! longer than a packet go as several requests.
 
 use mc683xx_target::Unsupported;
+use std::collections::VecDeque;
+use std::ops::Range;
 use std::time::Duration;
 use std::time::Instant;
 
@@ -89,6 +91,21 @@ const WORD_BITS: u64 = 17;
 /// firmware's handling between PIO words.
 const WORD_OVERHEAD_US: u64 = 20;
 const MICROS_PER_SECOND: u64 = 1_000_000;
+
+/// Memory requests a block keeps sent and unanswered.  The pod answers
+/// one at a time, in order, and reads the next request as soon as it
+/// has written a reply (docs/usb-protocol.md, Transport), so one
+/// request waiting behind the one in progress hides the host's turn
+/// between reply and request; a few more cover the host's scheduling
+/// and USB frame jitter.  Few, so a failure leaves few stale replies,
+/// and few requests run behind it.  The USB transport keeps a read
+/// waiting for each.
+pub(crate) const IN_FLIGHT: usize = 4;
+
+// Each request outstanding, and each stale reply a failed block leaves
+// ahead of the next block's (up to `IN_FLIGHT`, the failed request's own
+// after a timeout), has a tag of its own among the 255.
+const _: () = assert!(2 * IN_FLIGHT <= u8::MAX as usize);
 
 /// How long the pod may take over a request of `workload` at DSCLK
 /// `dsclk_hz`: [`TIMEOUT`], its words, and each wait at the first of
@@ -324,35 +341,56 @@ impl<T: Transport> Pod<T> {
     }
 
     /// Reads `data.len()` bytes from `address` in `size` accesses,
-    /// through SFC, as many requests as it takes.
+    /// through SFC, as many requests as it takes, up to [`IN_FLIGHT`]
+    /// of them outstanding.
     ///
     /// # Errors
-    /// As [`Error`]; a length that is not whole accesses.
+    /// As [`Error`]; a length that is not whole accesses.  The first
+    /// failure is returned at once and nothing more is sent; `data` is
+    /// filled up to the failed chunk.  The requests already sent behind
+    /// it still run, and a later exchange discards their replies.
     pub fn read_memory(&mut self, address: Address, size: Size, data: &mut [u8]) -> Result<(), Error> {
-        check_length(size, data.len())?;
-        for (offset, chunk) in chunks(data.len()).zip(data.chunks_mut(MAX_MEMORY_BYTES)) {
-            let request = Request::ReadMemory { address: at(address, offset), size, length: chunk.len() };
-            let mut reply = [0; PACKET];
-            let body = self.request(&request, &mut reply)?;
-            if body.len() != chunk.len() {
-                return Err(ReplyError::Malformed.into());
-            }
-            chunk.copy_from_slice(body);
-        }
-        Ok(())
+        let length = data.len();
+        check_length(size, length)?;
+        self.pipeline(
+            chunk_count(length),
+            |n, tag, packet| {
+                let range = chunk(length, n);
+                Request::ReadMemory { address: at(address, range.start), size, length: range.len() }
+                    .encode(tag, packet)
+            },
+            |n, body| {
+                let into = &mut data[chunk(length, n)];
+                if body.len() != into.len() {
+                    return Err(ReplyError::Malformed.into());
+                }
+                into.copy_from_slice(body);
+                Ok(())
+            },
+        )
     }
 
     /// Writes `data` at `address` in `size` accesses, through DFC, as
-    /// many requests as it takes.
+    /// many requests as it takes, up to [`IN_FLIGHT`] of them
+    /// outstanding.
     ///
     /// # Errors
-    /// As [`Error`]; a length that is not whole accesses.
+    /// As [`Error`]; a length that is not whole accesses.  The first
+    /// failure is returned at once and nothing more is sent, but the
+    /// chunks already sent behind the failed one (up to one fewer than
+    /// [`IN_FLIGHT`]) still run: memory past the failed chunk may be
+    /// written.
     pub fn write_memory(&mut self, address: Address, size: Size, data: &[u8]) -> Result<(), Error> {
         check_length(size, data.len())?;
-        for (offset, chunk) in chunks(data.len()).zip(data.chunks(MAX_MEMORY_BYTES)) {
-            self.done(&Request::WriteMemory { address: at(address, offset), size, data: chunk })?;
-        }
-        Ok(())
+        self.pipeline(
+            chunk_count(data.len()),
+            |n, tag, packet| {
+                let range = chunk(data.len(), n);
+                Request::WriteMemory { address: at(address, range.start), size, data: &data[range] }
+                    .encode(tag, packet)
+            },
+            |_, body| empty(body),
+        )
     }
 
     /// Raw serial words, each answered with the 17 bits shifted in, as
@@ -390,7 +428,36 @@ impl<T: Transport> Pod<T> {
     fn done(&mut self, request: &Request<'_>) -> Result<(), Error> {
         let mut reply = [0; PACKET];
         let body = self.request(request, &mut reply)?;
-        if body.is_empty() { Ok(()) } else { Err(ReplyError::Malformed.into()) }
+        empty(body)
+    }
+
+    /// Exchanges `count` requests, the `n`th as `encode(n, tag, packet)`
+    /// writes it, keeping up to [`IN_FLIGHT`] outstanding, and hands
+    /// each reply's result to `take(n, body)`, in order.  The pod starts
+    /// a request at the earliest once it has written the reply before,
+    /// so each reply's timeout still runs from when the host starts
+    /// waiting for it.  The first failure, sending, receiving or
+    /// `take`'s, is returned at once and nothing more is sent.
+    fn pipeline(
+        &mut self,
+        count: usize,
+        mut encode: impl FnMut(usize, u8, &mut [u8; PACKET]) -> Result<usize, ParseError>,
+        mut take: impl FnMut(usize, &[u8]) -> Result<(), Error>,
+    ) -> Result<(), Error> {
+        let mut unsent = 0..count;
+        let mut outstanding = VecDeque::with_capacity(IN_FLIGHT);
+        for n in unsent.by_ref().take(IN_FLIGHT) {
+            outstanding.push_back(self.send_request(|tag, packet| encode(n, tag, packet))?);
+        }
+        for n in 0..count {
+            let sent = outstanding.pop_front().expect("a request sent for each reply still to come");
+            let mut reply = [0; PACKET];
+            take(n, self.receive_reply(sent, &mut reply)?)?;
+            if let Some(next) = unsent.next() {
+                outstanding.push_back(self.send_request(|tag, packet| encode(next, tag, packet))?);
+            }
+        }
+        Ok(())
     }
 
     /// Encodes and exchanges `request`; returns the reply's result.
@@ -399,24 +466,41 @@ impl<T: Transport> Pod<T> {
     }
 
     /// Sends the request `encode` writes, with the next tag, and returns
-    /// its reply's result.  Replies with another tag are stale (left by
-    /// a request this host gave up on) and discarded.
+    /// its reply's result.
     fn exchange<'r>(
         &mut self,
         encode: impl FnOnce(u8, &mut [u8; PACKET]) -> Result<usize, ParseError>,
         reply: &'r mut [u8; PACKET],
     ) -> Result<&'r [u8], Error> {
+        let sent = self.send_request(encode)?;
+        self.receive_reply(sent, reply)
+    }
+
+    /// Sends the request `encode` writes, with the next tag, without
+    /// waiting for its reply.
+    fn send_request(
+        &mut self,
+        encode: impl FnOnce(u8, &mut [u8; PACKET]) -> Result<usize, ParseError>,
+    ) -> Result<Sent, Error> {
         self.tag = self.tag % u8::MAX + 1;
         let mut packet = [0; PACKET];
         let length = encode(self.tag, &mut packet)?;
         let request = Request::parse(&packet[1..length])?;
         let timeout = timeout(Workload::of(&request), self.dsclk_hz);
         self.transport.send(&packet[..length])?;
-        let deadline = Instant::now() + timeout;
+        Ok(Sent { tag: self.tag, timeout })
+    }
+
+    /// Waits for the reply to the request `sent`, its timeout running
+    /// from now, and returns its result.  Replies with another tag are
+    /// stale (left by a request this host gave up on, or sent behind a
+    /// failed one) and discarded.
+    fn receive_reply<'r>(&mut self, sent: Sent, reply: &'r mut [u8; PACKET]) -> Result<&'r [u8], Error> {
+        let deadline = Instant::now() + sent.timeout;
         let length = loop {
-            let length = self.receive(reply, deadline, timeout)?;
+            let length = self.receive(reply, deadline, sent.timeout)?;
             if let Ok((header, _)) = parse_reply_header(&reply[..length])
-                && header.tag == self.tag
+                && header.tag == sent.tag
             {
                 self.freeze_edges = Some(header.freeze_edges);
                 break length;
@@ -442,10 +526,31 @@ impl<T: Transport> Pod<T> {
     }
 }
 
-/// Each chunk's offset, [`MAX_MEMORY_BYTES`] apart, a whole number of
-/// longs, so a chunk never splits an access.
-fn chunks(length: usize) -> impl Iterator<Item = usize> {
-    (0..length).step_by(MAX_MEMORY_BYTES)
+/// A request sent and not yet answered.
+#[derive(Debug, Clone, Copy)]
+struct Sent {
+    /// Its tag, which its reply echoes.
+    tag: u8,
+    /// How long its reply may take, from when the host starts waiting.
+    timeout: Duration,
+}
+
+/// The chunks, a request each, a block of `length` bytes goes in.
+fn chunk_count(length: usize) -> usize {
+    length.div_ceil(MAX_MEMORY_BYTES)
+}
+
+/// The `n`th chunk of a block of `length` bytes: chunks start
+/// [`MAX_MEMORY_BYTES`] apart, a whole number of longs, so a chunk
+/// never splits an access.
+fn chunk(length: usize, n: usize) -> Range<usize> {
+    let start = n * MAX_MEMORY_BYTES;
+    start..length.min(start + MAX_MEMORY_BYTES)
+}
+
+/// A reply body that should be empty.
+fn empty(body: &[u8]) -> Result<(), Error> {
+    if body.is_empty() { Ok(()) } else { Err(ReplyError::Malformed.into()) }
 }
 
 fn at(Address(base): Address, offset: usize) -> Address {
@@ -483,6 +588,7 @@ mod tests {
     use super::Address;
     use super::Atemp;
     use super::Error;
+    use super::IN_FLIGHT;
     use super::Pod;
     use super::Register;
     use super::Size;
@@ -716,6 +822,170 @@ mod tests {
             })
             .collect();
         assert_eq!(lengths, [(Address(0x2000), 56), (Address(0x2038), 56), (Address(0x2070), 18)]);
+    }
+
+    /// What the host did, in order, as [`Queued`] saw it.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    enum Event {
+        /// Sent the request with this tag.
+        Sent(u8),
+        /// Received the reply with this tag.
+        Received(u8),
+    }
+
+    /// A pod that takes requests in order, one at a time, answering
+    /// each only as the host reads, as the pod's writing a reply before
+    /// reading the next request makes it.  A memory read gives each
+    /// byte's address, low 8 bits; a register read its tag; the memory
+    /// request at `fail_at` fails with `NoFreeze`.
+    struct Queued {
+        /// Requests sent and not yet answered, in order.
+        unanswered: VecDeque<Vec<u8>>,
+        /// The host's sends and receives.
+        log: Vec<Event>,
+        /// The address of the memory request that fails.
+        fail_at: Option<Address>,
+        /// The addresses of the memory writes run, in order.
+        written: Vec<Address>,
+    }
+
+    impl Queued {
+        fn new(fail_at: Option<Address>) -> Self {
+            Self { unanswered: VecDeque::new(), log: Vec::new(), fail_at, written: Vec::new() }
+        }
+
+        /// The most requests unanswered at once.
+        fn most_outstanding(&self) -> usize {
+            let (_, most) = self.log.iter().fold((0_usize, 0), |(now, most), event| match event {
+                Event::Sent(_) => (now + 1, most.max(now + 1)),
+                Event::Received(_) => (now - 1, most),
+            });
+            most
+        }
+
+        /// The tags of the requests sent, in order.
+        fn sent(&self) -> Vec<u8> {
+            self.log
+                .iter()
+                .filter_map(|event| match event {
+                    Event::Sent(tag) => Some(*tag),
+                    Event::Received(_) => None,
+                })
+                .collect()
+        }
+    }
+
+    impl Transport for Queued {
+        fn send(&mut self, request: &[u8]) -> Result<(), TransportError> {
+            self.log.push(Event::Sent(request[0]));
+            self.unanswered.push_back(request.to_vec());
+            Ok(())
+        }
+
+        fn receive(&mut self, reply: &mut [u8; PACKET], timeout: Duration) -> Result<usize, TransportError> {
+            let request = self.unanswered.pop_front().ok_or(TransportError::NoReply(timeout))?;
+            let tag = request[0];
+            self.log.push(Event::Received(tag));
+            let (status, body): (Status, Vec<u8>) = match parsed(&request) {
+                Request::ReadMemory { address, .. } | Request::WriteMemory { address, .. }
+                    if Some(address) == self.fail_at =>
+                {
+                    (Status::NoFreeze, Vec::new())
+                }
+                Request::ReadMemory { address: Address(base), length, .. } => {
+                    (Status::Ok, (0..length).map(|n| (base as usize + n) as u8).collect())
+                }
+                Request::WriteMemory { address, .. } => {
+                    self.written.push(address);
+                    (Status::Ok, Vec::new())
+                }
+                Request::ReadRegister(_) => (Status::Ok, u32::from(tag).to_le_bytes().to_vec()),
+                other => panic!("{other:?}"),
+            };
+            let message: Vec<u8> = [tag, 0, status as u8].into_iter().chain(body).collect();
+            reply[..message.len()].copy_from_slice(&message);
+            Ok(message.len())
+        }
+    }
+
+    /// The log of a block of `chunks` requests all answered: `IN_FLIGHT`
+    /// sent, then each reply followed by the next request, if any.
+    fn pipelined(chunks: u8) -> Vec<Event> {
+        let in_flight = u8::try_from(IN_FLIGHT).unwrap();
+        (1..=in_flight.min(chunks))
+            .map(Event::Sent)
+            .chain((1..=chunks).flat_map(|n| {
+                std::iter::once(Event::Received(n))
+                    .chain((n + in_flight <= chunks).then_some(Event::Sent(n + in_flight)))
+            }))
+            .collect()
+    }
+
+    #[test]
+    fn memory_reads_keep_requests_in_flight() {
+        let mut pod = Pod::new(Queued::new(None));
+        let mut data = vec![0; 10 * MAX_MEMORY_BYTES - 4];
+        pod.read_memory(Address(0x1000), Size::Long, &mut data).unwrap();
+        assert!(data.iter().enumerate().all(|(n, b)| *b == (0x1000 + n) as u8));
+        let transport = pod.into_transport();
+        assert_eq!(transport.log, pipelined(10));
+        assert_eq!(transport.most_outstanding(), IN_FLIGHT);
+    }
+
+    #[test]
+    fn memory_writes_keep_requests_in_flight() {
+        let mut pod = Pod::new(Queued::new(None));
+        pod.write_memory(Address(0x2000), Size::Word, &[0; 6 * MAX_MEMORY_BYTES]).unwrap();
+        let transport = pod.into_transport();
+        assert_eq!(transport.log, pipelined(6));
+        assert_eq!(transport.most_outstanding(), IN_FLIGHT);
+        let expected: Vec<_> = (0..6).map(|n| Address(0x2000 + n * 56)).collect();
+        assert_eq!(transport.written, expected);
+    }
+
+    #[test]
+    fn a_block_shorter_than_in_flight_sends_each_chunk_at_once() {
+        let mut pod = Pod::new(Queued::new(None));
+        let mut data = [0; 2 * MAX_MEMORY_BYTES];
+        pod.read_memory(Address(0), Size::Byte, &mut data).unwrap();
+        let log = pod.into_transport().log;
+        assert_eq!(log, [Event::Sent(1), Event::Sent(2), Event::Received(1), Event::Received(2)]);
+    }
+
+    #[test]
+    fn a_failure_mid_block_stops_sending_and_later_exchanges_discard_its_stale_replies() {
+        // The third chunk fails.
+        let mut pod = Pod::new(Queued::new(Some(Address(0x1000 + 2 * 56))));
+        let mut data = vec![0; 10 * MAX_MEMORY_BYTES];
+        assert!(matches!(
+            pod.read_memory(Address(0x1000), Size::Byte, &mut data),
+            Err(Error::Reply(ReplyError::Failed(Status::NoFreeze)))
+        ));
+        let failed_at = 3;
+        let sent_before = failed_at + u8::try_from(IN_FLIGHT).unwrap() - 1;
+        assert_eq!(pod.transport.sent(), (1..=sent_before).collect::<Vec<_>>(), "none after the failure");
+        assert_eq!(pod.transport.unanswered.len(), IN_FLIGHT - 1, "stale, behind the failed one");
+        assert_eq!(pod.read_register(Register::D0).unwrap(), u32::from(sent_before + 1), "its own reply");
+        let after: Vec<_> = pod.transport.log.iter().rev().take(IN_FLIGHT + 1).rev().copied().collect();
+        let expected: Vec<_> = (failed_at + 1..=sent_before)
+            .map(Event::Received)
+            .chain([Event::Received(sent_before + 1)])
+            .collect();
+        assert_eq!(after[1..], expected, "the stale replies, then its own");
+        assert_eq!(after[0], Event::Sent(sent_before + 1));
+    }
+
+    #[test]
+    fn writes_sent_behind_a_failed_one_still_run() {
+        let mut pod = Pod::new(Queued::new(Some(Address(0x2000))));
+        assert!(matches!(
+            pod.write_memory(Address(0x2000), Size::Byte, &[0; 8 * MAX_MEMORY_BYTES]),
+            Err(Error::Reply(ReplyError::Failed(Status::NoFreeze)))
+        ));
+        pod.read_register(Register::D0).unwrap();
+        let expected: Vec<_> =
+            (1..IN_FLIGHT).map(|n| Address(0x2000 + 56 * u32::try_from(n).unwrap())).collect();
+        assert_eq!(pod.into_transport().written, expected);
     }
 
     #[test]

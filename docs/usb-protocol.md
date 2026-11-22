@@ -55,9 +55,18 @@ Stream (Unix or TCP socket):
 
 Either way:
 
-- Strictly one request, then its reply.  The host waits for the reply
-  before sending the next request.  No pipelining, no batching beyond
-  what one request carries (15 raw words, 56 memory bytes).
+- The pod answers requests one at a time, in order: each reply before
+  the next request is read.  A host may send a few requests before
+  reading the first one's reply (the `bdm` host keeps up to 4 memory
+  requests of a block outstanding, `IN_FLIGHT`); the later ones wait
+  in the endpoint or the socket, and the pod starts each as soon as it
+  has written the reply before.  Tags tell their replies apart.  A
+  reply's timeout runs from when the host starts waiting for it, since
+  the pod starts a request no earlier than its reply to the one
+  before.  A host that stops at a failed reply sends nothing more;
+  the requests already sent behind it still run, and their replies,
+  read later, are stale.  No batching beyond what one request carries
+  (15 raw words, 56 memory bytes).
 - Every request but Hello starts with a tag byte, which the reply
   echoes.  A host that gave up waiting for a reply (its timeout, an
   interrupt) may later read it ahead of the next request's: it takes
