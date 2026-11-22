@@ -833,8 +833,11 @@ How to run each item and what to expect: `docs/bring-up.md`.
       a request), the rest the wire.  On an 8.39 MHz target DUMP works at 3 MHz
       and fails at 3.5 MHz (docs/58503a/); a 16.78 MHz target and FILL
       not yet
-- [ ] Load and run a test program from RAM
-- [ ] Flash programming (target-resident algorithm)
+- [x] Load and run a test program from RAM: a loop under gdb, and
+      smartclock's flash routine to its BGND (docs/58503a/)
+- [x] Flash programming (target-resident algorithm): smartclock's
+      flash tool through the Python module, two sector pairs erased,
+      programmed, verified and restored (docs/58503a/)
 - [ ] `Cpu32Target` shared with emulator; run smartclock harness on
       silicon
 
