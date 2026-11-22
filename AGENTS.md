@@ -122,7 +122,8 @@
   without allocation; chip-specific code goes in `firmware/pod-fw/`
   only.
 - No blocking in an async task; long work runs in steps between I/O
-  (a long DUMP/FILL yields between USB packets).
+  (a long DUMP/FILL yields between USB packets).  The one exception:
+  a short word's answer is spun for, at most 50 us (PLAN.md, Firmware).
 
 ## Stack and RAM (no_std)
 
