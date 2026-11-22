@@ -381,7 +381,9 @@ pods apart (`bdm --pod usb:SERIAL`).  Requests:
   or a GO the CPU did not take, with no entry read since.
 - SetClock: DSCLK's rate; the reply gives the rate set, never faster
   than asked and at most 4 MHz until the throughput test measures the
-  margin (`mc683xx-bdm-proto`'s `dsclk::MAX_HZ` has the arithmetic),
+  margin (`mc683xx-bdm-proto`'s `dsclk::MAX_HZ` has the arithmetic, for
+  a 16.78 MHz target; an 8.39 MHz target fails at 3.5 MHz,
+  docs/58503a/),
   and at least 10 kHz (`dsclk::MIN_HZ`): with not-ready waits bounded
   by time as well as NOPs (1000 NOPs or 20 ms, `pod::NOT_READY_*`),
   that bounds every request's time, which the host's timeout covers
@@ -730,7 +732,8 @@ code and no `unsafe`; no USB request, so the protocol is unchanged.
     stop, no scratch, MOVE to SR setting and clearing T1, ORI to SR,
     RTE popping T1, a privilege violation; the unwinding itself on frames
     (`step.rs`'s tests), an interrupt above the trace among them.
-    On silicon not yet.
+    On silicon: a step over a branch and off a breakpoint in RAM
+    (docs/58503a/).
 
 ---
 
@@ -773,10 +776,14 @@ How to run each item and what to expect: `docs/bring-up.md`.
       CSBARBT $0007, CSORBT $7B70 (docs/58503a/)
 - [ ] Write chip-select init; read/write external RAM.  Chip selects
       written and read through (CSBOOT and CS1: a 512 KB flash read
-      back identical to a known image; docs/58503a/); RAM not yet
+      back identical to a known image; docs/58503a/); RAM's chip
+      selects written by hand and a loop run from RAM under gdb
+      (docs/58503a/)
 - [ ] Block DUMP/FILL throughput test; raise DSCLK until it fails,
       back off.  DUMP at 1 MHz: 512 KB of longs in 18.9 s, about
-      28 KB/s
+      28 KB/s, USB-limited.  On an 8.39 MHz target DUMP works at 3 MHz
+      and fails at 3.5 MHz (docs/58503a/); a 16.78 MHz target and FILL
+      not yet
 - [ ] Load and run a test program from RAM
 - [ ] Flash programming (target-resident algorithm)
 - [ ] `Cpu32Target` shared with emulator; run smartclock harness on

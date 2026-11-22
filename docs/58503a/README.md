@@ -25,7 +25,7 @@ straight in.  Buzzed out, power off:
 ## Clock
 
 SYNCR reads $3F08 after reset: the synthesizer from a 32.768 kHz
-reference, 8.39 MHz.  DSCLK at 1 MHz works.
+reference, 8.39 MHz.  DSCLK works up to 3 MHz (DSCLK).
 
 ## After a reset entry
 
@@ -167,15 +167,32 @@ left it refusing commands (illegal command, then unexpected
 responses); `bdm resync` did not clear that, `bdm reset` did
 (2026-11-21).
 
+## Register writes
+
+D0, D7, A0, A6, USP and VBR written with $12345678 read back the same;
+D0 with $DEADBEEF too.  SFC 5 and DFC 3 read back; $12345678 reads back
+0 in SFC and DFC, which hold 3 bits (pod 0.3.0, 2026-11-21).
+
 ## gdb
 
 `bdm gdb` from a reset entry, gdb-multiarch with `set architecture
 m68k:cpu32` and `set endian big`: registers, memory and disassembly of
-the boot code at $550 work; `detach` lets the firmware boot.  Steps and
-RAM breakpoints need the RAM chip selects (CS0, CS2, CS3) and a scratch
-block the firmware does not use.  smartclock's RAM map: $106000 while
-the primary runs (VBR $10000); all of RAM with the firmware stopped;
-not $106000 under the installer.
+the boot code at $550 work; `detach` lets the firmware boot.
+smartclock's RAM map: $106000 while the primary runs (VBR $10000); all
+of RAM with the firmware stopped; not $106000 under the installer.
+
+Breakpoints and steps in RAM, pod 0.3.0 (protocol 11), 2026-11-21:
+`bdm gdb --scratch 0x108000` from a reset entry, the RAM chip selects
+(CS0, CS2, CS3) set as the firmware sets them, the watchdog off, and a
+loop at $100000: `addq.l #1,d0; addq.l #1,d1; bra.s`.
+
+- A breakpoint at $100004 hit twice with `continue`, D0 and D1
+  counting.
+- `stepi` stepped over the `bra.s` and off a breakpoint.
+- A second breakpoint at $100002 hit; `delete` then `kill` left the
+  target halted, the loop's bytes intact.
+- Ctrl-C in gdb during `continue` halted the target ("Program received
+  signal SIGINT"); a `stepi` then worked; `detach` left it running.
 
 Single-step on the running primary, halted at $133EE, scratch $106000,
 SIMCR $414A for the session (2026-11-21): the first `stepi` took a
@@ -191,6 +208,16 @@ error instead: with SIMCR $614A, a read of $110000 (unmapped) replied
 ## Throughput
 
 DUMP at 1 MHz DSCLK: 512 KB of longs in 18.9 s, about 28 KB/s.
+
+## DSCLK
+
+The 512 KB flash (`bdm dump 0 0x80000 --size long`) read the same as at
+1 MHz at 2, 2.5 and 3 MHz: 24.0 s at 1 MHz, 20.8 s at 2 MHz, so
+USB-limited.  At 3.5 and 4 MHz it failed ("unexpected response from
+target"), and only `bdm reset` recovered (`bdm resync` did not) (pod
+0.3.0, protocol 11, 2026-11-21).  The system clock is 8.39 MHz (Clock),
+so MC68331UM Table A-7 allows DSCLK up to 4.19 MHz; 3.5 MHz is about
+83% of that.
 
 ## The six main-board LEDs
 

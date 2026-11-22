@@ -54,12 +54,15 @@ are Rust.
 
 Works, on an MC68331 target: reset into background mode, halt and go,
 registers, memory and SIM register reads, a 512 KB flash read, writes,
-and gdb (registers, memory, disassembly).
+and gdb (registers, memory, disassembly, breakpoints, continue, step,
+Ctrl-C, detach and kill).
 
-Not yet tried on silicon (`TODO.md`): gdb breakpoints, continue and
-step; a flash-programming command (flash has been programmed with
-`bdm write` sequences); the Pico 2 (RP2350) build; DSCLK
-above 4 MHz.
+Not yet tried on silicon (`TODO.md`): a flash-programming command
+(flash has been programmed with `bdm write` sequences); the Pico 2
+(RP2350) build; DSCLK above 4 MHz.
+
+DSCLK is limited to half the target's system clock, which on a slow
+target (`docs/58503a/`) is below the pod's 4 MHz cap.
 
 Known limit: a pod restart (a USB replug, say) during `bdm hold` or in
 the middle of a request can disturb a halted target until `bdm reset`.
