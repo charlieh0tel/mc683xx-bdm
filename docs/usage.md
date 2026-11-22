@@ -67,6 +67,9 @@ shows every register and word byte-reversed: set the endianness.
 - Ctrl-C in gdb halts the target. SIGINT or SIGTERM to `bdm` ends the
   session: breakpoints removed, the target halted, SFC and DFC put
   back, exit status 130 or 143. A second signal exits at once.
+- gdb closing the connection without detaching or killing
+  (`disconnect`, or gdb exiting) ends the session the same way, with
+  exit status 1.
 
 ## Python
 
@@ -122,6 +125,8 @@ with mc683xx_bdm.Pod("usb") as pod:
 released. Ctrl-C (`KeyboardInterrupt`, or any signal handler's
 exception) ends the session, breakpoints removed and the target
 halted, and is raised; a failure to clean up is its `__cause__`.
+gdb closing the connection without detaching or killing ends it the
+same way and raises `TargetError`.
 Python leaves SIGTERM to its default, which ends the process with
 nothing removed: a script that may get one installs a handler that
 raises.

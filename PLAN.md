@@ -709,15 +709,21 @@ code and no `unsafe`; no USB request, so the protocol is unchanged.
     BGND replaced, `bdm` puts back SFC and DFC, and exits 128 plus the
     signal, so no BGND is left in the program.  A second signal
     meanwhile exits at once.  gdb's own Ctrl-C is a byte on its
-    connection, a halt for gdb, not this.  Tested end to end
+    connection, a halt for gdb, not this.  gdb closing its connection
+    without `D` or `k` (`disconnect`, gdb exiting) ends the session at
+    the end of file, halted or running, as an error does: breakpoints
+    removed, the target halted, a connection error returned (`bdm`
+    exits 1, Python raises `TargetError`).  Tested end to end
     (`crates/host/tests/gdb.rs`): the `bdm`
     binary on the model, raw packets on TCP: `?`, `m`, `g`, `s`,
     `Z0`/`z0` and `c` to the breakpoint, Ctrl-C, `D` and `k`, SIGINT
     while running (the breakpoint's word, SFC and DFC back) and SIGTERM
-    waiting for gdb; the same
+    waiting for gdb, and gdb hanging up halted and running (`gdb::serve`
+    in the test); the same
     from Python (`crates/py/tests/test_gdb.py`), with a signal handler's
     exception waiting for gdb and while running, and raised still when
-    cleaning up after it fails (the failure its `__cause__`).
+    cleaning up after it fails (the failure its `__cause__`), and gdb
+    hanging up while running.
   - `step()` is in `Cpu32Target` (mc683xx-target 0.8): from RPC to
     where T1 would trap, before any handler's first instruction, the
     exceptions the instruction raised and an interrupt pending taken
