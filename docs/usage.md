@@ -6,8 +6,9 @@ The pod needs the udev rule `packaging/udev/70-mc683xx-pod.rules`. The
 Debian package installs it; otherwise copy it into
 `/etc/udev/rules.d/` and replug the pod.
 
-The rule gives the pod to the user at the seat (`TAG+="uaccess"`) and
-to group `plugdev`, mode 0660. Uaccess does not reach a login over
+The rule gives the pod, and the Pico's USB bootloader (2e8a:0003,
+2e8a:000f), to the user at the seat (`TAG+="uaccess"`) and to group
+`plugdev`, mode 0660. Uaccess does not reach a login over
 ssh, so add a remote user to the group: `sudo adduser USER plugdev`.
 1209:0001 is pid.codes' shared test pair, so the rule also matches
 anything else that uses it.
@@ -15,7 +16,9 @@ anything else that uses it.
 ## Firmware
 
 `bdm bootsel` reboots the pod into the Pico's bootloader; copy
-`pod-fw-rp2040.uf2` onto the RPI-RP2 drive it mounts. The UF2 is in
+`pod-fw-rp2040.uf2` onto the RPI-RP2 drive it mounts, or, where
+nothing mounts it (a login over ssh), `picotool load -x
+pod-fw-rp2040.uf2`. The UF2 is in
 each GitHub Release and, with the Debian package, at
 `/usr/share/mc683xx-bdm/`. A blank Pico starts in the bootloader. The
 release UF2 is for the Pico; a Pico 2 needs its own build
