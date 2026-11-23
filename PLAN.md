@@ -636,7 +636,8 @@ code and no `unsafe`; no USB request, so the protocol is unchanged.
   target), so Ctrl-C ends it, cleaned up, and is raised.  No board
   setup in it or in `bdm`: a script does that before serving.
 - Linux needs a udev rule for access without root
-  (`packaging/udev/70-mc683xx-pod.rules`, docs/usage.md): uaccess for the
+  (`packaging/udev/70-mc683xx-pod.rules`, docs/usage.md), for the pod
+  and the Pico's bootloader (picotool over ssh): uaccess for the
   user at the seat, and group plugdev, mode 0660, for a login over
   ssh, which uaccess does not reach.
 - Debian package `mc683xx-bdm` (`make deb`): `bdm`, the udev rule and

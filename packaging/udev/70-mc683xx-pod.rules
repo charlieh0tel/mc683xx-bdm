@@ -1,10 +1,14 @@
-# The mc683xx pod (USB 1209:0001), for bdm without root.
+# The mc683xx pod (USB 1209:0001), and the Pico's USB bootloader that
+# `bdm bootsel` reboots it into (2e8a:0003 RP2040, 2e8a:000f RP2350),
+# for bdm and picotool without root.
 #
-# uaccess gives the pod to the user logged in at the machine's seat; it
+# uaccess gives them to the user logged in at the machine's seat; it
 # must run before 73-seat-late.rules, hence 70.  A login over ssh has no
-# seat, so uaccess does nothing for it: the pod is also group plugdev,
+# seat, so uaccess does nothing for it: they are also group plugdev,
 # mode 0660, and a remote user needs `sudo adduser USER plugdev`.
 #
 # 1209:0001 is pid.codes' shared test pair, so this also matches
-# anything else using it.
+# anything else using it; the bootloader lines match every RP2040 and
+# RP2350 in BOOTSEL.
 SUBSYSTEM=="usb", ATTRS{idVendor}=="1209", ATTRS{idProduct}=="0001", TAG+="uaccess", GROUP="plugdev", MODE="0660"
+SUBSYSTEM=="usb", ATTRS{idVendor}=="2e8a", ATTRS{idProduct}=="0003|000f", TAG+="uaccess", GROUP="plugdev", MODE="0660"
