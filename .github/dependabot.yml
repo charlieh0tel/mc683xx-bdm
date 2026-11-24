@@ -3,11 +3,14 @@
 # reads, so it bumps the SHA and the comment together.  deb-workflows'
 # rust-build-deb@v1 is a tag maintained to move, which it leaves alone.
 # Cargo and uv are left out: advisories come from Dependabot alerts,
-# and version bumps alone are noise.
+# and version bumps alone are noise.  ee-tooling.yml is ee_tooling's
+# adopt's, checked against its template: it changes only through adopt.
 version: 2
 updates:
   - package-ecosystem: github-actions
     directory: /
+    exclude-paths:
+      - .github/workflows/ee-tooling.yml
     schedule:
       interval: weekly
     groups:
