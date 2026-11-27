@@ -47,6 +47,11 @@ as picotool shows it; case ignored). `bdm list` opens no pod, so it
 needs no udev rule. `--pod unix:PATH` or `tcp:HOST:PORT` reaches a
 stand-in pod ([development.md](development.md)).
 
+Numbers (addresses, lengths, values, bytes, rates) are decimal, `0x`
+hexadecimal or `0b` binary, with `_` allowed between digits:
+`0xff_fa00`. A decimal number has no leading zero and no sign; `$ff`
+and `0XFF` are refused.
+
 `--fc`, for `dump` and `write`, names the address space:
 `supervisor-data` (the default), `supervisor-program`, `user-data`,
 `user-program` or `cpu-space`, in any case, or its number, 0 to 7.

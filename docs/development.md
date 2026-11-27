@@ -47,6 +47,9 @@ cargo run -p mc683xx-bdm-stand-in -- unix:/tmp/pod.sock &
 cargo run -p mc683xx-bdm --bin bdm -- --pod unix:/tmp/pod.sock reset
 ```
 
+Its model RAM starts at 0x100000; `--ram-base` moves it, a number as
+`bdm` takes one (`--ram-base 0x200000`; bare digits are decimal).
+
 ## Python module
 
 ```

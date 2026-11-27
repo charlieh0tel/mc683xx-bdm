@@ -21,6 +21,7 @@ use mc683xx_bdm_model::board::ModelBoard;
 use mc683xx_bdm_proto::pod::Pod;
 use mc683xx_target::Address;
 use mc683xx_target::Entry;
+use mc683xx_target::parse_integer;
 
 /// The model's RAM, in bytes.
 const RAM: usize = 64 * 1024;
@@ -41,9 +42,9 @@ type ModelPod = Pod<ModelBoard<RAM>>;
 struct Cli {
     /// Where to listen: `unix:PATH` or `tcp:HOST:PORT`.
     listen: String,
-    /// Where the model's 64 KiB of RAM starts; every other address is a
-    /// bus error.
-    #[arg(long, value_parser = parse_address, default_value = "0x100000")]
+    /// Where the model's 64 KiB of RAM starts (decimal, `0x` or `0b`);
+    /// every other address is a bus error.
+    #[arg(long, value_parser = parse_integer::<u32>, default_value = "0x100000")]
     ram_base: u32,
     /// Start with BDM not enabled, as after a reset without BKPT held:
     /// a halt then fails until a reset into background mode.
@@ -52,11 +53,6 @@ struct Cli {
     /// Start halted, before the pod's time: its ATEMP is stale.
     #[arg(long)]
     halted: bool,
-}
-
-fn parse_address(text: &str) -> Result<u32> {
-    let digits = text.strip_prefix("0x").unwrap_or(text);
-    Ok(u32::from_str_radix(digits, 16)?)
 }
 
 /// Serves each connection in its own thread, closing it if another

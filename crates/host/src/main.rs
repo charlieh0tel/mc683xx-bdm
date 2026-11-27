@@ -42,6 +42,7 @@ use mc683xx_target::Entry;
 use mc683xx_target::FunctionCode;
 use mc683xx_target::Register;
 use mc683xx_target::Size;
+use mc683xx_target::parse_integer;
 use signal_hook::consts::SIGINT;
 use signal_hook::consts::SIGTERM;
 use signal_hook::flag;
@@ -80,6 +81,9 @@ const DEFAULT_POD: &str = "usb";
 const VERSION: &str = concat!(env!("CARGO_PKG_VERSION"), " ", env!("GIT_VERSION"));
 
 /// The CPU32 BDM pod (PLAN.md).
+///
+/// Numbers are decimal, `0x` hexadecimal or `0b` binary, with `_`
+/// allowed between digits (`0xff_fa00`).
 #[derive(Debug, Parser)]
 #[command(name = "bdm", version = VERSION)]
 struct Cli {
@@ -93,7 +97,7 @@ struct Cli {
     command: Command,
 }
 
-/// What to do.  Numbers are decimal, or hex with `0x` or `$`.
+/// What to do.
 #[derive(Debug, Subcommand)]
 enum Command {
     /// FREEZE, RESET and DS levels, target VDD, and ATEMP when halted.
@@ -110,12 +114,12 @@ enum Command {
     Go,
     /// Stack RPC and run from ADDRESS.
     Call {
-        #[arg(value_parser = number)]
+        #[arg(value_parser = parse_integer::<u32>)]
         address: u32,
     },
     /// Set DSCLK's rate, or without one show the rate in effect.
     Clock {
-        #[arg(value_parser = number)]
+        #[arg(value_parser = parse_integer::<u32>)]
         hz: Option<u32>,
     },
     /// Every data, address and system register.
@@ -126,14 +130,14 @@ enum Command {
     /// Write a register.
     Set {
         register: String,
-        #[arg(value_parser = number)]
+        #[arg(value_parser = parse_integer::<u32>)]
         value: u32,
     },
     /// Hex dump LENGTH bytes from ADDRESS, or save them raw to a file.
     Dump {
-        #[arg(value_parser = number)]
+        #[arg(value_parser = parse_integer::<u32>)]
         address: u32,
-        #[arg(value_parser = number)]
+        #[arg(value_parser = parse_integer::<u32>)]
         length: u32,
         #[arg(long, value_enum, default_value_t = Width::Word)]
         size: Width,
@@ -149,10 +153,10 @@ enum Command {
     },
     /// Write BYTES at ADDRESS.
     Write {
-        #[arg(value_parser = number)]
+        #[arg(value_parser = parse_integer::<u32>)]
         address: u32,
         /// Bytes, each a number.
-        #[arg(value_parser = byte, required = true)]
+        #[arg(value_parser = parse_integer::<u8>, required = true)]
         bytes: Vec<u8>,
         #[arg(long, value_enum, default_value_t = Width::Byte)]
         size: Width,
@@ -200,13 +204,13 @@ enum Command {
         listen: String,
         /// RAM the program does not use, for a step's exception table
         /// and BGND stub (1026 bytes, even address).
-        #[arg(long, value_parser = number)]
+        #[arg(long, value_parser = parse_integer::<u32>)]
         scratch: u32,
     },
     /// Raw serial words, each answered with the 17 bits shifted in.
     /// With the target running, the clocks are BKPT pulses.
     Xfer {
-        #[arg(value_parser = word, required = true)]
+        #[arg(value_parser = parse_integer::<u16>, required = true)]
         words: Vec<u16>,
     },
 }
@@ -227,23 +231,6 @@ impl From<Width> for Size {
             Width::Long => Self::Long,
         }
     }
-}
-
-fn number(text: &str) -> Result<u32> {
-    let hex = text.strip_prefix("0x").or_else(|| text.strip_prefix("0X")).or_else(|| text.strip_prefix('$'));
-    match hex {
-        Some(digits) => u32::from_str_radix(digits, 16),
-        None => text.parse(),
-    }
-    .with_context(|| format!("not a number: {text}"))
-}
-
-fn byte(text: &str) -> Result<u8> {
-    u8::try_from(number(text)?).with_context(|| format!("not a byte: {text}"))
-}
-
-fn word(text: &str) -> Result<u16> {
-    u16::try_from(number(text)?).with_context(|| format!("not a 16-bit word: {text}"))
 }
 
 /// A hex listing of `data`, read from `address`: `DUMP_LINE` bytes a
@@ -581,16 +568,46 @@ mod tests {
     use super::loopback_mismatch;
     use super::loopback_words;
     use super::message;
-    use super::number;
     use super::save_dump;
     use super::usb_serial;
 
+    /// What `bdm write TEXT 1` takes TEXT for: an address.
+    fn address(text: &str) -> Result<u32, clap::Error> {
+        match Cli::try_parse_from(["bdm", "write", text, "1"])?.command {
+            Command::Write { address, .. } => Ok(address),
+            command => panic!("parsed as {command:?}"),
+        }
+    }
+
     #[test]
-    fn numbers() {
-        assert_eq!(number("42").unwrap(), 42);
-        assert_eq!(number("0xFFFA00").unwrap(), 0x00FF_FA00);
-        assert_eq!(number("$ff").unwrap(), 0xFF);
-        assert!(number("0xG").is_err());
+    fn numbers_are_decimal_hexadecimal_or_binary() {
+        assert_eq!(address("42").unwrap(), 42);
+        assert_eq!(address("0").unwrap(), 0);
+        assert_eq!(address("0xFFFA00").unwrap(), 0x00FF_FA00);
+        assert_eq!(address("0xfffa00").unwrap(), 0x00FF_FA00);
+        assert_eq!(address("0b1010").unwrap(), 10);
+        assert_eq!(address("0x10_0000").unwrap(), 0x0010_0000);
+        assert_eq!(address("1_000").unwrap(), 1000);
+        assert_eq!(address("0xffffffff").unwrap(), u32::MAX);
+        for refused in ["$ff", "0XFF", "010", "+5", "-1", "ff", "0xG", "0x", "1__0", "_1", "0x100000000"] {
+            assert!(address(refused).is_err(), "{refused} taken");
+        }
+    }
+
+    #[test]
+    fn bytes_and_words_are_checked_for_width() {
+        let bytes = |text: &str| match Cli::try_parse_from(["bdm", "write", "0", text])?.command {
+            Command::Write { bytes, .. } => Ok::<_, clap::Error>(bytes),
+            command => panic!("parsed as {command:?}"),
+        };
+        assert_eq!(bytes("0xff").unwrap(), [0xFF]);
+        assert!(bytes("256").is_err());
+        let words = |text: &str| match Cli::try_parse_from(["bdm", "xfer", text])?.command {
+            Command::Xfer { words } => Ok::<_, clap::Error>(words),
+            command => panic!("parsed as {command:?}"),
+        };
+        assert_eq!(words("0xffff").unwrap(), [0xFFFF]);
+        assert!(words("0x10000").is_err());
     }
 
     #[test]
