@@ -168,6 +168,9 @@ pub(crate) enum Ending {
     Detached,
     /// gdb killed the target: it stays halted.
     Killed,
+    /// gdb closed the connection without detaching or killing: its
+    /// breakpoints removed, the target halted.
+    HungUp,
 }
 
 impl From<gdb::Ending> for Ending {
@@ -175,6 +178,7 @@ impl From<gdb::Ending> for Ending {
         match ending {
             gdb::Ending::Detached => Self::Detached,
             gdb::Ending::Killed => Self::Killed,
+            gdb::Ending::HungUp => Self::HungUp,
         }
     }
 }

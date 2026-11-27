@@ -185,7 +185,8 @@ enum Command {
     /// restart, without resetting it.
     Resync,
     /// Serve gdb's remote protocol at LISTEN until gdb detaches (the
-    /// target runs on) or kills (it stays halted): `target remote
+    /// target runs on), kills or hangs up (it stays halted, the
+    /// breakpoints removed): `target remote
     /// HOST:PORT` in an m68k gdb.  Breakpoints are BGND written into
     /// RAM; a step traces through an exception table in SCRATCH.
     /// SIGINT or SIGTERM ends it with the breakpoints removed, the
@@ -507,6 +508,7 @@ fn gdb<T: Transport>(
     match gdb::serve(target, scratch, connection, &check) {
         Ok(Ending::Detached) => writeln!(out, "gdb detached: running")?,
         Ok(Ending::Killed) => writeln!(out, "gdb killed: halted")?,
+        Ok(Ending::HungUp) => writeln!(out, "gdb hung up: breakpoints removed, halted")?,
         Err(ServeError::Host(signal)) => {
             writeln!(out, "gdb ended by {signal}: breakpoints removed, halted")?;
             return Err(signal.into());

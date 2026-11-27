@@ -360,8 +360,8 @@ impl PodView {
 
     /// Serves one gdb session at `address` (`HOST:PORT`, port 0 picks
     /// one) over this pod, as `bdm gdb` does, until gdb detaches (the
-    /// target runs on) or kills the target (it stays halted), and
-    /// returns which.  Breakpoints are BGND written into memory, so RAM
+    /// target runs on), kills the target or hangs up (it stays halted,
+    /// gdb's breakpoints removed), and returns which.  Breakpoints are BGND written into memory, so RAM
     /// only; a step traces through an exception table and BGND stub in
     /// `scratch`, 1026 bytes of RAM at an even address the program does
     /// not use.  `ready(port)` is called once it listens, before gdb

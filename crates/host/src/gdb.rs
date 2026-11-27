@@ -40,6 +40,9 @@ pub enum Ending {
     Detached,
     /// gdb killed the target: it stays halted.
     Killed,
+    /// gdb closed the connection without detaching or killing: its
+    /// breakpoints removed, the target halted.
+    HungUp,
 }
 
 /// The pod's error, or the host's reason to end the session: the
@@ -264,7 +267,7 @@ pub fn accept<'c, E: std::error::Error, C: Fn() -> Result<(), E>>(
 }
 
 /// Serves gdb on `connection` over `target` until gdb detaches (the
-/// target resumed) or kills it (left halted), with `scratch` for its
+/// target resumed), kills it or hangs up (left halted), with `scratch` for its
 /// steps ([`PodTarget::set_scratch`], cleared when the session ends).
 /// `check` is asked whenever the
 /// session waits on gdb or looks at the target running.
@@ -288,6 +291,7 @@ pub fn serve<T: Transport, E: std::error::Error + 'static, C: Fn() -> Result<(),
     match served? {
         mc683xx_gdb::Ending::Detached => Ok(Ending::Detached),
         mc683xx_gdb::Ending::Killed => Ok(Ending::Killed),
+        mc683xx_gdb::Ending::HungUp => Ok(Ending::HungUp),
         other => Err(ServeError::Unknown(format!("{other:?}"))),
     }
 }
