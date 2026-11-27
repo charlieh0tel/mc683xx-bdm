@@ -25,13 +25,13 @@
 - Report a watchdog reset to the host (WATCHDOG's REASON at start,
   say in Pins or Version, and in `bdm pins`): a protocol change, so
   `PROTOCOL_VERSION`, `docs/usb-protocol.md` and `mc683xx-bdm` with it.
-- `bdm load` and `bdm init` over m683xx-emu's `mc683xx-debug` once it
-  lands (PLAN.md, Host); tests against `bdm-stand-in`.  FRZSW is set
+- `bdm load` and `bdm init`: use mc683xx-debug 0.9 for loading and
+  init (PLAN.md, Host); tests against `bdm-stand-in`.  FRZSW is set
   at reset (SIMCR $60CF), but a program may clear it, and then the
   watchdog runs while the CPU is halted: an init script sets it
   again.
-- `monitor init` and `monitor load` in `bdm gdb`, once `mc683xx-debug`
-  is in (PLAN.md, Host, Loading and init).
+- `monitor init` and `monitor load` in `bdm gdb`, over mc683xx-debug
+  0.9 (PLAN.md, Host, Loading and init).
 - The next carrier revision's changes: `hardware/README.md`, Next
   revision.
 - Python bindings (`mc683xx-bdm-py`): `step` (and the scratch area) now that
