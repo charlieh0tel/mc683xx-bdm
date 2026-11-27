@@ -32,6 +32,7 @@ bdm reset                     # reset into background mode
 bdm regs                      # every register
 bdm dump 0xfffa00 64          # memory; --output FILE for raw bytes
 bdm write 0x100000 0x4e 0x71  # bytes; --size word|long
+bdm dump 0 16 --fc user-data  # another address space
 bdm go                        # run from RPC
 bdm halt                      # stop a running target
 bdm reset --run               # reset to run, background mode off
@@ -45,6 +46,10 @@ picks one by the serial number `bdm list` shows (the Pico's unique ID,
 as picotool shows it; case ignored). `bdm list` opens no pod, so it
 needs no udev rule. `--pod unix:PATH` or `tcp:HOST:PORT` reaches a
 stand-in pod ([development.md](development.md)).
+
+`--fc`, for `dump` and `write`, names the address space:
+`supervisor-data` (the default), `supervisor-program`, `user-data`,
+`user-program` or `cpu-space`, in any case, or its number, 0 to 7.
 
 Keep DSCLK at or below about a third of the target's system clock
 ([status.md](status.md)).
