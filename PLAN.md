@@ -673,9 +673,10 @@ code and no `unsafe`; no USB request, so the protocol is unchanged.
   `mc683xx_target::Unsupported`, which a later trait method's default
   body returns; `pod::Error::Unsupported` carries it.
 - Loading and init (agreed with m683xx-emu, 2026-11-01; pending:
-  `mc683xx-debug` has not landed, and neither `bdm load` nor `bdm
-  init` exists yet, TODO.md): `mc683xx-debug`, in m683xx-emu (MIT OR
-  Apache-2.0), over `Cpu32Target`.
+  `mc683xx-debug` 0.9.0 is published on crates.io but not yet used
+  here, and neither `bdm load` nor `bdm init` exists yet, TODO.md):
+  `mc683xx-debug`, in m683xx-emu (MIT OR Apache-2.0), over
+  `Cpu32Target`.
   - Loading: S-records (checksums, S5/S6 counts), ELF32 big-endian
     m68k PT_LOAD segments, and raw binary at an address.  Writes are
     fc 5 by default, word writes with odd-edge bytes, an optional
