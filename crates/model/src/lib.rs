@@ -28,11 +28,11 @@ use core::ops::Range;
 
 use mc683xx_bdm_proto::bdm::byte_count;
 use mc683xx_bdm_proto::session::Link;
-use mc683xx_target::address::Address;
-use mc683xx_target::entry::Entry;
-use mc683xx_target::register::Register;
-use mc683xx_target::register::SystemRegister;
-use mc683xx_target::size::Size;
+use mc683xx_target::Address;
+use mc683xx_target::Entry;
+use mc683xx_target::Register;
+use mc683xx_target::Size;
+use mc683xx_target::SystemRegister;
 
 /// Words the CPU shifts out (CPU32RM Table 7-3).
 const NOT_READY: u32 = 0x1_0000;

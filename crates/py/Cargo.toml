@@ -26,6 +26,6 @@ python = ["dep:pyo3"]
 [dependencies]
 mc683xx-bdm.workspace = true
 mc683xx-bdm-proto.workspace = true
-mc683xx-target = "0.8.0"
+mc683xx-target = "0.9.0"
 pyo3 = { version = "0.30.1", optional = true }
 thiserror = "2.0.21"

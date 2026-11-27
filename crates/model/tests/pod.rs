@@ -25,10 +25,10 @@ use mc683xx_bdm_proto::usb::parse_pins;
 use mc683xx_bdm_proto::usb::parse_reply;
 use mc683xx_bdm_proto::usb::parse_reply_header;
 use mc683xx_bdm_proto::usb::parse_value;
-use mc683xx_target::address::Address;
-use mc683xx_target::entry::Entry;
-use mc683xx_target::register::Register;
-use mc683xx_target::size::Size;
+use mc683xx_target::Address;
+use mc683xx_target::Entry;
+use mc683xx_target::Register;
+use mc683xx_target::Size;
 
 /// The model's RAM: where, and how much.
 const RAM_BASE: u32 = 0x0010_0000;

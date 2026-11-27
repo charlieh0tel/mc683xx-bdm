@@ -21,7 +21,7 @@ use mc683xx_bdm_proto::dsclk::MIN_HZ;
 use mc683xx_bdm_proto::pod::Board;
 use mc683xx_bdm_proto::pod::VddError;
 use mc683xx_bdm_proto::session::Link;
-use mc683xx_target::entry::Entry;
+use mc683xx_target::Entry;
 
 use crate::Target;
 

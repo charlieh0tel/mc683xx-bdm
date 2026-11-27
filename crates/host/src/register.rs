@@ -2,8 +2,8 @@
 //! and written through any [`Cpu32Target`].
 
 use mc683xx_target::Cpu32Target;
-use mc683xx_target::register::Register;
-use mc683xx_target::register::SystemRegister;
+use mc683xx_target::Register;
+use mc683xx_target::SystemRegister;
 
 /// A register by name: a data or address register, or a system
 /// register.
@@ -79,8 +79,8 @@ impl Named {
 
 #[cfg(test)]
 mod tests {
-    use mc683xx_target::register::Register;
-    use mc683xx_target::register::SystemRegister;
+    use mc683xx_target::Register;
+    use mc683xx_target::SystemRegister;
 
     use super::Named;
     use super::UnknownRegister;

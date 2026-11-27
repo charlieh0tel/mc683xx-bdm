@@ -33,10 +33,10 @@ use mc683xx_bdm_proto::usb::parse_reply_header;
 
 use mc683xx_bdm_proto::usb::parse_transfer_reply;
 use mc683xx_bdm_proto::usb::parse_value;
-use mc683xx_target::address::Address;
-use mc683xx_target::register::Register;
-use mc683xx_target::register::SystemRegister;
-use mc683xx_target::size::Size;
+use mc683xx_target::Address;
+use mc683xx_target::Register;
+use mc683xx_target::Size;
+use mc683xx_target::SystemRegister;
 
 use crate::step::StepError;
 use crate::transport::Transport;
@@ -567,7 +567,7 @@ mod tests {
     use mc683xx_bdm_proto::usb::ReplyError;
     use mc683xx_bdm_proto::usb::Request;
     use mc683xx_bdm_proto::usb::Status;
-    use mc683xx_target::entry::Entry;
+    use mc683xx_target::Entry;
 
     use super::Address;
     use super::Atemp;

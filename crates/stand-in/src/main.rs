@@ -19,8 +19,8 @@ use mc683xx_bdm::stand_in::serve;
 use mc683xx_bdm_model::Target;
 use mc683xx_bdm_model::board::ModelBoard;
 use mc683xx_bdm_proto::pod::Pod;
-use mc683xx_target::address::Address;
-use mc683xx_target::entry::Entry;
+use mc683xx_target::Address;
+use mc683xx_target::Entry;
 
 /// The model's RAM, in bytes.
 const RAM: usize = 64 * 1024;

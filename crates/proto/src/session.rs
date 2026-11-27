@@ -8,10 +8,10 @@
 //! "command complete" comes back with the next command's opcode, and is
 //! ignored there.
 
-use mc683xx_target::address::Address;
-use mc683xx_target::register::Register;
-use mc683xx_target::register::SystemRegister;
-use mc683xx_target::size::Size;
+use mc683xx_target::Address;
+use mc683xx_target::Register;
+use mc683xx_target::Size;
+use mc683xx_target::SystemRegister;
 
 use crate::bdm::COMPLETE;
 use crate::bdm::Command;

@@ -36,12 +36,12 @@ use mc683xx_bdm_proto::usb::PROTOCOL_VERSION;
 use mc683xx_bdm_proto::usb::ReplyError;
 use mc683xx_bdm_proto::usb::SERIAL_NUMBER_CHARS;
 use mc683xx_bdm_proto::usb::Status;
+use mc683xx_target::Address;
 use mc683xx_target::Cpu32Target;
-use mc683xx_target::address::Address;
-use mc683xx_target::entry::Entry;
-use mc683xx_target::function_code::FunctionCode;
-use mc683xx_target::register::Register;
-use mc683xx_target::size::Size;
+use mc683xx_target::Entry;
+use mc683xx_target::FunctionCode;
+use mc683xx_target::Register;
+use mc683xx_target::Size;
 use signal_hook::consts::SIGINT;
 use signal_hook::consts::SIGTERM;
 use signal_hook::flag;
@@ -667,8 +667,8 @@ mod tests {
                 command => panic!("parsed as {command:?}"),
             }
         };
-        assert_eq!(fc("5").unwrap(), FunctionCode::SUPERVISOR_DATA);
-        assert_eq!(fc("7").unwrap(), FunctionCode::CPU_SPACE);
+        assert_eq!(fc("5").unwrap(), FunctionCode::SupervisorData);
+        assert_eq!(fc("7").unwrap(), FunctionCode::CpuSpace);
         assert!(fc("8").is_err());
         assert!(fc("0xD").is_err());
     }

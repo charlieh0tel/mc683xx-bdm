@@ -3,12 +3,11 @@
 
 use mc683xx_bdm::gdb;
 use mc683xx_bdm_proto::usb;
-use mc683xx_target::entry;
 use pyo3::pyclass;
 use pyo3::pymethods;
 
 /// Why the CPU entered background mode (Rust's
-/// `mc683xx_target::entry::Entry`; CPU32RM Table 7-2), as the
+/// `mc683xx_target::Entry`; CPU32RM Table 7-2), as the
 /// emulator's `mc683xx.Entry`.
 #[pyclass(module = "mc683xx_bdm", frozen, eq, hash)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -30,18 +29,18 @@ pub(crate) enum Entry {
     },
 }
 
-impl From<entry::Entry> for Entry {
-    fn from(entry: entry::Entry) -> Self {
+impl From<mc683xx_target::Entry> for Entry {
+    fn from(entry: mc683xx_target::Entry) -> Self {
         match entry {
-            entry::Entry::Breakpoint => Self::Breakpoint(),
-            entry::Entry::Background => Self::Background(),
-            entry::Entry::DoubleBusFault { ssw } => Self::DoubleBusFault { ssw },
-            entry::Entry::Unknown { atemp } => Self::Unknown { atemp },
+            mc683xx_target::Entry::Breakpoint => Self::Breakpoint(),
+            mc683xx_target::Entry::Background => Self::Background(),
+            mc683xx_target::Entry::DoubleBusFault { ssw } => Self::DoubleBusFault { ssw },
+            mc683xx_target::Entry::Unknown { atemp } => Self::Unknown { atemp },
         }
     }
 }
 
-impl From<Entry> for entry::Entry {
+impl From<Entry> for mc683xx_target::Entry {
     fn from(entry: Entry) -> Self {
         match entry {
             Entry::Breakpoint() => Self::Breakpoint,
@@ -55,7 +54,7 @@ impl From<Entry> for entry::Entry {
 #[pymethods]
 impl Entry {
     fn __str__(&self) -> String {
-        entry::Entry::from(*self).to_string()
+        mc683xx_target::Entry::from(*self).to_string()
     }
 
     fn __repr__(&self) -> String {

@@ -10,11 +10,11 @@ use mc683xx_bdm_proto::session::Error;
 use mc683xx_bdm_proto::session::Link;
 use mc683xx_bdm_proto::session::NotReadyLimit;
 use mc683xx_bdm_proto::session::Session;
-use mc683xx_target::address::Address;
-use mc683xx_target::entry::Entry;
-use mc683xx_target::register::Register;
-use mc683xx_target::register::SystemRegister;
-use mc683xx_target::size::Size;
+use mc683xx_target::Address;
+use mc683xx_target::Entry;
+use mc683xx_target::Register;
+use mc683xx_target::Size;
+use mc683xx_target::SystemRegister;
 
 /// The model's RAM: where, and how much.
 const RAM_BASE: u32 = 0x0010_0000;
