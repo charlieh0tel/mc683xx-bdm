@@ -71,8 +71,8 @@ shows every register and word byte-reversed: set the endianness.
   session: breakpoints removed, the target halted, SFC and DFC put
   back, exit status 130 or 143. A second signal exits at once.
 - gdb closing the connection without detaching or killing
-  (`disconnect`, or gdb exiting) ends the session the same way, with
-  exit status 1.
+  (`disconnect`, or gdb exiting) ends the session: breakpoints removed,
+  the target halted, SFC and DFC put back, exit status 0.
 
 ## Python
 
@@ -114,7 +114,9 @@ with mc683xx_bdm.Pod("usb") as pod:  # or "usb:SERIAL", "unix:/tmp/pod.sock"
 
 `serve_gdb` serves one gdb session over the open pod, after a script
 has set the target up (chip selects, say). It returns
-`Ending.DETACHED` (running) or `Ending.KILLED` (halted):
+`Ending.DETACHED` (running), `Ending.KILLED` (halted) or
+`Ending.HUNG_UP` (gdb closed the connection without detaching or
+killing; breakpoints removed, halted):
 
 ```python
 with mc683xx_bdm.Pod("usb") as pod:
@@ -128,8 +130,6 @@ with mc683xx_bdm.Pod("usb") as pod:
 released. Ctrl-C (`KeyboardInterrupt`, or any signal handler's
 exception) ends the session, breakpoints removed and the target
 halted, and is raised; a failure to clean up is its `__cause__`.
-gdb closing the connection without detaching or killing ends it the
-same way and raises `TargetError`.
 Python leaves SIGTERM to its default, which ends the process with
 nothing removed: a script that may get one installs a handler that
 raises.

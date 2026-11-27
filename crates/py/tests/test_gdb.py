@@ -15,7 +15,7 @@ from contextlib import contextmanager
 import pytest
 
 from conftest import RAM_BASE, launch
-from mc683xx_bdm import BusError, Ending, Entry, Pod, TargetError, TransportError
+from mc683xx_bdm import BusError, Ending, Entry, Pod, TransportError
 
 # The program, the step's scratch RAM and the supervisor stack.
 PROGRAM = RAM_BASE
@@ -218,8 +218,7 @@ def test_kill_leaves_it_halted(pod):
 def test_hanging_up_while_running_removes_the_breakpoints(pod):
     client = Client([f"Z0,{UNREACHED:x},2", "c!"], then=lambda: time.sleep(RUNNING_S), hang_up=True)
     started = time.monotonic()
-    with pytest.raises(TargetError, match="HungUp"):
-        serve(pod, client)
+    assert serve(pod, client) == Ending.HUNG_UP
     assert time.monotonic() - started < PROMPTLY_S
     assert client.replies == ["OK"]
     assert pod.background is not None, "halted"

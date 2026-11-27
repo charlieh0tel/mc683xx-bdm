@@ -21,7 +21,6 @@ use std::time::Duration;
 use std::time::Instant;
 
 use mc683xx_bdm::gdb;
-use mc683xx_bdm::gdb::ServeError;
 use mc683xx_bdm::pod::Error;
 use mc683xx_bdm::pod::Pod;
 use mc683xx_bdm::stand_in::serve;
@@ -257,6 +256,20 @@ fn kill_leaves_it_halted() {
 }
 
 #[test]
+fn hanging_up_succeeds() {
+    let (bdm, mut gdb, pod) = session("hang-up");
+    assert!(gdb.ask("?").starts_with("T05"));
+    assert_eq!(gdb.ask(&format!("Z0,{UNREACHED:x},2")), "OK");
+    drop(gdb);
+    let (succeeded, printed) = finish(bdm);
+    assert!(succeeded);
+    assert_eq!(printed, "gdb hung up: breakpoints removed, halted\n");
+    assert_eq!(word(&pod, UNREACHED), UNREACHED_WORD);
+    assert!(pod.lock().unwrap().board_mut().target().frozen());
+    assert_eq!(function_codes(&pod), (USER_DATA, USER_DATA), "the program's");
+}
+
+#[test]
 fn sigint_while_running_removes_the_breakpoints() {
     let (bdm, mut gdb, pod) = session("sigint");
     assert!(gdb.ask("?").starts_with("T05"));
@@ -337,7 +350,7 @@ fn hang_up(then: impl FnOnce(&mut Gdb, &Mutex<ModelPod>) + Send + 'static) {
     let connection = gdb::accept("127.0.0.1:0", ready, &check).unwrap();
     let served = gdb::serve(&mut target, Address(SCRATCH), connection, &check);
     client.join().unwrap();
-    assert!(matches!(&served, Err(ServeError::Unknown(ending)) if ending == "HungUp"), "{served:?}");
+    assert!(matches!(served, Ok(gdb::Ending::HungUp)), "{served:?}");
     assert_eq!(word(&pod, UNREACHED), UNREACHED_WORD, "the word BGND replaced");
     assert!(pod.lock().unwrap().board_mut().target().frozen());
     target.restore_function_codes().unwrap();
