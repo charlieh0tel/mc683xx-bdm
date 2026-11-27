@@ -137,9 +137,10 @@ enum Command {
         length: u32,
         #[arg(long, value_enum, default_value_t = Width::Word)]
         size: Width,
-        /// Function code, the address space: 5 supervisor data, 6
-        /// supervisor program, 1 and 2 user, 7 CPU space.
-        #[arg(long, default_value = "5")]
+        /// Function code, the address space, by name or number:
+        /// supervisor-data (5), supervisor-program (6), user-data (1),
+        /// user-program (2), cpu-space (7).
+        #[arg(long, default_value_t = FunctionCode::SupervisorData)]
         fc: FunctionCode,
         /// Write the bytes read to FILE, created or truncated, instead
         /// of the hex listing.
@@ -156,7 +157,7 @@ enum Command {
         #[arg(long, value_enum, default_value_t = Width::Byte)]
         size: Width,
         /// Function code, as for dump.
-        #[arg(long, default_value = "5")]
+        #[arg(long, default_value_t = FunctionCode::SupervisorData)]
         fc: FunctionCode,
     },
     /// With DSI jumpered to DSO (GP3 to GP2) on a bare Pico, no
@@ -669,10 +670,18 @@ mod tests {
                 command => panic!("parsed as {command:?}"),
             }
         };
+        assert_eq!(fc("supervisor-program").unwrap(), FunctionCode::SupervisorProgram);
+        assert_eq!(fc("CPU-Space").unwrap(), FunctionCode::CpuSpace);
         assert_eq!(fc("5").unwrap(), FunctionCode::SupervisorData);
-        assert_eq!(fc("7").unwrap(), FunctionCode::CpuSpace);
+        assert_eq!(fc("0b1").unwrap(), FunctionCode::UserData);
+        assert_eq!(fc("0x7").unwrap(), FunctionCode::CpuSpace);
         assert!(fc("8").is_err());
         assert!(fc("0xD").is_err());
+        assert!(fc("supervisor").is_err());
+        let Command::Dump { fc, .. } = Cli::try_parse_from(["bdm", "dump", "0", "4"]).unwrap().command else {
+            panic!("not a dump");
+        };
+        assert_eq!(fc, FunctionCode::SupervisorData, "the default");
     }
 
     #[test]
