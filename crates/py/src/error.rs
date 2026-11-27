@@ -3,6 +3,7 @@
 
 use mc683xx_bdm::register::UnknownRegister;
 use mc683xx_bdm::transport::TransportError;
+use mc683xx_target::NoFunctionCode;
 
 /// A call that failed: the pod's, or a host's mistake the bindings
 /// refuse.
@@ -18,8 +19,8 @@ pub(crate) enum Error {
     #[error("no {0}-byte access: give 1, 2 or 4")]
     Size(u32),
     /// A function code wider than FC\[2:0\].
-    #[error("no function code {0}: FC[2:0] is 0 to 7")]
-    FunctionCode(u8),
+    #[error(transparent)]
+    FunctionCode(#[from] NoFunctionCode),
     /// A value wider than its access.
     #[error("{value:#x} does not fit {bytes} bytes")]
     Width {

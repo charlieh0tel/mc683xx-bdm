@@ -6,8 +6,8 @@
 //! entered.  MOVEC to or from VBR, which the pod's table would break,
 //! is decoded here to be emulated instead (`VbrMove`).
 
-use mc683xx_target::address::Address;
-use mc683xx_target::register::Register;
+use mc683xx_target::Address;
+use mc683xx_target::Register;
 
 /// SR's trace bits (CPU32RM 2.3.3): T1 traces every instruction, T0
 /// changes of flow.
@@ -329,8 +329,8 @@ pub(crate) fn unwind<E>(
 mod tests {
     use std::convert::Infallible;
 
-    use mc683xx_target::address::Address;
-    use mc683xx_target::register::Register;
+    use mc683xx_target::Address;
+    use mc683xx_target::Register;
 
     use super::Frame;
     use super::SCRATCH_BYTES;

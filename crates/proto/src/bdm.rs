@@ -2,10 +2,10 @@
 //! 7.2.8).  A word is 17 bits: bit 16 is status (from the CPU) or
 //! control (from the host, always clear), bits 15-0 data.
 
-use mc683xx_target::address::Address;
-use mc683xx_target::register::Register;
-use mc683xx_target::register::SystemRegister;
-use mc683xx_target::size::Size;
+use mc683xx_target::Address;
+use mc683xx_target::Register;
+use mc683xx_target::Size;
+use mc683xx_target::SystemRegister;
 
 /// Opcodes, CPU32RM 7.2.8.4-7.2.8.15.  RSREG's figure there prints
 /// 0x2480, the same as WSREG's: a misprint (PLAN.md, Protocol summary).

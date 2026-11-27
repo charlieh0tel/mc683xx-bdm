@@ -17,10 +17,10 @@ use mc683xx_bdm::target::PodTarget;
 use mc683xx_bdm::transport::PodAddress;
 use mc683xx_bdm::transport::Transport;
 use mc683xx_bdm_proto::bdm::byte_count;
+use mc683xx_target::Address;
 use mc683xx_target::Cpu32Target;
-use mc683xx_target::address::Address;
-use mc683xx_target::function_code::FunctionCode;
-use mc683xx_target::register::Register;
+use mc683xx_target::FunctionCode;
+use mc683xx_target::Register;
 use pyo3::Bound;
 use pyo3::Py;
 use pyo3::PyAny;
@@ -48,7 +48,7 @@ type Target = PodTarget<Box<dyn Transport + Send>>;
 
 /// The default function code: supervisor data (CPU32RM Table 5-1), as
 /// `bdm`'s and the emulator's.
-const SUPERVISOR_DATA: u8 = FunctionCode::SUPERVISOR_DATA.get();
+const SUPERVISOR_DATA: u8 = FunctionCode::SupervisorData as u8;
 
 /// The pod (Rust's `PodTarget`), open from construction until `close`,
 /// best used as `with Pod(...) as pod:`; one collected unclosed closes

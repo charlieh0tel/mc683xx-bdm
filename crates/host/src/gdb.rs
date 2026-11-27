@@ -10,19 +10,19 @@ use std::fmt;
 use std::io;
 use std::net::SocketAddr;
 
+use mc683xx_gdb::Bdm;
 use mc683xx_gdb::SessionError;
-use mc683xx_gdb::bdm::Bdm;
 use mc683xx_gdb::connection::PollError;
 use mc683xx_gdb::connection::Polled;
 use mc683xx_gdb::connection::Waiter;
 use mc683xx_gdb::connection::accept_polled;
+use mc683xx_target::Address;
 use mc683xx_target::Cpu32Target;
-use mc683xx_target::address::Address;
-use mc683xx_target::entry::Entry;
-use mc683xx_target::function_code::FunctionCode;
-use mc683xx_target::register::Register;
-use mc683xx_target::register::SystemRegister;
-use mc683xx_target::size::Size;
+use mc683xx_target::Entry;
+use mc683xx_target::FunctionCode;
+use mc683xx_target::Register;
+use mc683xx_target::Size;
+use mc683xx_target::SystemRegister;
 
 use crate::pod;
 use crate::target::PodTarget;
@@ -151,7 +151,7 @@ impl<C> fmt::Debug for Asked<'_, C> {
     }
 }
 
-impl<E, C: Fn() -> Result<(), E>> Waiter for Asked<'_, C> {
+impl<E: std::error::Error, C: Fn() -> Result<(), E>> Waiter for Asked<'_, C> {
     type Error = E;
 
     fn wait<R: Send>(&mut self, wait: impl FnOnce() -> R + Send) -> R {
@@ -252,7 +252,7 @@ impl<T: Transport, E: std::error::Error + 'static, C: Fn() -> Result<(), E>> Cpu
 /// [`ServeError::Listen`] if the listener cannot be bound or the
 /// connection taken; [`ServeError::Host`] with `ready`'s or `check`'s
 /// error.
-pub fn accept<'c, E: fmt::Debug, C: Fn() -> Result<(), E>>(
+pub fn accept<'c, E: std::error::Error, C: Fn() -> Result<(), E>>(
     address: &str,
     ready: impl FnOnce(SocketAddr) -> Result<(), E>,
     check: &'c C,
@@ -298,7 +298,7 @@ mod tests {
 
     use mc683xx_gdb::SessionError;
     use mc683xx_gdb::connection::PollError;
-    use mc683xx_target::address::Address;
+    use mc683xx_target::Address;
 
     use super::ServeError;
     use super::Stopped;

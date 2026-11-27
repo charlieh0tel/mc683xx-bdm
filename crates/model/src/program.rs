@@ -8,10 +8,10 @@
 //! [`RUN_LIMIT`] instructions is a program the model cannot follow: it
 //! is left running, as a CPU running code no one watches.
 
-use mc683xx_target::entry::Entry;
-use mc683xx_target::register::Register;
-use mc683xx_target::register::SystemRegister;
-use mc683xx_target::size::Size;
+use mc683xx_target::Entry;
+use mc683xx_target::Register;
+use mc683xx_target::Size;
+use mc683xx_target::SystemRegister;
 
 use crate::SR_S;
 use crate::Target;

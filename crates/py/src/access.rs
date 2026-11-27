@@ -2,8 +2,8 @@
 //! as a number, and a single value as big-endian bytes.
 
 use mc683xx_bdm_proto::bdm::byte_count;
-use mc683xx_target::function_code::FunctionCode;
-use mc683xx_target::size::Size;
+use mc683xx_target::FunctionCode;
+use mc683xx_target::Size;
 
 use crate::error::Error;
 
@@ -22,7 +22,7 @@ pub(crate) const fn size(bytes: u32) -> Result<Size, Error> {
 
 /// The function code `bits` gives: 0 to 7.
 pub(crate) fn function_code(bits: u8) -> Result<FunctionCode, Error> {
-    FunctionCode::new(bits).ok_or(Error::FunctionCode(bits))
+    Ok(FunctionCode::try_from(bits)?)
 }
 
 /// `value` as one big-endian access of `size`: the bytes, of which the
@@ -45,8 +45,9 @@ pub(crate) fn decode(bytes: &[u8]) -> u32 {
 
 #[cfg(test)]
 mod tests {
-    use mc683xx_target::function_code::FunctionCode;
-    use mc683xx_target::size::Size;
+    use mc683xx_target::FunctionCode;
+    use mc683xx_target::NoFunctionCode;
+    use mc683xx_target::Size;
 
     use super::decode;
     use super::encode;
@@ -66,8 +67,8 @@ mod tests {
 
     #[test]
     fn function_codes_fit_three_bits() {
-        assert_eq!(function_code(6).unwrap(), FunctionCode::SUPERVISOR_PROGRAM);
-        assert!(matches!(function_code(8), Err(Error::FunctionCode(8))));
+        assert_eq!(function_code(6).unwrap(), FunctionCode::SupervisorProgram);
+        assert!(matches!(function_code(8), Err(Error::FunctionCode(NoFunctionCode(8)))));
     }
 
     #[test]

@@ -5,7 +5,6 @@
 use std::convert::Infallible;
 use std::io::BufRead;
 use std::io::BufReader;
-use std::io::ErrorKind;
 use std::io::Read;
 use std::io::Write;
 use std::net::TcpStream;
@@ -31,10 +30,10 @@ use mc683xx_bdm::target::PodTarget;
 use mc683xx_bdm::transport::StreamTransport;
 use mc683xx_bdm_model::Target;
 use mc683xx_bdm_model::board::ModelBoard;
+use mc683xx_target::Address;
 use mc683xx_target::Cpu32Target;
-use mc683xx_target::address::Address;
-use mc683xx_target::register::Register;
-use mc683xx_target::register::SystemRegister;
+use mc683xx_target::Register;
+use mc683xx_target::SystemRegister;
 
 const RAM_BASE: u32 = 0x0010_0000;
 const RAM: usize = 4096;
@@ -338,10 +337,7 @@ fn hang_up(then: impl FnOnce(&mut Gdb, &Mutex<ModelPod>) + Send + 'static) {
     let connection = gdb::accept("127.0.0.1:0", ready, &check).unwrap();
     let served = gdb::serve(&mut target, Address(SCRATCH), connection, &check);
     client.join().unwrap();
-    assert!(
-        matches!(&served, Err(ServeError::Connection(error)) if error.kind() == ErrorKind::UnexpectedEof),
-        "{served:?}"
-    );
+    assert!(matches!(&served, Err(ServeError::Unknown(ending)) if ending == "HungUp"), "{served:?}");
     assert_eq!(word(&pod, UNREACHED), UNREACHED_WORD, "the word BGND replaced");
     assert!(pod.lock().unwrap().board_mut().target().frozen());
     target.restore_function_codes().unwrap();

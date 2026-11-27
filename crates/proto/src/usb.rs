@@ -4,10 +4,10 @@
 //! status, then a body that depends on the request.  Hello alone is
 //! untagged, the same in every protocol version.
 
-use mc683xx_target::address::Address;
-use mc683xx_target::register::Register;
-use mc683xx_target::register::SystemRegister;
-use mc683xx_target::size::Size;
+use mc683xx_target::Address;
+use mc683xx_target::Register;
+use mc683xx_target::Size;
+use mc683xx_target::SystemRegister;
 
 use crate::bdm::byte_count;
 use crate::session;
