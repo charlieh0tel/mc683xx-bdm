@@ -1,3 +1,23 @@
+mc683xx-bdm (0.5.0-1) unstable; urgency=low
+
+  * mc683xx-target and mc683xx-gdb 0.9: memory arguments in the order
+    (address, size, function code, data); FunctionCode from
+    mc683xx-target replaces pod::function_code.
+  * bdm: numbers are decimal, 0x hexadecimal or 0b binary, with _
+    between digits; $hex, 0X, a leading zero and a leading + are
+    refused.  bdm-stand-in --ram-base reads bare digits as decimal.
+  * bdm: --fc takes a function code's name (supervisor-data, ...) or a
+    number, 0-7.
+  * bdm gdb: gdb hanging up ends the session, breakpoints removed and
+    the target halted, with exit status 0.
+  * Python package: serve_gdb returns Ending.HUNG_UP when gdb hangs up;
+    a function code is an int, checked 0-7.
+  * udev rule: the Pico's bootloader too (2e8a:0003, 2e8a:000f), so
+    picotool flashes the pod over ssh after bdm bootsel.
+  * Protocol unchanged (11).
+
+ -- Christopher Hoover <ch@murgatroid.com>  Thu, 26 Nov 2026 23:00:00 -0800
+
 mc683xx-bdm (0.4.0-1) unstable; urgency=low
 
   * Pod: U1 off between requests, so a pod restart (a USB replug)

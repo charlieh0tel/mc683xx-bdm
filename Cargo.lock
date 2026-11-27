@@ -287,7 +287,7 @@ checksum = "0ca88d725a0a943b096803bd34e73a4437208b6077654cc4ecb2947a5f91618d"
 
 [[package]]
 name = "mc683xx-bdm"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "anyhow",
  "clap",
@@ -303,7 +303,7 @@ dependencies = [
 
 [[package]]
 name = "mc683xx-bdm-model"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "embassy-futures",
  "mc683xx-bdm-proto",
@@ -312,7 +312,7 @@ dependencies = [
 
 [[package]]
 name = "mc683xx-bdm-proto"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "embassy-futures",
  "mc683xx-target",
@@ -321,7 +321,7 @@ dependencies = [
 
 [[package]]
 name = "mc683xx-bdm-py"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "mc683xx-bdm",
  "mc683xx-bdm-proto",
@@ -332,7 +332,7 @@ dependencies = [
 
 [[package]]
 name = "mc683xx-bdm-stand-in"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "anyhow",
  "clap",
