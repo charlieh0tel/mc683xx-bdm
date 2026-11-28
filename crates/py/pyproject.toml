@@ -71,3 +71,7 @@ known-first-party = ["mc683xx_bdm", "conftest"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[tool.mypy]
+strict = true
+files = ["python", "tests"]
