@@ -11,10 +11,11 @@ import threading
 import time
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
+from pathlib import Path
 
 import pytest
 
-from conftest import RAM_BASE, launch
+from conftest import RAM_BASE, StandIn, launch
 from mc683xx_bdm import BusError, Ending, Entry, Pod, TransportError
 
 # The program, the step's scratch RAM and the supervisor stack.
@@ -137,7 +138,7 @@ def load(pod: Pod) -> None:
 
 
 @pytest.fixture
-def pod(stand_in) -> Iterator[Pod]:
+def pod(stand_in: StandIn) -> Iterator[Pod]:
     """A pod on a stand-in, halted at PROGRAM with CODE there."""
     with Pod(stand_in()) as pod:
         load(pod)
@@ -173,7 +174,7 @@ def alarm(first: Callable[[], None] = lambda: None) -> Iterator[Callable[[], Non
         signal.signal(signal.SIGALRM, previous)
 
 
-def test_step_break_continue_interrupt_and_detach(pod):
+def test_step_break_continue_interrupt_and_detach(pod: Pod) -> None:
     client = Client(
         [
             "?",
@@ -209,13 +210,13 @@ def test_step_break_continue_interrupt_and_detach(pod):
     assert pod.read_register("D1") == 0xFFFFFFFF
 
 
-def test_kill_leaves_it_halted(pod):
+def test_kill_leaves_it_halted(pod: Pod) -> None:
     client = Client(["?", "k!"])
     assert serve(pod, client) == Ending.KILLED
     assert pod.background is not None
 
 
-def test_hanging_up_while_running_removes_the_breakpoints(pod):
+def test_hanging_up_while_running_removes_the_breakpoints(pod: Pod) -> None:
     client = Client([f"Z0,{UNREACHED:x},2", "c!"], then=lambda: time.sleep(RUNNING_S), hang_up=True)
     started = time.monotonic()
     assert serve(pod, client) == Ending.HUNG_UP
@@ -225,20 +226,20 @@ def test_hanging_up_while_running_removes_the_breakpoints(pod):
     assert pod.read_memory(UNREACHED, 2, size=2) == UNREACHED_WORD, "BGND gone"
 
 
-def test_the_pod_is_the_caller_s_again_after_a_session(pod):
+def test_the_pod_is_the_caller_s_again_after_a_session(pod: Pod) -> None:
     serve(pod, Client(["D"]))
     pod.halt()
     pod.write_register("PC", PROGRAM)
     assert serve(pod, Client(["g", "D"])) == Ending.DETACHED
 
 
-def test_a_signal_ends_the_wait_for_gdb(pod):
+def test_a_signal_ends_the_wait_for_gdb(pod: Pod) -> None:
     with alarm() as send, pytest.raises(Alarm):
         pod.serve_gdb("127.0.0.1:0", ready=lambda port: send(), scratch=SCRATCH)
     assert pod.read_register("PC") == PROGRAM, "untouched, and the pod free"
 
 
-def test_a_signal_while_running_removes_the_breakpoints(pod):
+def test_a_signal_while_running_removes_the_breakpoints(pod: Pod) -> None:
     with alarm() as send:
 
         def signal_when_running() -> None:
@@ -255,7 +256,7 @@ def test_a_signal_while_running_removes_the_breakpoints(pod):
     assert pod.read_memory(UNREACHED, 2, size=2) == UNREACHED_WORD, "BGND gone"
 
 
-def test_a_signal_whose_clean_up_fails_is_raised(stand_in_binary, socket_dir):
+def test_a_signal_whose_clean_up_fails_is_raised(stand_in_binary: Path, socket_dir: Path) -> None:
     socket = socket_dir / "pod.sock"
     process = launch(stand_in_binary, socket)
 
@@ -281,7 +282,7 @@ def test_a_signal_whose_clean_up_fails_is_raised(stand_in_binary, socket_dir):
         lose_the_pod()
 
 
-def test_ready_s_exception_is_raised(pod):
+def test_ready_s_exception_is_raised(pod: Pod) -> None:
     def ready(port: int) -> None:
         raise ValueError(f"not now, {port}")
 
@@ -289,12 +290,12 @@ def test_ready_s_exception_is_raised(pod):
         pod.serve_gdb("127.0.0.1:0", ready=ready, scratch=SCRATCH)
 
 
-def test_an_address_that_cannot_be_bound_is_an_os_error(pod):
+def test_an_address_that_cannot_be_bound_is_an_os_error(pod: Pod) -> None:
     with pytest.raises(OSError, match=re.escape("listening for gdb on 256.0.0.1:0")):
         pod.serve_gdb("256.0.0.1:0", scratch=SCRATCH)
 
 
-def test_scratch_is_required_and_a_closed_pod_refuses(pod):
+def test_scratch_is_required_and_a_closed_pod_refuses(pod: Pod) -> None:
     with pytest.raises(TypeError, match="scratch"):
         pod.serve_gdb("127.0.0.1:0")  # type: ignore[call-arg]
     pod.close()
@@ -302,7 +303,7 @@ def test_scratch_is_required_and_a_closed_pod_refuses(pod):
         pod.serve_gdb("127.0.0.1:0", scratch=SCRATCH)
 
 
-def test_the_pod_s_error_is_raised_as_any_call_s(pod):
+def test_the_pod_s_error_is_raised_as_any_call_s(pod: Pod) -> None:
     client = Client(["s", "D"])
     try:
         with pytest.raises(BusError):

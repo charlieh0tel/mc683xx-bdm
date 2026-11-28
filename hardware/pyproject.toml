@@ -10,6 +10,7 @@ dependencies = []
 [dependency-groups]
 dev = [
     "ee-tooling",
+    "mypy>=2.4.1",
     "pytest>=9.2.0",
     "ruff>=0.17.3",
 ]
@@ -28,3 +29,12 @@ select = ["E", "F", "W", "I", "UP", "B", "RUF"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
+
+[tool.mypy]
+strict = true
+files = ["fastcheck.py", "tests"]
+
+[[tool.mypy.overrides]]
+# KiCad's, in the system Python, without stubs.
+module = ["pcbnew"]
+ignore_missing_imports = true

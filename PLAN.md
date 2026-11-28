@@ -625,8 +625,8 @@ code and no `unsafe`; no USB request, so the protocol is unchanged.
   (AGENTS.md, Python) rather than a Makefile's venv.  `make lint` runs
   clippy with `python`, ruff and pytest against `bdm-stand-in`, mypy's
   stubtest of the stubs against the module (allowlist:
-  `stubtest-allowlist.txt`, the compiled submodule) and mypy on the
-  tests; mypy is a dev dependency only, as in cpu32-py.
+  `stubtest-allowlist.txt`, the compiled submodule) and mypy, strict,
+  on the stubs and tests; mypy is a dev dependency only, as in cpu32-py.
   `Pod.serve_gdb(address="127.0.0.1:1234", ready=None, *, scratch)`
   is `bdm gdb` from a script (Host, gdb): cpu32-py's `serve_gdb`
   signature, with `scratch` added and keyword-only, since the pod has

@@ -6,8 +6,9 @@ import subprocess
 import sys
 import tempfile
 import time
-from collections.abc import Callable, Iterator
+from collections.abc import Iterator
 from pathlib import Path
+from typing import Protocol
 
 import pytest
 
@@ -22,6 +23,13 @@ LISTEN_POLL_S = 0.01
 # on macOS (SUN_LEN), shorter than its per-user temporary directory's
 # tmp_path.
 SOCKET_ROOT = "/tmp"
+
+
+class StandIn(Protocol):
+    """The `stand_in` fixture: starts a stand-in with bdm-stand-in's
+    options and returns its pod name."""
+
+    def __call__(self, *options: str) -> str: ...
 
 
 @pytest.fixture
@@ -74,7 +82,7 @@ def launch(binary: Path, socket: Path, *options: str) -> subprocess.Popen[bytes]
 
 
 @pytest.fixture
-def stand_in(stand_in_binary: Path, socket_dir: Path) -> Iterator[Callable[..., str]]:
+def stand_in(stand_in_binary: Path, socket_dir: Path) -> Iterator[StandIn]:
     """Starts a stand-in with bdm-stand-in's options; returns its pod
     name, `unix:PATH`.  Each is stopped when the test ends."""
     processes: list[subprocess.Popen[bytes]] = []

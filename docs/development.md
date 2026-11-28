@@ -60,7 +60,8 @@ uv build --wheel
 ```
 
 `make lint` checks `python/mc683xx_bdm/__init__.pyi` against the module
-with mypy's stubtest.
+with mypy's stubtest, and runs mypy, strict (`pyproject.toml`), on
+the stubs and tests.
 
 ## Debian package
 

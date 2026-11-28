@@ -7,11 +7,12 @@ import re
 import socket
 import struct
 import threading
+from pathlib import Path
 
 import pytest
 
 import mc683xx_bdm
-from conftest import RAM_BASE, RAM_BYTES
+from conftest import RAM_BASE, RAM_BYTES, StandIn
 from mc683xx_bdm import Atemp, Entry, Pod
 
 # Function codes (CPU32RM Table 5-1).
@@ -28,7 +29,7 @@ OK = 0
 DEFAULT_HZ = 1_000_000
 
 
-def test_a_session(stand_in):
+def test_a_session(stand_in: StandIn) -> None:
     with Pod(stand_in()) as pod:
         assert pod.hello() == mc683xx_bdm.PROTOCOL_VERSION
         assert pod.reset_with_breakpoint() == Entry.Breakpoint()
@@ -55,7 +56,7 @@ def test_a_session(stand_in):
         assert registers["RPC"] == RAM_BASE
 
 
-def test_the_pod_stays_open_across_calls(stand_in):
+def test_the_pod_stays_open_across_calls(stand_in: StandIn) -> None:
     pod = Pod(stand_in())
     pod.reset_with_breakpoint()
     for value in range(64):
@@ -69,7 +70,7 @@ def test_the_pod_stays_open_across_calls(stand_in):
         pod.hello()
 
 
-def test_memory_in_every_size(stand_in):
+def test_memory_in_every_size(stand_in: StandIn) -> None:
     with Pod(stand_in()) as pod:
         pod.reset_with_breakpoint()
         data = bytes(range(200))
@@ -84,7 +85,7 @@ def test_memory_in_every_size(stand_in):
             pod.read_memory(RAM_BASE, 3, size=3)
 
 
-def test_single_accesses_are_big_endian(stand_in):
+def test_single_accesses_are_big_endian(stand_in: StandIn) -> None:
     with Pod(stand_in()) as pod:
         pod.reset_with_breakpoint()
         pod.bus_write(RAM_BASE, 4, 0x12345678)
@@ -96,7 +97,7 @@ def test_single_accesses_are_big_endian(stand_in):
             pod.bus_write(RAM_BASE, 1, 0x100)
 
 
-def test_function_codes_are_restored(stand_in):
+def test_function_codes_are_restored(stand_in: StandIn) -> None:
     pod_name = stand_in()
     with Pod(pod_name) as pod:
         pod.reset_with_breakpoint()
@@ -113,7 +114,7 @@ def test_function_codes_are_restored(stand_in):
         assert pod.read_register("DFC") == USER_DATA, "put back by close"
 
 
-def test_a_pod_collected_unclosed_closes_itself_and_warns(stand_in):
+def test_a_pod_collected_unclosed_closes_itself_and_warns(stand_in: StandIn) -> None:
     pod_name = stand_in()
     pod = Pod(pod_name)
     pod.reset_with_breakpoint()
@@ -127,7 +128,7 @@ def test_a_pod_collected_unclosed_closes_itself_and_warns(stand_in):
         assert pod.read_register("SFC") == USER_DATA, "put back as close does"
 
 
-def test_go_then_poll_then_halt(stand_in):
+def test_go_then_poll_then_halt(stand_in: StandIn) -> None:
     with Pod(stand_in()) as pod:
         assert pod.reset_with_breakpoint() == Entry.Breakpoint()
         assert pod.background == Entry.Breakpoint()
@@ -145,7 +146,7 @@ def test_go_then_poll_then_halt(stand_in):
         assert pod.background is None
 
 
-def test_pins_and_version(stand_in):
+def test_pins_and_version(stand_in: StandIn) -> None:
     with Pod(stand_in()) as pod:
         pod.reset_with_breakpoint()
         pins = pod.pins()
@@ -157,7 +158,7 @@ def test_pins_and_version(stand_in):
         assert pod.version()
 
 
-def test_a_bus_error_raises_bus_error(stand_in):
+def test_a_bus_error_raises_bus_error(stand_in: StandIn) -> None:
     with Pod(stand_in()) as pod:
         pod.reset_with_breakpoint()
         with pytest.raises(mc683xx_bdm.BusError):
@@ -165,14 +166,14 @@ def test_a_bus_error_raises_bus_error(stand_in):
         assert pod.read_memory(RAM_BASE + RAM_BYTES - 2, 2) == b"\x00\x00", "works after"
 
 
-def test_halt_without_background_mode_enabled(stand_in):
+def test_halt_without_background_mode_enabled(stand_in: StandIn) -> None:
     with Pod(stand_in("--no-bdm")) as pod:
         with pytest.raises(mc683xx_bdm.TargetError):
             pod.halt()
         assert pod.reset_with_breakpoint() == Entry.Breakpoint()
 
 
-def test_a_halt_the_pod_did_not_see_is_unknown(stand_in):
+def test_a_halt_the_pod_did_not_see_is_unknown(stand_in: StandIn) -> None:
     with Pod(stand_in("--halted")) as pod:
         entry = pod.background
         assert isinstance(entry, Entry.Unknown)
@@ -180,7 +181,7 @@ def test_a_halt_the_pod_did_not_see_is_unknown(stand_in):
         assert isinstance(pod.resync(), Atemp.Stale)
 
 
-def test_clock_and_raw_transfer(stand_in):
+def test_clock_and_raw_transfer(stand_in: StandIn) -> None:
     with Pod(stand_in()) as pod:
         pod.reset_with_breakpoint()
         assert pod.get_clock() == DEFAULT_HZ
@@ -191,14 +192,14 @@ def test_clock_and_raw_transfer(stand_in):
             pod.transfer([0x10000])
 
 
-def test_entries_read_as_the_emulators():
+def test_entries_read_as_the_emulators() -> None:
     assert str(Entry.Breakpoint()) == "breakpoint"
     assert repr(Entry.DoubleBusFault(ssw=0x1234)) == "Entry.DoubleBusFault(ssw=0x1234)"
     assert Entry.Unknown(atemp=3) == Entry.Unknown(atemp=3)
     assert len({Entry.Background(), Entry.Background()}) == 1
 
 
-def test_bad_names_are_value_errors(stand_in):
+def test_bad_names_are_value_errors(stand_in: StandIn) -> None:
     with pytest.raises(ValueError, match="usb, usb:SERIAL, unix:PATH or tcp:HOST:PORT"):
         Pod("serial:/dev/ttyACM0")
     with Pod(stand_in()) as pod:
@@ -207,7 +208,7 @@ def test_bad_names_are_value_errors(stand_in):
             pod.read_register("D8")
 
 
-def test_no_pod_is_a_transport_error(socket_dir):
+def test_no_pod_is_a_transport_error(socket_dir: Path) -> None:
     with pytest.raises(mc683xx_bdm.TransportError) as raised:
         Pod(f"unix:{socket_dir / 'none.sock'}")
     assert isinstance(raised.value, OSError)
@@ -228,16 +229,16 @@ def clock_reply(tag: int) -> bytes:
     return bytes([len(reply)]) + reply
 
 
-def test_the_gil_is_released_while_waiting_on_the_pod(socket_dir):
+def test_the_gil_is_released_while_waiting_on_the_pod(socket_dir: Path) -> None:
     """A pod answered by a Python thread: it can answer only if the
     calls release the GIL while they wait, or they time out."""
     path = str(socket_dir / "python.sock")
     listener = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
     listener.bind(path)
     listener.listen(1)
-    requests = []
+    requests: list[bytes] = []
 
-    def serve():
+    def serve() -> None:
         connection, _ = listener.accept()
         with connection:
             while length := connection.recv(1):

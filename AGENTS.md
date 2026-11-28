@@ -155,6 +155,7 @@
 - After code changes and before commits, run `uv run ruff format`, `uv run ruff check`, `uv run pytest`, and any configured type checks. Fix failures before committing.
 - Be Pythonic: comprehensions, `with`, unpacking, `dict.get`, `any`/`all`,
   and the stdlib before a hand-rolled helper.
+- Use typing and mypy (strict).
 
 ## GitHub
 
